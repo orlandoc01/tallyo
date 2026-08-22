@@ -1,0 +1,440 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+ * Color theme CSS variables — one class on <html> drives the entire palette.
+ * Teal is the default (applied when no color-* class is present).
+ * Switching themes only adds/removes a single class; all Tailwind brand-*
+ * utilities resolve through these variables automatically. */
+
+:root,
+html.color-teal {
+  /* Teal (default) */
+  --brand-50-lt:  240 253 250;
+  --brand-100-lt: 204 251 241;
+  --brand-50:  var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  --brand-200: 153 246 228;
+  --brand-300: 94 234 212;
+  --brand-400: 45 212 191;
+  --brand-500: 20 184 166;
+  --brand-600: 13 148 136;
+  --brand-700: 15 118 110;
+  --brand-800: 17 94 89;
+  --brand-900: 19 78 74;
+  --paper:     242 250 249;
+  --text-primary: 82 82 82;
+  /* Dark-mode surface overrides for brand-50 and brand-100 */
+  --brand-50-dk:  4 47 46;
+  --brand-100-dk: 10 63 60;
+}
+
+html.color-indigo {
+  --brand-50-lt:  238 242 255;
+  --brand-100-lt: 224 231 255;
+  --brand-50:  var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  --brand-200: 199 210 254;
+  --brand-300: 165 180 252;
+  --brand-400: 129 140 248;
+  --brand-500: 99 102 241;
+  --brand-600: 79 70 229;
+  --brand-700: 67 56 202;
+  --brand-800: 55 48 163;
+  --brand-900: 49 46 129;
+  --paper:     245 245 251;
+  --brand-50-dk:  30 27 75;
+  --brand-100-dk: 49 46 129;
+}
+
+html.color-orange {
+  --brand-50-lt:  255 247 237;
+  --brand-100-lt: 255 237 213;
+  --brand-50:  var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  --brand-200: 254 215 170;
+  --brand-300: 253 186 116;
+  --brand-400: 251 146 60;
+  --brand-500: 249 115 22;
+  --brand-600: 234 88 12;
+  --brand-700: 194 65 12;
+  --brand-800: 154 52 18;
+  --brand-900: 124 45 18;
+  --paper:     250 246 240;
+  --brand-50-dk:  45 19 8;
+  --brand-100-dk: 124 45 18;
+}
+
+html.color-azure {
+  --brand-50-lt:  240 249 255;
+  --brand-100-lt: 224 242 254;
+  --brand-50:  var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  --brand-200: 186 230 253;
+  --brand-300: 125 211 252;
+  --brand-400: 56 189 248;
+  --brand-500: 14 165 233;
+  --brand-600: 2 132 199;
+  --brand-700: 3 105 161;
+  --brand-800: 7 89 133;
+  --brand-900: 12 74 110;
+  --paper:     240 248 255;
+  --brand-50-dk:  8 47 73;
+  --brand-100-dk: 12 74 110;
+}
+
+html.color-maroon {
+  --brand-50-lt:  255 241 242;
+  --brand-100-lt: 255 228 230;
+  --brand-50:  var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  --brand-200: 254 205 211;
+  --brand-300: 253 164 175;
+  --brand-400: 251 113 133;
+  --brand-500: 225 29 72;
+  --brand-600: 190 18 60;
+  --brand-700: 159 18 57;
+  --brand-800: 136 19 55;
+  --brand-900: 76 5 25;
+  --paper:     255 245 246;
+  --brand-50-dk:  48 4 20;
+  --brand-100-dk: 76 5 25;
+}
+
+:root {
+  color: rgb(var(--text-primary));
+  background: rgb(var(--paper));
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mobile bottom nav positioning lock (issues #17, #52, #62, #78).
+ *
+ * The mobile bottom nav has regressed 4+ times with the same symptom: the bar
+ * "floats to the center" on mobile because `position: fixed` quietly stops
+ * pinning to the viewport. Past fixes (portal to <body>, inline styles) each
+ * patched one failure mode but left others reachable. These rules are the
+ * floor that catches every remaining mode at once:
+ *
+ *   1. `.mobile-bottom-nav { position: fixed !important; bottom/left/right: 0
+ *      !important; top: auto !important }` makes the positioning unreachable
+ *      from inline `style={...}` and from any utility class — only another
+ *      `!important` declaration with equal or higher specificity could win.
+ *   2. `top: auto !important` prevents a stray `top: ...` from stretching the
+ *      bar to fill the viewport (which visually reads as "floating up").
+ *   3. `transform: none !important` on `html, body` prevents any descendant
+ *      utility (`scale-*`, `translate-*`, `rotate-*`, `backdrop-blur-*`, etc.)
+ *      from ever being applied to the root containers — those CSS properties
+ *      establish a new containing block, which would make `position: fixed`
+ *      resolve relative to the transformed ancestor instead of the viewport
+ *      and the nav would scroll with the page.
+ *
+ * Do not relax these without re-reading the four prior issues. The companion
+ * regression test in `App.integration.test.tsx` (`mobile bottom nav
+ * positioning on <route>`) asserts the matching DOM invariants. */
+html,
+body {
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  backdrop-filter: none !important;
+  contain: none !important;
+  will-change: auto !important;
+}
+
+.mobile-bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  width: 100vw !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #737373 !important;
+}
+
+/* Light theme foreground: keep strong text readable without near-black weight. */
+html:not(.dark) .text-neutral-950,
+html:not(.dark) .text-neutral-900,
+html:not(.dark) .text-neutral-800,
+html:not(.dark) .text-neutral-700,
+html:not(.dark) .hover\:text-neutral-950:hover,
+html:not(.dark) .hover\:text-neutral-900:hover,
+html:not(.dark) .hover\:text-neutral-800:hover,
+html:not(.dark) .hover\:text-neutral-700:hover {
+  color: rgb(var(--text-primary));
+}
+
+.recharts-wrapper *:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Setup wizard: always render in light mode regardless of dark/theme state.
+ * html.dark .setup-light .* has one more class than html.dark .*, so it wins. */
+html.dark .setup-light {
+  --brand-50: var(--brand-50-lt);
+  --brand-100: var(--brand-100-lt);
+  color-scheme: light;
+  color: rgb(var(--text-primary));
+  background: rgb(var(--paper));
+}
+html.dark .setup-light .bg-paper      { background-color: rgb(var(--paper)); }
+html.dark .setup-light .bg-white      { background-color: #ffffff; }
+html.dark .setup-light .bg-neutral-50 { background-color: #fafafa; }
+html.dark .setup-light .bg-brand-50   { background-color: rgb(var(--brand-50)); }
+html.dark .setup-light .bg-brand-100  { background-color: rgb(var(--brand-100)); }
+html.dark .setup-light .bg-red-50     { background-color: #fef2f2; }
+html.dark .setup-light .bg-amber-50   { background-color: #fffbeb; }
+html.dark .setup-light .bg-orange-50  { background-color: #fff7ed; }
+html.dark .setup-light .text-neutral-950 { color: rgb(var(--text-primary)); }
+html.dark .setup-light .text-neutral-900 { color: rgb(var(--text-primary)); }
+html.dark .setup-light .text-neutral-800 { color: rgb(var(--text-primary)); }
+html.dark .setup-light .text-neutral-700 { color: rgb(var(--text-primary)); }
+html.dark .setup-light .text-neutral-600 { color: #525252; }
+html.dark .setup-light .text-neutral-500 { color: #737373; }
+html.dark .setup-light .text-neutral-400 { color: #a3a3a3; }
+html.dark .setup-light .text-red-600    { color: #dc2626; }
+html.dark .setup-light .text-red-700    { color: #b91c1c; }
+html.dark .setup-light .text-red-800    { color: #991b1b; }
+html.dark .setup-light .text-amber-600  { color: #d97706; }
+html.dark .setup-light .text-amber-700  { color: #b45309; }
+html.dark .setup-light .text-amber-800  { color: #92400e; }
+html.dark .setup-light .text-amber-900  { color: #78350f; }
+html.dark .setup-light .text-orange-600 { color: #ea580c; }
+html.dark .setup-light .text-orange-700 { color: #c2410c; }
+html.dark .setup-light .text-orange-800 { color: #9a3412; }
+html.dark .setup-light .text-orange-900 { color: #7c2d12; }
+html.dark .setup-light .border-red-200    { border-color: #fecaca; }
+html.dark .setup-light .border-amber-200  { border-color: #fde68a; }
+html.dark .setup-light .border-orange-200 { border-color: #fed7aa; }
+html.dark .setup-light input,
+html.dark .setup-light select,
+html.dark .setup-light textarea {
+  background-color: #ffffff;
+  color: #171717;
+}
+
+/* Dark mode overrides — html.dark has higher specificity than Tailwind utilities */
+html.dark {
+  --brand-50: var(--brand-50-dk);
+  --brand-100: var(--brand-100-dk);
+  --text-primary-dark: 196 191 185;
+  --text-secondary-dark: 168 162 158;
+  color-scheme: dark;
+  background: #0f0f14;
+  /* Softer base text — keeps body copy from glaring near-white against the dark bg */
+  color: rgb(var(--text-secondary-dark));
+}
+
+/* Backgrounds */
+html.dark .bg-white        { background-color: #1c1b1a; }
+html.dark .bg-white\/90    { background-color: rgb(28 27 26 / 0.9); }
+html.dark .bg-paper        { background-color: #0f0f14; }
+html.dark .bg-neutral-50   { background-color: #242321; }
+html.dark .bg-neutral-100  { background-color: #2a2928; }
+/* Active nav item, selected theme button, role badges — theme-aware via CSS variables.
+   html.dark swaps brand-50/100 so opacity variants like bg-brand-50/70 stay muted too. */
+html.dark .bg-brand-50     { background-color: rgb(var(--brand-50-dk)); }
+html.dark .bg-brand-100    { background-color: rgb(var(--brand-100-dk)); }
+/* Pill/badge light backgrounds + cash flow breakdown fill bars */
+html.dark .bg-emerald-50   { background-color: #052e16; }
+html.dark .bg-emerald-100  { background-color: #064e3b; }
+html.dark .bg-red-50       { background-color: #321414; }
+html.dark .bg-red-100      { background-color: #3f0d0d; }
+html.dark .bg-amber-50     { background-color: #2f2410; }
+html.dark .bg-amber-100    { background-color: #3f2d0d; }
+html.dark .bg-orange-50    { background-color: #341b0d; }
+html.dark .bg-orange-100   { background-color: #431407; }
+html.dark .bg-blue-100     { background-color: #0f1e3a; }
+html.dark .bg-violet-100   { background-color: #2e1065; }
+
+/* Text — graded from heading-bright down to muted, none near pure white */
+html.dark .text-neutral-950,
+html.dark .text-neutral-900,
+html.dark .text-neutral-800,
+html.dark .dark\:text-neutral-950,
+html.dark .dark\:text-neutral-900,
+html.dark .dark\:text-neutral-800,
+html.dark .dark\:text-neutral-50,
+html.dark .dark\:text-neutral-100,
+html.dark .dark\:hover\:text-neutral-950:hover,
+html.dark .dark\:hover\:text-neutral-900:hover,
+html.dark .dark\:hover\:text-neutral-800:hover,
+html.dark .dark\:hover\:text-neutral-50:hover,
+html.dark .dark\:hover\:text-neutral-100:hover {
+  color: rgb(var(--text-primary-dark));
+}
+html.dark .text-neutral-700,
+html.dark .text-neutral-600,
+html.dark .dark\:text-neutral-700,
+html.dark .dark\:text-neutral-600,
+html.dark .dark\:text-neutral-200,
+html.dark .dark\:text-neutral-300,
+html.dark .dark\:hover\:text-neutral-700:hover,
+html.dark .dark\:hover\:text-neutral-600:hover,
+html.dark .dark\:hover\:text-neutral-200:hover,
+html.dark .dark\:hover\:text-neutral-300:hover {
+  color: rgb(var(--text-secondary-dark));
+}
+html.dark .text-neutral-500,
+html.dark .dark\:text-neutral-500,
+html.dark .dark\:hover\:text-neutral-500:hover { color: #8d8780; }
+html.dark .text-neutral-400,
+html.dark .dark\:text-neutral-400,
+html.dark .dark\:hover\:text-neutral-400:hover { color: #6b655f; }
+html.dark .text-red-600,
+html.dark .text-red-700,
+html.dark .text-red-800,
+html.dark .dark\:text-red-600,
+html.dark .dark\:text-red-700,
+html.dark .dark\:text-red-800 { color: #fca5a5; }
+html.dark .text-amber-600,
+html.dark .text-amber-700,
+html.dark .text-amber-800,
+html.dark .text-amber-900,
+html.dark .dark\:text-amber-600,
+html.dark .dark\:text-amber-700,
+html.dark .dark\:text-amber-800,
+html.dark .dark\:text-amber-900 { color: #fcd34d; }
+html.dark .text-orange-600,
+html.dark .text-orange-700,
+html.dark .text-orange-800,
+html.dark .text-orange-900,
+html.dark .dark\:text-orange-600,
+html.dark .dark\:text-orange-700,
+html.dark .dark\:text-orange-800,
+html.dark .dark\:text-orange-900 { color: #fdba74; }
+
+/* Borders */
+html.dark .border-neutral-200  { border-color: #292524; }
+html.dark .border-neutral-100  { border-color: #1c1b1a; }
+
+/* Dividers — match the border overrides so divide-y lines look the same as borders in dark mode */
+html.dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: #292524; }
+html.dark .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1c1b1a; }
+html.dark .border-neutral-300  { border-color: #44403c; }
+html.dark .border-emerald-200  { border-color: #064e3b; }
+/* Soft-red danger borders — muted so the outline/separator doesn't glare white */
+html.dark .border-red-200      { border-color: #5e2a2a; }
+html.dark .border-red-100      { border-color: #382020; }
+html.dark .border-amber-200    { border-color: #5c4314; }
+html.dark .border-orange-200   { border-color: #5f3215; }
+
+/* Hover states */
+html.dark .hover\:bg-neutral-50:hover  { background-color: #242321; }
+html.dark .hover\:bg-neutral-100:hover { background-color: #2a2928; }
+html.dark .hover\:bg-red-50:hover      { background-color: #3b0505; }
+
+/* Form controls */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1c1b1a;
+  color: rgb(var(--text-primary-dark));
+}
+
+html.dark input:disabled,
+html.dark select:disabled,
+html.dark textarea:disabled {
+  background-color: #242321;
+  border-color: #292524;
+  color: #8d8780;
+  opacity: 1;
+}
+
+/* Card shadow */
+html.dark .shadow-card {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
+}
+
+/* Recharts: dim grid lines and lighten axis labels to match the surrounding text */
+html.dark .recharts-cartesian-grid line { stroke: #292524; }
+html.dark .recharts-cartesian-axis-tick-value { fill: rgb(var(--text-secondary-dark)); }
+
+/* Dark mode: Recharts default tooltip */
+html.dark .recharts-default-tooltip {
+  background-color: #1c1b1a !important;
+  border-color: #292524 !important;
+}
+html.dark .recharts-tooltip-label,
+html.dark .recharts-tooltip-item {
+  color: #bdb8b2 !important;
+}
+
+/* Category-colored trends bars and lines: drop to 30% so they read as muted as the
+   breakdown bars do on mobile. Cash flow bars (deep solid colors to match their
+   breakdown) and the comparison chart opt out below. */
+html.dark .recharts-bar-rectangle path,
+html.dark .recharts-bar-rectangle rect,
+html.dark .recharts-curve,
+html.dark .recharts-line-dots circle {
+  opacity: 0.3;
+}
+html.dark .trends-chart .recharts-bar-rectangle path,
+html.dark .trends-chart .recharts-bar-rectangle rect,
+html.dark .trends-chart .recharts-curve,
+html.dark .trends-chart .recharts-line-dots circle,
+html.dark .cashflow-chart .recharts-bar-rectangle path,
+html.dark .cashflow-chart .recharts-bar-rectangle rect {
+  opacity: 1;
+}
+html.dark .cashflow-chart .recharts-curve {
+  opacity: 0.4;
+}
+html.dark .cashflow-chart .recharts-line-dots circle,
+html.dark .cashflow-chart .recharts-reference-line line {
+  opacity: 1;
+}
+
+/* Mobile: brighter colors for the trends stacked bar chart */
+@media (max-width: 1023px) {
+  html.dark .cashflow-chart .recharts-bar-rectangle path,
+  html.dark .cashflow-chart .recharts-bar-rectangle rect {
+    opacity: 1;
+  }
+
+  html.dark .cashflow-chart .recharts-curve {
+    opacity: 0.75;
+  }
+
+  html.dark .cashflow-chart .recharts-line-dots circle,
+  html.dark .cashflow-chart .recharts-reference-line line {
+    opacity: 1;
+  }
+
+}
+
+/* Spending comparison custom dot: white fill → surface color */
+html.dark [fill="white"] { fill: #1c1b1a; }

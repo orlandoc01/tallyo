@@ -1,0 +1,17 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - dupl
+    - errorlint
+    - modernize
+    - thelper
+    - unparam
+  exclusions:
+    generated: lax
+    paths:
+      - internal/database/dbgen/
+      - internal/graph/generated.go
+      - internal/graph/model/models_gen.go

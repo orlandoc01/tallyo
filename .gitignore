@@ -1,0 +1,12 @@
+data/
+env.local
+*.db
+*.db-*
+node_modules/
+.cache/
+web/dist/**
+!web/dist/.gitkeep
+web/coverage/
+web/test-results/
+web/issues/*
+.claude/settings.local.json

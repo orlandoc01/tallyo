@@ -1,0 +1,121 @@
+# =============================================================================
+# Budgets domain — per-category monthly budget targets and reporting.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+"""A single per-category budget target for a given month."""
+type Budget implements Node {
+  id: ID!
+  month: String!
+  category: Category!
+  amount: Money!
+}
+
+"""A budget line for one category — budgeted vs actual for the month."""
+type BudgetLine {
+  """The budget row ID; null when only actuals exist (no budget target set)."""
+  id: ID
+  category: Category!
+  budgeted: Money!
+  actual: Money!
+  remaining: Money!
+}
+
+"""A budget section grouped by category group."""
+type BudgetSection {
+  label: String!
+  group: CategoryGroup!
+  budgeted: Money!
+  actual: Money!
+  remaining: Money!
+  lines: [BudgetLine!]!
+}
+
+"""Budget report for a single month with section-level rollups."""
+type BudgetReport {
+  month: String!
+  expensesBudgeted: Money!
+  expensesActual: Money!
+  incomeBudgeted: Money!
+  incomeActual: Money!
+  remainingBudgeted: Money!
+  remainingActual: Money!
+  sections: [BudgetSection!]!
+}
+
+"""Budget report history, ordered by month descending."""
+type BudgetReportHistory {
+  items: [BudgetReport!]!
+}
+
+# -----------------------------------------------------------------------------
+# Query Inputs
+# -----------------------------------------------------------------------------
+
+input BudgetReportInput {
+  """Month in YYYY-MM format."""
+  month: String!
+}
+
+input BudgetReportHistoryInput {
+  """Start month in YYYY-MM format, inclusive."""
+  startMonth: String
+
+  """End month in YYYY-MM format, exclusive."""
+  endMonth: String
+}
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+extend type Query {
+  """Aggregate budget totals for months with budget history."""
+  budgetReportHistory(input: BudgetReportHistoryInput): BudgetReportHistory!
+    @requiresScope(scope: "read:budgets")
+
+  """Budget report for a month, grouped by category group with actual-vs-budgeted lines."""
+  budgetReport(input: BudgetReportInput!): BudgetReport!
+    @requiresScope(scope: "read:budgets")
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Inputs / Payloads
+# -----------------------------------------------------------------------------
+
+input SetBudgetInput {
+  month: String!
+  categoryId: ID!
+  amount: Money!
+}
+type SetBudgetPayload { budget: Budget! }
+
+input DeleteBudgetInput {
+  id: ID!
+}
+type DeleteBudgetPayload { success: Boolean! }
+
+input CopyBudgetsInput {
+  fromMonth: String!
+  toMonth: String!
+}
+type CopyBudgetsPayload { copiedCount: Int! }
+
+# -----------------------------------------------------------------------------
+# Mutations
+# -----------------------------------------------------------------------------
+
+extend type Mutation {
+  setBudget(input: SetBudgetInput!): SetBudgetPayload!
+    @requiresScope(scope: "write:budgets")
+
+  deleteBudget(input: DeleteBudgetInput!): DeleteBudgetPayload!
+    @requiresScope(scope: "write:budgets")
+
+  """Copy all category budgets from one month to another, skipping existing rows."""
+  copyBudgets(input: CopyBudgetsInput!): CopyBudgetsPayload!
+    @requiresScope(scope: "write:budgets")
+}

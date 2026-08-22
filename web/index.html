@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f2faf9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Spending" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Tallyo</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      ;(function () {
+        var t = localStorage.getItem('tallyo-theme')
+        var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+        var themes = ['teal', 'indigo', 'orange', 'azure', 'maroon']
+        var stored = localStorage.getItem('tallyo-color-theme')
+        var ct = themes.indexOf(stored) !== -1 ? stored : 'teal'
+        document.documentElement.classList.add('color-' + ct)
+        var touchIcon = document.querySelector('link[rel="apple-touch-icon"]')
+        if (touchIcon) touchIcon.href = '/apple-touch-icon-' + ct + '.png'
+      })()
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

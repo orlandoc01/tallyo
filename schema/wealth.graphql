@@ -1,0 +1,486 @@
+# =============================================================================
+# Wealth domain — assets, holdings, net worth, manual snapshots,
+# and balance sync.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Enums
+# -----------------------------------------------------------------------------
+
+enum AssetClassifier {
+  CASH
+  PUBLIC
+  COMPANY_EQUITY
+  CRYPTOCURRENCY
+  STABLECOIN
+  REAL_ESTATE
+}
+
+enum AssetType {
+  CURRENCY
+  SECURITY
+  CRYPTO
+  REAL_ESTATE
+  OTHER
+}
+
+enum AssetSourceAdapter { PLAID SIMPLEFIN DEBANK }
+
+enum NetWorthRange {
+  ONE_MONTH
+  THREE_MONTH
+  YTD
+  ONE_YEAR
+  ALL
+}
+
+enum ConnectivityStatus {
+  HEALTHY
+  NOT_FOUND
+  IGNORE
+}
+
+enum BalanceReviewDecision {
+  IN_REVIEW
+  APPROVED_CHANGES
+}
+
+enum BalanceReviewAction {
+  APPROVE_CHANGES
+  USE_PROVIDER
+}
+
+enum LiabilityCategory { CARD MORTGAGE LOAN OTHER }
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+type Address {
+  street: String
+  city: String
+  state: String
+  zip: String
+  homeType: String
+}
+
+"""Type-specific details for a real-estate asset."""
+type RealEstateAssetDetails {
+  address: Address!
+}
+
+"""
+Discriminated union of type-specific asset details.
+The `assetType` field on the parent `Asset` determines which variant is returned,
+or null when the asset has no side-table (e.g. CURRENCY).
+"""
+union AssetDetails = RealEstateAssetDetails
+
+"""Wealth-owned property details exposed on account records."""
+union AccountWealthProperty = RealEstateAssetDetails
+
+type Asset implements Node {
+  id: ID!
+  assetType: AssetType!
+  identifier: String!
+  name: String
+  classifier: AssetClassifier!
+  currentPrice: Float
+  details: AssetDetails
+  """Fixed USD price per unit, overriding live price. May be negative for contra-assets."""
+  forcedUsdPrice: Float
+  """Ticker used for Yahoo price lookups. Falls back to identifier when null."""
+  trackingTicker: String
+  """Multiplier applied to the tracking ticker's price. Default 1."""
+  trackingMultiplier: Float!
+  priceConnectivity: ConnectivityStatus!
+  "Provider-side IDs this asset is tracked by, across all integrations."
+  adapterSources: [AssetAdapterSource!]!
+  """Computed current position across accounts. Null when the asset is not held."""
+  latestSnapshot: AssetSnapshot
+    @requiresScope(scope: "read:assets")
+}
+
+"""Computed current-position projection for one asset. Not persisted; no Node ID."""
+type AssetSnapshot {
+  """Latest contributing account snapshot date; older accounts carry forward."""
+  asOfDate: Date!
+  """Null when any contributing provider supplies valuation without quantity."""
+  totalHeldQuantity: Float
+  totalHeldValueUSD: Money!
+  holdings: [Holding!]
+    @requiresScope(scope: "read:holdings")
+}
+
+type AssetAdapterSource {
+  sourceAdapter: AssetSourceAdapter!
+  sourceId: String!
+}
+
+"""Live price quote for a single ticker."""
+type AssetQuote {
+  ticker: String!
+  priceUSD: Float!
+  asOf: DateTime!
+}
+
+type Holding {
+  assetId: ID!
+  asset: Asset!
+  accountId: ID!
+  account: Account!
+  """May be null when a provider supplies valuation without quantity."""
+  quantity: Float
+  valueUSD: Money!
+  """True for user-managed snapshot holdings."""
+  manual: Boolean!
+}
+
+type HoldingRollup {
+  asset: Asset!
+  """Null when any contributing provider supplies valuation without quantity."""
+  totalQuantity: Float
+  valueUSD: Money!
+  percentOfClassifier: Float!
+  holdings: [Holding!]
+    @requiresScope(scope: "read:holdings")
+}
+
+type NetWorthPoint {
+  date: Date!
+  totalAssetsUSD: Money!
+  totalLiabilitiesUSD: Money!
+  netWorthUSD: Money!
+}
+
+"""One data point in the historical per-classifier asset series."""
+type ClassifierHistoryPoint {
+  date: Date!
+  classifier: AssetClassifier!
+  """Human-readable label, e.g. Public Assets."""
+  label: String!
+  valueUSD: Money!
+}
+
+"""One data point in the historical per-category liability series."""
+type LiabilityHistoryPoint {
+  date: Date!
+  category: LiabilityCategory!
+  """Human-readable label, e.g. Credit Card."""
+  label: String!
+  """Negative USD value representing the liability amount."""
+  valueUSD: Money!
+}
+
+type ClassifierBreakdown {
+  classifier: AssetClassifier!
+  label: String!
+  valueUSD: Money!
+  percentOfAssets: Float!
+  assetCount: Int!
+  holdings: [HoldingRollup!]!
+}
+
+type LiabilityBreakdown {
+  category: LiabilityCategory!
+  label: String!
+  valueUSD: Money!
+  percentOfLiabilities: Float!
+  accountCount: Int!
+  accounts: [Account!]!
+}
+
+type NetWorthReport {
+  asOfDate: Date
+  currentNetWorthUSD: Money!
+  currentAssetsUSD: Money!
+  currentLiabilitiesUSD: Money!
+  classifierBreakdown: [ClassifierBreakdown!]!
+  liabilityBreakdown: [LiabilityBreakdown!]!
+}
+
+"""Historical net worth and per-classifier breakdown over a date range."""
+type HistoricalNetWorthReport {
+  """Net worth time series over the requested range."""
+  series: [NetWorthPoint!]!
+  """Per-classifier asset value series over the requested range."""
+  classifierSeries: [ClassifierHistoryPoint!]!
+  """Per-category liability value series over the requested range."""
+  liabilitySeries: [LiabilityHistoryPoint!]!
+}
+
+"""A flagged balance snapshot review for a single account."""
+type BalanceSnapshotReview implements Node {
+  id: ID!
+  account: Account!
+  firstFlaggedDate: Date!
+  latestFlaggedDate: Date!
+  flaggedSnapshotCount: Int!
+  providerBalanceUSD: Money!
+  carryForwardBalanceUSD: Money!
+  flagReason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type BalanceSnapshotReviewList { items: [BalanceSnapshotReview!]! }
+
+"""A single stored balance snapshot for one account on one local day, with per-asset holdings."""
+type AccountSnapshot implements Node {
+  id: ID!
+  """Owning account ID."""
+  accountId: ID!
+  """Local-timezone day this snapshot represents (YYYY-MM-DD)."""
+  date: Date!
+  """Stored total balance in USD for countable holdings in the snapshot."""
+  balanceUSD: Money!
+  """Sign-aware account value for this snapshot: assets are positive, liabilities negative."""
+  netContributionUSD: Money!
+  """Per-asset breakdown, including the CASH (USD) line."""
+  holdings: [Holding!]
+    @requiresScope(scope: "read:holdings")
+  """True when this snapshot is currently flagged by spike protection."""
+  flagged: Boolean!
+}
+
+type AccountSnapshotConnection {
+  edges: [AccountSnapshotEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type AccountSnapshotEdge {
+  node: AccountSnapshot!
+  cursor: String!
+}
+
+# -----------------------------------------------------------------------------
+# Account extensions (wealth fields added to the accounts-domain Account type)
+# -----------------------------------------------------------------------------
+
+extend type Account {
+  """Most recent account snapshot, including the per-asset holdings captured for that local day."""
+  latestSnapshot: AccountSnapshot
+    @requiresScope(scope: "read:wealth")
+  """Wealth-owned property details for PROPERTY accounts backed by linked assets."""
+  accountWealthProperty: AccountWealthProperty
+    @requiresScope(scope: "read:wealth")
+}
+
+# -----------------------------------------------------------------------------
+# Query Inputs
+# -----------------------------------------------------------------------------
+
+input NetWorthInput {
+  ownerIds: [ID!]
+  accountIds: [ID!]
+}
+
+input HistoricalNetWorthInput {
+  range: NetWorthRange!
+  granularity: Granularity
+  filters: NetWorthInput
+}
+
+input AssetsInput {
+  assetType: AssetType
+  priceConnectivity: ConnectivityStatus
+  includeHistorical: Boolean = false
+  """Full-text query matched against asset identifier and name; results are ranked by relevance."""
+  search: String
+}
+
+input AccountSnapshotInput {
+  """Resolve a specific snapshot row directly by its ID."""
+  snapshotId: ID
+  """Resolve by account. With date: latest snapshot on that local day. Without date: most recent snapshot."""
+  accountId: ID
+  """Local-timezone day (YYYY-MM-DD). Optional; omit for most recent."""
+  date: Date
+}
+
+input AccountSnapshotsInput {
+  accountId: ID!
+  first: Int
+  after: String
+}
+
+input SnapshotHoldingInput {
+  assetId: ID!
+  """New quantity. For cash this is the USD amount."""
+  quantity: Float
+  """New USD value for the holding line."""
+  valueUSD: Money!
+}
+
+type AssetList { items: [Asset!]! }
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+extend type Query {
+  """Current household net worth snapshot with breakdowns. Closed accounts are excluded."""
+  netWorth(input: NetWorthInput!): NetWorthReport!
+    @requiresScope(scope: "read:wealth")
+
+  """Historical net worth and per-classifier allocation series. Closed accounts contribute only through their closure date."""
+  historicalNetWorth(input: HistoricalNetWorthInput!): HistoricalNetWorthReport!
+    @requiresScope(scope: "read:wealth")
+
+  """Live price quote for a security ticker."""
+  assetQuote(ticker: String!): AssetQuote!
+    @requiresScope(scope: "read:assets")
+
+  """Assets with optional connectivity-status and text-search filtering."""
+  assets(input: AssetsInput): AssetList!
+    @requiresScope(scope: "read:assets")
+
+  """Pending balance snapshot reviews."""
+  balanceSnapshotReviews: BalanceSnapshotReviewList!
+    @requiresScope(scope: "read:wealth")
+
+  """Read one balance snapshot by ID, or by account and optional local date."""
+  accountSnapshot(input: AccountSnapshotInput!): AccountSnapshot
+    @requiresScope(scope: "read:wealth")
+
+  """Paginated account snapshots, newest first, one per local day."""
+  accountSnapshots(input: AccountSnapshotsInput!): AccountSnapshotConnection!
+    @requiresScope(scope: "read:wealth")
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Inputs / Payloads
+# -----------------------------------------------------------------------------
+
+# Asset
+
+input UpdateSecurityAssetInput {
+  cusip: String
+  isin: String
+}
+
+input CreateSecurityAssetInput {
+  cusip: String
+  isin: String
+}
+
+input CreateAssetInput {
+  assetType: AssetType!
+  identifier: String!
+  name: String
+  classifier: AssetClassifier!
+  """Fixed USD price per unit."""
+  forcedUsdPrice: Float
+  trackingTicker: String
+  trackingMultiplier: Float
+  security: CreateSecurityAssetInput
+}
+
+type CreateAssetPayload { asset: Asset! }
+
+input UpdateAssetInput {
+  id: ID!
+  identifier: String
+  name: String
+  classifier: AssetClassifier
+  """When false, clear any forced USD price. When true, forcedUsdPrice must be provided."""
+  forcePrice: Boolean
+  """Fixed USD price per unit."""
+  forcedUsdPrice: Float
+  trackingTicker: String
+  trackingMultiplier: Float
+  priceConnectivity: ConnectivityStatus
+  security: UpdateSecurityAssetInput
+}
+type UpdateAssetPayload { asset: Asset! }
+
+input MergeAssetInput {
+  "Identifies the adapter-source row to re-point (currently on the duplicate)."
+  sourceAdapter: AssetSourceAdapter!
+  sourceId: String!
+  "The surviving asset that absorbs the duplicate."
+  assetId: ID!
+}
+
+type MergeAssetPayload { asset: Asset! }
+
+input LinkRealEstateInput {
+  street: String
+  city: String
+  state: String
+  zip: String
+  homeType: String
+  ownerId: ID!
+  label: String
+  manualValuationUSD: Money!
+}
+type LinkRealEstatePayload {
+  connection: Connection!
+  account: Account!
+  valuationUSD: Money!
+}
+
+input UpdateRealEstateInput {
+  connectionId: ID!
+  name: String
+  street: String
+  city: String
+  state: String
+  zip: String
+  homeType: String
+  valuationUSD: Money
+}
+type UpdateRealEstatePayload { account: Account! }
+
+input ResolveBalanceReviewInput {
+  id: ID!
+  """APPROVE_CHANGES keeps carry-forward; USE_PROVIDER restores provider data."""
+  action: BalanceReviewAction!
+}
+
+type ResolveBalanceReviewPayload { success: Boolean! }
+
+input ChangeAccountSnapshotInput {
+  """Snapshot ID returned by accountSnapshot(); updated in place."""
+  snapshotId: ID!
+  """Full replacement holdings set. Include 0-quantity lines to zero an asset."""
+  holdings: [SnapshotHoldingInput!]!
+}
+
+type ChangeAccountSnapshotPayload {
+  snapshot: AccountSnapshot!
+  """The refreshed account, so clients can update net worth and holdings views."""
+  account: Account!
+}
+
+# -----------------------------------------------------------------------------
+# Mutations
+# -----------------------------------------------------------------------------
+
+extend type Mutation {
+  """Create a user-managed asset catalog row."""
+  createAsset(input: CreateAssetInput!): CreateAssetPayload!
+    @requiresScope(scope: "write:assets")
+
+  """Edit an asset's shared fields and type-specific details."""
+  updateAsset(input: UpdateAssetInput!): UpdateAssetPayload!
+    @requiresScope(scope: "write:assets")
+
+  mergeAsset(input: MergeAssetInput!): MergeAssetPayload!
+    @requiresScope(scope: "write:assets")
+
+  linkRealEstate(input: LinkRealEstateInput!): LinkRealEstatePayload!
+    @requiresScope(scope: "write:accounts")
+  updateRealEstate(input: UpdateRealEstateInput!): UpdateRealEstatePayload!
+    @requiresScope(scope: "write:accounts")
+  unlinkRealEstate(id: ID!): Boolean!
+    @requiresScope(scope: "write:accounts")
+
+  resolveBalanceReview(input: ResolveBalanceReviewInput!): ResolveBalanceReviewPayload!
+    @requiresScope(scope: "write:wealth")
+
+  """Overwrite a snapshot's balance and holdings in place."""
+  changeAccountSnapshot(input: ChangeAccountSnapshotInput!): ChangeAccountSnapshotPayload!
+    @requiresScope(scope: "write:wealth")
+}

@@ -1,0 +1,136 @@
+morningstar_category,category_group,asset_class
+Large Value,US Equity,Equity
+Large Blend,US Equity,Equity
+Large Growth,US Equity,Equity
+Mid-Cap Value,US Equity,Equity
+Mid-Cap Blend,US Equity,Equity
+Mid-Cap Growth,US Equity,Equity
+Small Value,US Equity,Equity
+Small Blend,US Equity,Equity
+Small Growth,US Equity,Equity
+Communications,Sector Equity,Equity
+Consumer Cyclical,Sector Equity,Equity
+Consumer Defensive,Sector Equity,Equity
+Energy Limited Partnership,Sector Equity,Equity
+Equity Energy,Sector Equity,Equity
+Equity Precious Metals,Sector Equity,Equity
+Financial,Sector Equity,Equity
+Global Real Estate,Sector Equity,Equity
+Health,Sector Equity,Equity
+Industrials,Sector Equity,Equity
+Infrastructure,Sector Equity,Equity
+Natural Resources,Sector Equity,Equity
+Real Estate,Sector Equity,Equity
+Technology,Sector Equity,Equity
+Utilities,Sector Equity,Equity
+Miscellaneous Sector,Sector Equity,Equity
+Conservative Allocation,Allocation,Allocation
+Moderately Conservative Allocation,Allocation,Allocation
+Moderate Allocation,Allocation,Allocation
+Moderately Aggressive Allocation,Allocation,Allocation
+Aggressive Allocation,Allocation,Allocation
+Global Conservative Allocation,Allocation,Allocation
+Global Moderately Conservative Allocation,Allocation,Allocation
+Global Moderate Allocation,Allocation,Allocation
+Global Moderately Aggressive Allocation,Allocation,Allocation
+Global Aggressive Allocation,Allocation,Allocation
+Convertibles,Allocation,Allocation
+Tactical Allocation,Allocation,Allocation
+Target-Date 2000-2010,Allocation,Allocation
+Target-Date 2015,Allocation,Allocation
+Target-Date 2020,Allocation,Allocation
+Target-Date 2025,Allocation,Allocation
+Target-Date 2030,Allocation,Allocation
+Target-Date 2035,Allocation,Allocation
+Target-Date 2040,Allocation,Allocation
+Target-Date 2045,Allocation,Allocation
+Target-Date 2050,Allocation,Allocation
+Target-Date 2055,Allocation,Allocation
+Target-Date 2060,Allocation,Allocation
+Target-Date 2065+,Allocation,Allocation
+Target-Date Retirement,Allocation,Allocation
+Miscellaneous Allocation,Allocation,Allocation
+Foreign Large Value,International Equity,Equity
+Foreign Large Blend,International Equity,Equity
+Foreign Large Growth,International Equity,Equity
+Foreign Small/Mid-Value,International Equity,Equity
+Foreign Small/Mid-Blend,International Equity,Equity
+Foreign Small/Mid-Growth,International Equity,Equity
+Global Large-Stock Growth,International Equity,Equity
+Global Large-Stock Blend,International Equity,Equity
+Global Large-Stock Value,International Equity,Equity
+Global Small/Mid Stock,International Equity,Equity
+Diversified Emerging Markets,International Equity,Equity
+Diversified Pacific/Asia,International Equity,Equity
+Miscellaneous Region,International Equity,Equity
+Europe Stock,International Equity,Equity
+Latin America Stock,International Equity,Equity
+Pacific/Asia ex-Japan Stock,International Equity,Equity
+China Region,International Equity,Equity
+India Equity,International Equity,Equity
+Japan Stock,International Equity,Equity
+Long-Short Equity,Nontraditional Equity,Alternative
+Derivative Income,Nontraditional Equity,Alternative
+Defined Outcome,Nontraditional Equity,Alternative
+Equity Hedged,Nontraditional Equity,Alternative
+Macro Trading,Alternative,Alternative
+Event Driven,Alternative,Alternative
+Relative Value Arbitrage,Alternative,Alternative
+Multistrategy,Alternative,Alternative
+Equity Market Neutral,Alternative,Alternative
+Systematic Trend,Alternative,Alternative
+Trading—Leveraged Commodities,Miscellaneous,Alternative
+Trading—Inverse Commodities,Miscellaneous,Alternative
+Trading—Leveraged Debt,Miscellaneous,Alternative
+Trading—Inverse Debt,Miscellaneous,Alternative
+Trading—Leveraged Equity,Miscellaneous,Alternative
+Trading—Inverse Equity,Miscellaneous,Alternative
+Trading—Miscellaneous,Miscellaneous,Alternative
+Digital Assets,Miscellaneous,Alternative
+Single Currency,Miscellaneous,Alternative
+Commodities Broad Basket,Commodities,Commodities
+Commodities Focused,Commodities,Commodities
+Long Government,Taxable Bond,Fixed Income
+Intermediate Government,Taxable Bond,Fixed Income
+Short Government,Taxable Bond,Fixed Income
+Inflation-Protected Bond,Taxable Bond,Fixed Income
+Long-Term Bond,Taxable Bond,Fixed Income
+Intermediate Core Bond,Taxable Bond,Fixed Income
+Intermediate Core-Plus Bond,Taxable Bond,Fixed Income
+Short-Term Bond,Taxable Bond,Fixed Income
+Ultrashort Bond,Taxable Bond,Fixed Income
+Bank Loan,Taxable Bond,Fixed Income
+Stable Value,Taxable Bond,Fixed Income
+Corporate Bond,Taxable Bond,Fixed Income
+Preferred Stock,Taxable Bond,Fixed Income
+High-Yield Bond,Taxable Bond,Fixed Income
+Multisector Bond,Taxable Bond,Fixed Income
+Global Bond,Taxable Bond,Fixed Income
+Global Bond-USD Hedged,Taxable Bond,Fixed Income
+Target Maturity,Taxable Bond,Fixed Income
+Emerging-Markets Bond,Taxable Bond,Fixed Income
+Emerging-Markets Local-Currency Bond,Taxable Bond,Fixed Income
+Nontraditional Bond,Taxable Bond,Fixed Income
+Miscellaneous Fixed Income,Taxable Bond,Fixed Income
+Short-Term Inflation-Protected Bond,Taxable Bond,Fixed Income
+Muni National Long,Municipal Bond,Fixed Income
+Muni National Intermediate,Municipal Bond,Fixed Income
+Muni National Short,Municipal Bond,Fixed Income
+High-Yield Muni,Municipal Bond,Fixed Income
+Muni Single State Long,Municipal Bond,Fixed Income
+Muni Single State Intermediate,Municipal Bond,Fixed Income
+Muni Single State Short,Municipal Bond,Fixed Income
+Muni California Long,Municipal Bond,Fixed Income
+Muni California Intermediate,Municipal Bond,Fixed Income
+Muni Massachusetts,Municipal Bond,Fixed Income
+Muni Minnesota,Municipal Bond,Fixed Income
+Muni New Jersey,Municipal Bond,Fixed Income
+Muni New York Long,Municipal Bond,Fixed Income
+Muni New York Intermediate,Municipal Bond,Fixed Income
+Muni Ohio,Municipal Bond,Fixed Income
+Muni Pennsylvania,Municipal Bond,Fixed Income
+Muni Target Maturity,Municipal Bond,Fixed Income
+Money Market—Taxable,Money Market,Cash
+Money Market—Tax-Free,Money Market,Cash
+Money Market—Non-40 Act,Money Market,Cash
+Prime Money Market,Money Market,Cash

@@ -1,0 +1,52 @@
+version: "2"
+plugins:
+  - name: golang
+    wasm:
+      url: https://github.com/orlandoc01/sqlc-gen-go/releases/download/v3.0.2-sqlite.4/sqlc-gen-go.wasm
+      sha256: "f0ab610b7471897b84c8b7de005f3610a9723cfff7e2474601dc3a7c9895ccab"
+sql:
+  - engine: "sqlite"
+    schema:
+      - "internal/database/testdata/schema.sql"
+      - "internal/database/testdata/sqlc_fts_schema.sql"
+    queries: "internal/database/queries"
+    codegen:
+      - plugin: golang
+        out: "internal/database/dbgen"
+        options:
+          package: "dbgen"
+          sql_package: "database/sql"
+          emit_json_tags: false
+          emit_db_tags: false
+          emit_empty_slices: true
+          emit_interface: false
+          emit_prepared_queries: false
+          emit_dynamic_filter: true
+          emit_pointers_for_null_types: true
+          query_parameter_limit: 0
+          omit_unused_structs: false
+          overrides:
+            - column: "transactions.amount_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "budgets.amount_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "recurring_charges.average_amount_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "recurring_charges.last_amount_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "account_balance_daily_snapshots.balance_usd_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "account_balance_snapshot_reviews.provider_balance_usd_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "account_balance_snapshot_reviews.carry_forward_balance_usd_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "account_balance_snapshot_provider_states.provider_balance_usd_cents"
+              go_type: "tallyo/internal/money.Cents"
+            - column: "asset_daily_holdings.value_usd_cents"
+              go_type: "tallyo/internal/money.Cents"
+            # nullable columns: sqlc ignores `nullable:` for column overrides,
+            # so pointer-ness must be encoded in the go_type itself
+            - column: "rules.amount_min_cents"
+              go_type: { import: "tallyo/internal/money", type: "Cents", pointer: true }
+            - column: "rules.amount_max_cents"
+              go_type: { import: "tallyo/internal/money", type: "Cents", pointer: true }

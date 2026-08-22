@@ -1,0 +1,11 @@
+.git
+data
+scripts
+*_test.go
+*.db
+*.db-*
+env-items-ids.txt
+web/node_modules
+web/dist
+web/coverage
+web/test-results

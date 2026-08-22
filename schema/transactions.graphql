@@ -1,0 +1,539 @@
+# =============================================================================
+# Transactions domain — categories, transactions, rules, spending reports,
+# cash flow, recurring charges.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Enums
+# -----------------------------------------------------------------------------
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+  TRANSFER
+}
+
+enum TransactionSortField {
+  DATE
+  AMOUNT
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+enum RecurrenceInterval {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RecurringStreamStatus {
+  MATURE
+  EARLY_DETECTION
+  TOMBSTONED
+  UNKNOWN
+}
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+type Category implements Node {
+  id: ID!
+  name: String!
+  emoji: String!
+  groupName: String!
+  groupEmoji: String!
+  kind: CategoryKind!
+  sortOrder: Int!
+  plaidPFC2Codes: [String!]!
+}
+
+type CategoryGroup implements Node {
+  id: ID!
+  name: String!
+  emoji: String!
+  kind: CategoryKind!
+  categories: [Category!]!
+}
+
+type CategoryList      { items: [Category!]! }
+type CategoryGroupList { items: [CategoryGroup!]! }
+
+type Tag implements Node {
+  id: ID!
+  name: String!
+  color: String!
+  transactionCount: Int!
+}
+
+type TagList { items: [Tag!]! }
+
+type Transaction implements Node {
+  id: ID!
+  account: Account!
+  amount: Money!
+  """ISO 8601 datetime when the transaction was authorized (YYYY-MM-DDTHH:mm:ssZ)."""
+  datetime: DateTime!
+  """ISO 8601 datetime when the transaction posted/settled (YYYY-MM-DDTHH:mm:ssZ)."""
+  postedDatetime: DateTime!
+  merchantName: String
+  originalName: String
+  """Merchant logo URL sourced from Plaid. Null when unavailable."""
+  logoUrl: String
+  """Always present — uncategorized transactions use the sentinel category (id 0)."""
+  category: Category!
+  isRecurring: Boolean!
+  isReviewed: Boolean!
+  notes: String
+  plaidCategory: String
+  pending: Boolean!
+  isHidden: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  tags: [Tag!]!
+}
+
+type TransactionConnection {
+  edges: [TransactionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type TransactionEdge {
+  node: Transaction!
+  cursor: String!
+}
+
+"""Aggregate statistics for a filtered set of transactions."""
+type TransactionsSummary {
+  totalCount: Int!
+  totalAmount: Money!
+  averageAmount: Money!
+  largestAmount: Money!
+  """Date of the earliest matching transaction."""
+  firstDate: Date
+  """Date of the most recent matching transaction."""
+  lastDate: Date
+}
+
+type TransactionsStagedForCategorization {
+  count: Int!
+}
+
+"""A recurring transaction stream sourced from Plaid's /transactions/recurring/get."""
+type RecurringCharge implements Node {
+  id: ID!
+  merchantName: String!
+  estimatedAmount: Money!
+  interval: RecurrenceInterval
+  category: Category
+  transactions: [Transaction!]!
+  firstDate: Date!
+  lastDate: Date!
+  lastAmount: Money!
+  isUserModified: Boolean!
+  """Computed from lastDate + interval. Null if interval is unknown."""
+  nextExpectedDate: Date
+  status: RecurringStreamStatus!
+  isActive: Boolean!
+}
+
+type RecurringChargeList { items: [RecurringCharge!]! }
+
+"""Aggregate spending stats for a single time bucket."""
+type SpendingAggregatePeriod {
+  periodLabel: String!
+  periodStart: Date!
+  periodEnd: Date!
+  totalAmount: Money!
+  transactionCount: Int!
+}
+
+"""Aggregate spending stats for a category within a single time bucket."""
+type CategorySpendingPeriod {
+  periodLabel: String!
+  periodStart: Date!
+  periodEnd: Date!
+  totalAmount: Money!
+  transactionCount: Int!
+  percentOfTotal: Float!
+}
+
+"""Aggregate spending stats for a single category."""
+type CategorySpendingAggregate {
+  category: Category!
+  totalAmount: Money!
+  transactionCount: Int!
+  percentOfTotal: Float!
+  periods: [CategorySpendingPeriod!]!
+}
+
+"""Combined spending report for totals, periods, and categories."""
+type SpendingByCategoryReport {
+  totalAmount: Money!
+  transactionCount: Int!
+  periods: [SpendingAggregatePeriod!]!
+  categories: [CategorySpendingAggregate!]!
+}
+
+"""Aggregate income, expenses, savings, and savings rate for a period."""
+type CashFlowSummary {
+  """Total income (sum of transactions in income categories)."""
+  income: Money!
+  """Total expenses (sum of transactions in non-income, non-transfer categories)."""
+  expenses: Money!
+  savings: Money!
+  """Savings / income as a percentage (0–100). 0 if income is zero."""
+  savingsRate: Float!
+}
+
+"""Spending or income total for a single category within a cash flow period."""
+type CashFlowBreakdown {
+  category: Category!
+  total: Money!
+  transactionCount: Int!
+  percentOfTotal: Float!
+}
+
+"""Cash flow data for a single time bucket (month, quarter, or year)."""
+type CashFlowPeriod {
+  periodLabel: String!   # e.g. "2026-05", "2026-Q1", "2025"
+  periodStart: Date!
+  periodEnd: Date!
+  summary: CashFlowSummary!
+  """Income categories with their totals, sorted by total descending."""
+  incomeByCategory: [CashFlowBreakdown!]!
+  """Expense categories with their totals, sorted by total descending."""
+  expensesByCategory: [CashFlowBreakdown!]!
+}
+
+"""Envelope type for the cashFlow query."""
+type CashFlowReport {
+  periods: [CashFlowPeriod!]!
+}
+
+# -----------------------------------------------------------------------------
+# Implementation Types
+# -----------------------------------------------------------------------------
+
+type Rule implements Node {
+  id: ID!
+  merchantPattern: String
+  originalPattern: String
+  merchantName: String
+  category: Category
+  tags: [Tag!]
+  shouldHide: Boolean
+  shouldBeRecurring: Boolean
+  accounts: [Account!]
+  amountMin: Money
+  amountMax: Money
+  priority: Int!
+  createdAt: DateTime!
+}
+
+type RuleList { items: [Rule!]! }
+
+# -----------------------------------------------------------------------------
+# Query Inputs
+# -----------------------------------------------------------------------------
+
+input TransactionsFilter {
+  datetimeRange: DateTimeRange
+  categoryIds: [ID!]
+  accountIds: [ID!]
+  ownerIds: [ID!]
+  isReviewed: Boolean
+  isRecurring: Boolean
+  isPending: Boolean
+  isHidden: Boolean
+  merchantPrefix: String
+  originalPrefix: String
+  excludeTransfers: Boolean
+  excludeIncome: Boolean
+  amountMin: Money
+  amountMax: Money
+  exactAmount: Money
+  tagIds: [ID!]
+  untagged: Boolean
+  "Full-text query matched against merchant name, original name, and notes."
+  search: String
+}
+
+input TransactionSort {
+  field: TransactionSortField!
+  direction: SortDirection!
+}
+
+input TransactionsInput {
+  filter: TransactionsFilter
+  sort: TransactionSort
+  first: Int
+  after: String
+  last: Int
+  before: String
+}
+
+input RulesInput {
+  merchantPattern: String
+  originalPattern: String
+  accountIds: [ID!]
+  amountMin: Money
+  amountMax: Money
+}
+
+input SpendingFilter {
+  datetimeRange: DateTimeRange!
+  """Optional for spendingByCategory; required by bucketed reports when period granularity matters."""
+  granularity: Granularity
+  categoryIds: [ID!]
+  ownerIds: [ID!]
+  accountIds: [ID!]
+  isHidden: Boolean
+  tagIds: [ID!]
+  untagged: Boolean
+}
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+extend type Query {
+  """Paginated transaction list with filtering and sorting."""
+  transactions(input: TransactionsInput): TransactionConnection!
+    @requiresScope(scope: "read:transactions")
+
+  """Single transaction by ID."""
+  transaction(id: ID!): Transaction
+    @requiresScope(scope: "read:transactions")
+
+  """Aggregate statistics for a filtered set of transactions."""
+  transactionsSummary(filter: TransactionsFilter): TransactionsSummary!
+    @requiresScope(scope: "read:transactions")
+
+  """Number of transactions awaiting background LLM categorization."""
+  transactionsStagedForCategorization: TransactionsStagedForCategorization!
+    @requiresScope(scope: "read:transactions")
+
+  """Detected recurring charges grouped by merchant."""
+  recurringCharges: RecurringChargeList!
+    @requiresScope(scope: "read:transactions")
+
+  """All categories."""
+  categories: CategoryList!
+    @requiresScope(scope: "read:categories")
+
+  """Categories organized by group (for filter UI / sidebar)."""
+  categoryGroups: CategoryGroupList!
+    @requiresScope(scope: "read:categories")
+
+  """All valid Plaid PFC2 detailed category codes."""
+  plaidPFC2Codes: [String!]!
+    @requiresScope(scope: "read:categories")
+
+  tags: TagList!
+    @requiresScope(scope: "read:tags")
+
+  """All rules, ordered by priority desc."""
+  rules(input: RulesInput): RuleList!
+    @requiresScope(scope: "read:rules")
+
+  """Combined spending report grouped by category for a date range."""
+  spendingByCategory(filter: SpendingFilter!): SpendingByCategoryReport!
+    @requiresScope(scope: "read:spending")
+
+  """
+  Cash flow data: income and expense breakdowns by category per period,
+  with summary totals (income, expenses, savings, savings rate).
+  Excludes transfers but includes income.
+  """
+  cashFlow(filter: SpendingFilter!): CashFlowReport!
+    @requiresScope(scope: "read:cashflow")
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Inputs / Payloads
+# -----------------------------------------------------------------------------
+
+input CreateCategoryGroupInput { name: String!, emoji: String!, kind: CategoryKind! }
+type  CreateCategoryGroupPayload { group: CategoryGroup! }
+
+input UpdateCategoryGroupInput { id: ID!, name: String!, emoji: String! }
+type  UpdateCategoryGroupPayload { group: CategoryGroup! }
+
+type DeleteCategoryGroupPayload { success: Boolean! }
+
+input CreateCategoryInput { name: String!, emoji: String!, groupId: ID! }
+type  CreateCategoryPayload { category: Category! }
+
+input UpdateCategoryInput { id: ID!, name: String!, emoji: String!, groupId: ID!, plaidPFC2Codes: [String!] }
+type  UpdateCategoryPayload { category: Category! }
+
+type DeleteCategoryPayload { success: Boolean! }
+
+input CreateTagInput { name: String!, color: String! }
+type CreateTagPayload { tag: Tag! }
+
+input UpdateTagInput { id: ID!, name: String!, color: String! }
+type UpdateTagPayload { tag: Tag! }
+
+type DeleteTagPayload { success: Boolean! }
+
+input ReorderCategoriesInput {
+  groupId: ID!
+  """Full ordered list of category IDs; backend assigns sort_order 1..N."""
+  categoryIds: [ID!]!
+}
+type ReorderCategoriesPayload { group: CategoryGroup! }
+
+input CreateRuleInput {
+  merchantPattern: String
+  originalPattern: String
+  changes: TransactionUpdates!
+  accountIds: [ID!]
+  amountMin: Money
+  amountMax: Money
+  priority: Int
+  applyRetroactively: Boolean
+}
+type CreateRulePayload {
+  rule: Rule!
+  retroactivelyUpdated: Int!
+}
+
+input UpdateRuleInput {
+  id: ID!
+  merchantPattern: String
+  originalPattern: String
+  changes: TransactionUpdates!
+  accountIds: [ID!]
+  amountMin: Money
+  amountMax: Money
+  priority: Int
+  applyRetroactively: Boolean
+}
+type UpdateRulePayload {
+  rule: Rule!
+  retroactivelyUpdated: Int!
+}
+
+type DeleteRulePayload { success: Boolean! }
+
+input CreateTransactionInput {
+  accountId: ID!
+  date: Date!
+  amount: Money!
+  merchantName: String
+  originalName: String
+  categoryId: ID
+  notes: String
+  isRecurring: Boolean
+  isHidden: Boolean
+}
+type CreateTransactionPayload { transaction: Transaction! }
+
+input TransactionUpdates {
+  merchantName: String
+  notes: String
+  isRecurring: Boolean
+  isHidden: Boolean
+  categoryId: ID
+  tagIds: [ID!]
+}
+
+input UpdateTransactionInput {
+  id: ID!
+  updates: TransactionUpdates!
+}
+type UpdateTransactionPayload { transaction: Transaction! }
+
+type DeleteTransactionPayload { success: Boolean! }
+
+input BulkUpdateTransactionsInput {
+  "Exactly one of transactionIds or filter must be supplied."
+  transactionIds: [ID!]
+  filter: TransactionsFilter
+  updates: TransactionUpdates!
+}
+type BulkUpdateTransactionsPayload {
+  updatedCount: Int!
+  transactions: [Transaction!]!
+}
+
+input BulkDeleteTransactionsInput {
+  "Exactly one of transactionIds or filter must be supplied."
+  transactionIds: [ID!]
+  filter: TransactionsFilter
+}
+type BulkDeleteTransactionsPayload { deletedCount: Int! }
+
+type ReprocessUncategorizedTransactionsPayload { stagedCount: Int! }
+
+# -----------------------------------------------------------------------------
+# Mutations
+# -----------------------------------------------------------------------------
+
+extend type Mutation {
+  createCategoryGroup(input: CreateCategoryGroupInput!): CreateCategoryGroupPayload!
+    @requiresScope(scope: "write:categories")
+  updateCategoryGroup(input: UpdateCategoryGroupInput!): UpdateCategoryGroupPayload!
+    @requiresScope(scope: "write:categories")
+  deleteCategoryGroup(id: ID!): DeleteCategoryGroupPayload!
+    @requiresScope(scope: "write:categories")
+
+  createCategory(input: CreateCategoryInput!): CreateCategoryPayload!
+    @requiresScope(scope: "write:categories")
+  updateCategory(input: UpdateCategoryInput!): UpdateCategoryPayload!
+    @requiresScope(scope: "write:categories")
+  deleteCategory(id: ID!): DeleteCategoryPayload!
+    @requiresScope(scope: "write:categories")
+  reorderCategories(input: ReorderCategoriesInput!): ReorderCategoriesPayload!
+    @requiresScope(scope: "write:categories")
+
+  createTag(input: CreateTagInput!): CreateTagPayload!
+    @requiresScope(scope: "write:tags")
+  updateTag(input: UpdateTagInput!): UpdateTagPayload!
+    @requiresScope(scope: "write:tags")
+  deleteTag(id: ID!): DeleteTagPayload!
+    @requiresScope(scope: "write:tags")
+
+  """
+  Create an auto-categorization rule.
+  If applyRetroactively is true, all existing matching transactions are updated.
+  """
+  createRule(input: CreateRuleInput!): CreateRulePayload!
+    @requiresScope(scope: "write:rules")
+  updateRule(input: UpdateRuleInput!): UpdateRulePayload!
+    @requiresScope(scope: "write:rules")
+  deleteRule(id: ID!): DeleteRulePayload!
+    @requiresScope(scope: "write:rules")
+
+  createTransaction(input: CreateTransactionInput!): CreateTransactionPayload!
+    @requiresScope(scope: "write:transactions")
+  """Edit transaction metadata (notes, recurring flag, etc.)."""
+  updateTransaction(input: UpdateTransactionInput!): UpdateTransactionPayload!
+    @requiresScope(scope: "write:transactions")
+  deleteTransaction(id: ID!): DeleteTransactionPayload!
+    @requiresScope(scope: "write:transactions")
+
+  """Batch-update transaction metadata for selected transactions."""
+  bulkUpdateTransactions(input: BulkUpdateTransactionsInput!): BulkUpdateTransactionsPayload!
+    @requiresScope(scope: "write:transactions")
+
+  """Permanently delete transactions. Exactly one of transactionIds or filter is required."""
+  bulkDeleteTransactions(input: BulkDeleteTransactionsInput!): BulkDeleteTransactionsPayload!
+    @requiresScope(scope: "write:transactions")
+
+  """
+  Stage every unreviewed transaction for LLM categorization and wake the
+  background worker. Fails if LLM categorization is not enabled.
+  """
+  reprocessUncategorizedTransactions: ReprocessUncategorizedTransactionsPayload!
+    @requiresScope(scope: "write:transactions")
+
+}

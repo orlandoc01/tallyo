@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secret test fixtures"
+regexes = [
+  '''aB3x9kLmPqRsTuVwXyZ1aB3x9kLmPqRsTuVwXyZ1aB3x9kLmPqRsTuVwXyZ1''',
+  '''00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff''',
+  '''c2V0dXAtdG9rZW4=''',
+  '''eyJhbGciOiJub25lIn0\.eyJzY29wZSI6IndyaXRlOnVzZXJzIHJlYWQ6dXNlcnMifQ\.sig''',
+]

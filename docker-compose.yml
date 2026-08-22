@@ -1,0 +1,17 @@
+services:
+  tallyo:
+    image: ghcr.io/orlandoc01/tallyo:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - tallyo-data:/data
+    restart: unless-stopped
+    # With a bind mount, run as your host user so files are owned by you
+    user: "1000:1000"
+
+volumes:
+  tallyo-data:
+
+# Run Tallyo behind your own reverse proxy or VPN for internet-facing access.
+# Plaid sync requires your own Plaid account and keys, configured in the app.
+# CSV import/export and manual holdings/liabilities work without Plaid.

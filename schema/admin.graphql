@@ -1,0 +1,301 @@
+# =============================================================================
+# Admin domain — users and role management.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+"""Access role assigned to a user."""
+enum Role { ADMIN WRITER READONLY SPEND_TRACKER CASHFLOW_TRACKER NET_WORTH_TRACKER PORTFOLIO_TRACKER }
+
+"""A user authorized to access the dashboard."""
+type User implements Node {
+  id: ID!
+  email: String!
+  role: Role!
+  createdAt: DateTime!
+}
+
+type UserList { items: [User!]! }
+
+"""Resolved server configuration. Secret values are obfuscated."""
+type Configuration {
+  configFilePath: String
+  dbPath: String!
+  port: String!
+  syncOff: Boolean!
+  locale: Locale!
+  general: GeneralConfiguration!
+  authorization: AuthorizationConfiguration!
+  llmCategorization: LlmCategorizationConfiguration!
+  googleAuthn: GoogleAuthnConfiguration!
+  passKeyAuthn: PassKeyAuthnConfiguration!
+  emailCodeAuthn: EmailCodeAuthnConfiguration!
+  mcp: McpConfiguration!
+  security: SecurityConfiguration!
+}
+
+type GeneralConfiguration {
+  disableTransactionTracking: Boolean!
+  disableWealthTracking: Boolean!
+  hideOwners: Boolean!
+}
+
+type AuthorizationConfiguration {
+  masterPassword: String
+  disableAllAuth: Boolean!
+  oauthIssuerUrl: String!
+  frontendRedirectUris: [String!]!
+  accessTokenLifetime: String!
+  refreshTokenLifetime: String!
+  devCorsAllowedOrigins: [String!]
+}
+
+"""LLM transaction-categorization backend."""
+enum LlmProvider { OLLAMA }
+
+type LlmCategorizationConfiguration {
+  enabled: Boolean!
+  provider: LlmProvider!
+  """Providers selectable in this deployment."""
+  allowedProviders: [LlmProvider!]!
+  ollama: OllamaProviderConfiguration!
+}
+
+type OllamaProviderConfiguration {
+  url: String
+  model: String!
+}
+
+type GoogleAuthnConfiguration {
+  enabled: Boolean!
+  googleClientId: String
+  googleClientSecret: String
+}
+
+type PassKeyAuthnConfiguration {
+  enabled: Boolean!
+  webauthnRpId: String
+  webauthnRpName: String!
+  webauthnRpOrigins: [String!]
+}
+
+type EmailCodeAuthnConfiguration {
+  enabled: Boolean!
+  smtpHost: String
+  smtpPort: String!
+  smtpFrom: String
+  smtpUsername: String
+  smtpPassword: String
+}
+
+type McpConfiguration {
+  enabled: Boolean!
+  """Hosts allowed as HTTPS redirect URIs for dynamically registered MCP clients."""
+  dynamicRedirectHosts: [String!]
+}
+
+type SecurityConfiguration {
+  trustedProxyCidrs: [String!]!
+}
+
+type Locale {
+  timezone: String!
+}
+
+# -----------------------------------------------------------------------------
+# Plaid Credential Types
+# -----------------------------------------------------------------------------
+
+"""
+A Plaid API credential pair (client_id + secret). Secrets are never exposed
+via the API — only the client_id and metadata are returned.
+"""
+type PlaidCredential {
+  id: Int!
+  clientId: String!
+  environment: PlaidEnvironment!
+  """Human-readable label for credential selection UI (e.g. "Primary", "Overflow")."""
+  label: String
+  """Number of active PlaidItems using this credential."""
+  itemCount: Int!
+  createdAt: DateTime!
+}
+
+type PlaidCredentialList { items: [PlaidCredential!]! }
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+extend type Query {
+  """All authorized users. Admin only."""
+  users: UserList!
+    @requiresScope(scope: "read:users")
+
+  """All Plaid API credentials for settings management. Secrets are never returned."""
+  plaidCredentials: PlaidCredentialList!
+    @requiresScope(scope: "read:settings")
+
+  """Resolved server configuration. Admin only."""
+  configuration: Configuration!
+    @requiresScope(scope: "read:settings")
+
+  """General feature visibility configuration. Readable by any authenticated user."""
+  generalConfiguration: GeneralConfiguration!
+    @requiresScope(scope: "read:owners")
+
+  """The instance timezone (IANA). Readable by any authenticated user."""
+  instanceTimezone: String!
+    @requiresScope(scope: "read:owners")
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Inputs / Payloads
+# -----------------------------------------------------------------------------
+
+input AddUserInput { email: String!, role: Role }
+type  AddUserPayload { user: User! }
+
+input CreateInviteLinkInput { userId: ID! }
+type CreateInviteLinkPayload { url: String!, expiresAt: DateTime! }
+
+input RemoveUserInput { id: ID! }
+type  RemoveUserPayload { success: Boolean! }
+
+input UpdateUserInput { id: ID!, role: Role! }
+type  UpdateUserPayload { user: User! }
+
+input CreatePlaidCredentialInput {
+  clientId: String!
+  secret: String!
+  environment: PlaidEnvironment!
+  label: String
+}
+type CreatePlaidCredentialPayload { credential: PlaidCredential! }
+
+input UpdatePlaidCredentialInput {
+  id: Int!
+  secret: String!
+  environment: PlaidEnvironment!
+}
+type UpdatePlaidCredentialPayload { credential: PlaidCredential! }
+
+input DeletePlaidCredentialInput { id: Int! }
+type DeletePlaidCredentialPayload { success: Boolean! }
+
+input LlmCategorizationConfigurationInput {
+  enabled: Boolean!
+  provider: LlmProvider!
+  ollama: OllamaProviderConfigurationInput!
+}
+
+input OllamaProviderConfigurationInput {
+  url: String
+  model: String!
+}
+
+input GoogleAuthnConfigurationInput {
+  enabled: Boolean!
+  googleClientId: String
+  googleClientSecret: String
+}
+
+input PassKeyAuthnConfigurationInput {
+  enabled: Boolean!
+  webauthnRpId: String
+  webauthnRpName: String!
+  webauthnRpOrigins: [String!]
+}
+
+input EmailCodeAuthnConfigurationInput {
+  enabled: Boolean!
+  smtpHost: String
+  smtpPort: String!
+  smtpFrom: String
+  smtpUsername: String
+  smtpPassword: String
+}
+
+input McpConfigurationInput {
+  enabled: Boolean!
+  dynamicRedirectHosts: [String!]
+}
+
+input SecurityConfigurationInput {
+  trustedProxyCidrs: [String!]!
+}
+
+input AuthorizationConfigurationInput {
+  masterPassword: String
+  disableAllAuth: Boolean!
+  oauthIssuerUrl: String!
+  frontendRedirectUris: [String!]!
+  accessTokenLifetime: String!
+  refreshTokenLifetime: String!
+  devCorsAllowedOrigins: [String!]
+}
+
+input LocaleConfigurationInput {
+  timezone: String!
+}
+
+input GeneralConfigurationInput {
+  disableTransactionTracking: Boolean!
+  disableWealthTracking: Boolean!
+  hideOwners: Boolean!
+}
+
+input UpdateConfigurationInput {
+  locale: LocaleConfigurationInput
+  general: GeneralConfigurationInput
+  authorization: AuthorizationConfigurationInput
+  llmCategorization: LlmCategorizationConfigurationInput
+  googleAuthn: GoogleAuthnConfigurationInput
+  passKeyAuthn: PassKeyAuthnConfigurationInput
+  emailCodeAuthn: EmailCodeAuthnConfigurationInput
+  mcp: McpConfigurationInput
+  security: SecurityConfigurationInput
+  setupComplete: Boolean
+}
+
+type UpdateConfigurationPayload { configuration: Configuration! }
+
+# -----------------------------------------------------------------------------
+# Mutations
+# -----------------------------------------------------------------------------
+
+extend type Mutation {
+  """Add a user. Admin only. Sends 24-hour invite link."""
+  addUser(input: AddUserInput!): AddUserPayload!
+    @requiresScope(scope: "write:users")
+
+  """Generate a single-use, 15-minute sign-in + passkey-onboarding link for an existing user."""
+  createInviteLink(input: CreateInviteLinkInput!): CreateInviteLinkPayload!
+    @requiresScope(scope: "write:settings")
+
+  """Remove a user and revoke all their tokens. Admin only."""
+  removeUser(input: RemoveUserInput!): RemoveUserPayload!
+    @requiresScope(scope: "write:users")
+
+  """Update a user's role. Admin only."""
+  updateUser(input: UpdateUserInput!): UpdateUserPayload!
+    @requiresScope(scope: "write:users")
+
+  """Store a Plaid API credential pair. Secrets are never returned."""
+  createPlaidCredential(input: CreatePlaidCredentialInput!): CreatePlaidCredentialPayload!
+    @requiresScope(scope: "write:settings")
+
+  """Rotate a Plaid credential secret or environment. client_id is immutable."""
+  updatePlaidCredential(input: UpdatePlaidCredentialInput!): UpdatePlaidCredentialPayload!
+    @requiresScope(scope: "write:settings")
+
+  """Delete a Plaid credential. Fails while Plaid items still reference it."""
+  deletePlaidCredential(input: DeletePlaidCredentialInput!): DeletePlaidCredentialPayload!
+    @requiresScope(scope: "write:settings")
+
+  """Update one or more runtime configuration sections. Omitted sections are left unchanged."""
+  updateConfiguration(input: UpdateConfigurationInput!): UpdateConfigurationPayload!
+    @requiresScope(scope: "write:settings")
+}

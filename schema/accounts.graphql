@@ -1,0 +1,373 @@
+# =============================================================================
+# Accounts domain — accounts, connections, Plaid items/credentials,
+# owners, and the Plaid Link flow.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Enums
+# -----------------------------------------------------------------------------
+
+enum AccountType {
+  DEPOSITORY
+  CREDIT
+  LOAN
+  INVESTMENT
+  OTHER
+  PROPERTY
+  CRYPTO_WALLET
+}
+
+enum PlaidEnvironment {
+  SANDBOX
+  DEVELOPMENT
+  PRODUCTION
+}
+
+enum PlaidItemHealthState {
+  HEALTHY
+  LINK_UPDATE_REQUIRED
+  SYNC_ERROR
+}
+
+# -----------------------------------------------------------------------------
+# Core Types
+# -----------------------------------------------------------------------------
+
+"""A household owner that accounts and connections are attributed to."""
+type Owner implements Node {
+  id: ID!
+  name: String!
+}
+
+type OwnerList { items: [Owner!]! }
+
+type Account implements Node {
+  id: ID!
+  """The data provider connection for this account. Null for manual accounts."""
+  connection: Connection
+  owner: Owner!
+  name: String!
+  type: AccountType!
+  subtype: String
+  """Last 4 digits of the account number. Null for manually created accounts."""
+  mask: String
+  """Free-form documentation notes visible only in account details."""
+  notes: String
+  closed: Boolean!
+  hidden: Boolean!
+  """True when the provider could not infer the account type and defaulted it.
+  Cleared when a user sets or confirms the type via updateAccount."""
+  needsReview: Boolean!
+  """True for accounts created manually (not synced from Plaid)."""
+  manual: Boolean!
+  """True when the account type is managed by its backing link and cannot be edited directly."""
+  typeLocked: Boolean!
+  lastSyncedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AccountList { items: [Account!]! }
+
+# -----------------------------------------------------------------------------
+# Plaid / Connection Types
+# -----------------------------------------------------------------------------
+
+"""An EVM wallet. Balances are synced across chains via an external provider."""
+type EVMWallet {
+  address: String!
+  chainIds: [String!]!
+}
+
+type EVMChain { id: String!, name: String! }
+type EVMChainList { items: [EVMChain!]! }
+
+"""A linked SimpleFIN connection (one institution under an Access Token)."""
+type SimpleFinConnection implements Node {
+  id: ID!
+  orgDomain: String
+  orgUrl: String
+  accounts: [Account!]!
+  lastSyncedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""A claimed SimpleFIN Access Token. The underlying Access URL is write-only."""
+type SimpleFinAccessToken implements Node {
+  id: ID!
+  label: String
+  owner: Owner!
+  connections: [SimpleFinConnection!]!
+  syncCron: String!
+  lastSyncedAt: DateTime
+  nextSyncAt: DateTime
+  createdAt: DateTime!
+}
+type SimpleFinAccessTokenList { items: [SimpleFinAccessToken!]! }
+
+"""A Plaid item or other data provider."""
+union ConnectionProvider = PlaidItem | EVMWallet | SimpleFinConnection
+
+"""
+A generic connection abstraction over any data provider (Plaid, Debank, etc.).
+Each connection maps to a row in the `connections` table via (source_table, source_id).
+"""
+type Connection implements Node {
+  id: ID!
+  """Institution or display name for this provider connection."""
+  name: String
+  owner: Owner!
+  isActive: Boolean!
+  provider: ConnectionProvider
+}
+
+type ConnectionList { items: [Connection!]! }
+
+"""
+A linked Plaid connection representing one financial institution. Each item
+holds an access token and sync cursor, and maps to one or more Accounts.
+"""
+type PlaidItem implements Node {
+  id: ID!
+  credential: PlaidCredential!
+  """Plaid institution ID (e.g. "ins_3")."""
+  institutionId: String
+  accounts: [Account!]!
+  lastSyncedAt: DateTime
+  """Current Plaid Item health state. LINK_UPDATE_REQUIRED means use Link update mode."""
+  healthState: PlaidItemHealthState!
+  """Last Plaid error code that changed healthState, if any."""
+  healthErrorCode: String
+  """Last Plaid error message that changed healthState, if any."""
+  healthErrorMessage: String
+  """When the current healthState was last written."""
+  healthUpdatedAt: DateTime
+  syncCron: String!
+  recurringSyncCron: String!
+  nextSyncAt: DateTime
+  nextRecurringSyncAt: DateTime
+  """Whether this item is actively syncing. False = soft-deleted."""
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type PlaidItemList       { items: [PlaidItem!]! }
+
+# -----------------------------------------------------------------------------
+# Query Inputs
+# -----------------------------------------------------------------------------
+
+input ConnectionsInput {
+  includeInactive: Boolean = false
+}
+
+input PlaidItemsInput {
+  includeInactive: Boolean = false
+}
+
+input CreateSimpleFinAccessTokenInput {
+  """The base64-encoded one-time Setup Token from SimpleFIN Bridge."""
+  setupToken: String!
+  ownerId: ID!
+  label: String
+}
+
+type CreateSimpleFinAccessTokenPayload {
+  accessToken: SimpleFinAccessToken!
+  connections: [SimpleFinConnection!]!
+  accounts: [Account!]!
+}
+
+# -----------------------------------------------------------------------------
+# Queries
+# -----------------------------------------------------------------------------
+
+extend type Query {
+  """All linked accounts."""
+  accounts: AccountList!
+    @requiresScope(scope: "read:accounts")
+
+  """Single account by ID, with latest snapshot and manual liabilities."""
+  account(id: ID!): Account!
+    @requiresScope(scope: "read:accounts")
+
+  """All household owners. Use for dropdowns when assigning items and accounts."""
+  owners: OwnerList!
+    @requiresScope(scope: "read:owners")
+
+  """All Plaid items (institutions), including soft-deleted if specified."""
+  plaidItems(input: PlaidItemsInput): PlaidItemList!
+    @requiresScope(scope: "read:accounts")
+
+  """All data provider connections, including inactive if specified."""
+  connections(input: ConnectionsInput): ConnectionList!
+    @requiresScope(scope: "read:accounts")
+
+  """All EVM chains supported by the wallet balance provider."""
+  evmChains: EVMChainList!
+    @requiresScope(scope: "read:accounts")
+
+  """All SimpleFIN access tokens."""
+  simpleFinAccessTokens: SimpleFinAccessTokenList!
+    @requiresScope(scope: "read:accounts")
+
+}
+
+# -----------------------------------------------------------------------------
+# Mutation Inputs / Payloads
+# -----------------------------------------------------------------------------
+
+# Owner
+
+input CreateOwnerInput { name: String! }
+
+# Account
+
+input CreateManualAccountInput {
+  """The Connection (provider) this account is grouped under. Null for truly manual accounts."""
+  connectionId: ID
+  name: String!
+  ownerId: ID!
+  type: AccountType!
+  notes: String
+  closed: Boolean
+  hidden: Boolean
+}
+type CreateManualAccountPayload { account: Account! }
+
+input UpdateAccountInput {
+  id: ID!
+  name: String
+  ownerId: ID
+  type: AccountType
+  """Plaid account subtype (e.g. "checking", "credit card"). Must be a valid Plaid subtype string."""
+  subtype: String
+  notes: String
+  closed: Boolean
+  hidden: Boolean
+}
+type UpdateAccountPayload { account: Account! }
+
+input RemoveManualAccountInput {
+  id: ID!
+}
+type RemoveManualAccountPayload { success: Boolean! }
+
+# Connection / item management
+
+input UpdateConnectionInput {
+  connectionId: ID!
+  isActive: Boolean
+  syncCron: String
+  recurringSyncCron: String
+  chainIds: [String!]
+}
+type UpdateConnectionPayload { connection: Connection! }
+
+input DeleteConnectionInput {
+  connectionId: ID!
+}
+type DeleteConnectionPayload { success: Boolean! }
+
+# EVM wallet
+
+input LinkEVMWalletInput {
+  """EVM address (0x followed by 40 hex characters)."""
+  address: String!
+  chainIds: [String!]!
+  ownerId: ID!
+  """Human-readable label; defaults to a truncated version of the address."""
+  label: String
+}
+type LinkEVMWalletPayload {
+  connection: Connection!
+  account: Account!
+}
+
+# Plaid link flow
+
+input CreateLinkTokenInput {
+  credentialId: Int!
+  ownerId: ID!
+}
+type CreateLinkTokenPayload {
+  linkToken: String!
+  expiration: DateTime!
+}
+
+input ExchangePublicTokenInput {
+  publicToken: String!
+  credentialId: Int!
+  ownerId: ID!
+  institutionId: String
+  institutionName: String
+}
+type ExchangePublicTokenPayload {
+  item: PlaidItem!
+  """Accounts discovered during the initial item sync."""
+  accounts: [Account!]!
+}
+
+type CompleteLinkUpdatePayload {
+  item: PlaidItem!
+}
+
+# -----------------------------------------------------------------------------
+# Mutations
+# -----------------------------------------------------------------------------
+
+extend type Mutation {
+  createOwner(input: CreateOwnerInput!): Owner!
+    @requiresScope(scope: "write:owners")
+  """Delete a household owner by ID. Fails if accounts or items still reference it."""
+  deleteOwner(id: ID!): Boolean!
+    @requiresScope(scope: "write:owners")
+
+  createManualAccount(input: CreateManualAccountInput!): CreateManualAccountPayload!
+    @requiresScope(scope: "write:accounts")
+  updateAccount(input: UpdateAccountInput!): UpdateAccountPayload!
+    @requiresScope(scope: "write:accounts")
+  removeManualAccount(input: RemoveManualAccountInput!): RemoveManualAccountPayload!
+    @requiresScope(scope: "write:accounts")
+
+  updateConnection(input: UpdateConnectionInput!): UpdateConnectionPayload!
+    @requiresScope(scope: "write:accounts")
+  deleteConnection(input: DeleteConnectionInput!): DeleteConnectionPayload!
+    @requiresScope(scope: "write:accounts")
+
+  """
+  Link an EVM wallet address. Validates the address, creates the connection,
+  and triggers an initial balance sync in the background.
+  """
+  linkEVMWallet(input: LinkEVMWalletInput!): LinkEVMWalletPayload!
+    @requiresScope(scope: "write:accounts")
+  unlinkEVMWallet(id: ID!): Boolean!
+    @requiresScope(scope: "write:accounts")
+
+  """Step 1 of Plaid Link: create a link_token for the frontend to initialize the Plaid Link UI."""
+  createLinkToken(input: CreateLinkTokenInput!): CreateLinkTokenPayload!
+    @requiresScope(scope: "write:accounts")
+  """Step 2 of Plaid Link: exchange the public_token returned by Plaid Link for an access_token."""
+  exchangePublicToken(input: ExchangePublicTokenInput!): ExchangePublicTokenPayload!
+    @requiresScope(scope: "write:accounts")
+  """Create a link_token for Plaid Link update mode for an existing Item."""
+  createUpdateLinkToken(itemId: ID!): CreateLinkTokenPayload!
+    @requiresScope(scope: "write:accounts")
+  """Called after the frontend receives Plaid Link update-mode onSuccess. Triggers an immediate sync."""
+  completeLinkUpdate(itemId: ID!): CompleteLinkUpdatePayload!
+    @requiresScope(scope: "write:accounts")
+
+  """Claim a Setup Token, store the Access URL, create connections/accounts, trigger initial sync."""
+  createSimpleFinAccessToken(input: CreateSimpleFinAccessTokenInput!): CreateSimpleFinAccessTokenPayload!
+    @requiresScope(scope: "write:accounts")
+
+  """Delete a SimpleFIN Access Token and all its connections/accounts."""
+  deleteSimpleFinAccessToken(id: ID!): Boolean!
+    @requiresScope(scope: "write:accounts")
+
+  """Clear last_synced_at to force a full re-pull on the next background sync tick."""
+  resetSimpleFinSync(id: ID!): SimpleFinAccessToken!
+    @requiresScope(scope: "write:accounts")
+}

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  web:
+    name: Web ${{ matrix.check_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check_name: typecheck
+            command: npm run typecheck
+          - check_name: lint
+            command: npm run lint
+          - check_name: coverage
+            command: npm run test:coverage -- --pool=forks --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run ${{ matrix.check_name }}
+        working-directory: web
+        run: ${{ matrix.command }}
+
+  server:
+    name: Server ${{ matrix.check_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check_name: codegen
+            command: make check-codegen
+          - check_name: lint
+            command: make lint
+          - check_name: deadcode
+            command: make deadcode
+          - check_name: coverage
+            command: make coverage GO_TEST_PARALLEL="$(nproc)"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Run ${{ matrix.check_name }}
+        working-directory: server
+        run: ${{ matrix.command }}
+
+  release-build:
+    name: Release build (snapshot)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Check GoReleaser config
+        run: go run github.com/goreleaser/goreleaser/v2@latest check
+
+      - name: Build release snapshot
+        run: go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=docker --skip=sbom

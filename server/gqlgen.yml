@@ -1,0 +1,83 @@
+schema:
+  - ../schema/*.graphql
+
+exec:
+  filename: internal/graph/generated.go
+  package: graph
+
+model:
+  filename: internal/graph/model/models_gen.go
+  package: model
+
+resolver:
+  layout: follow-schema
+  dir: internal/graph
+  package: graph
+  filename_template: "{name}.resolvers.go"
+
+models:
+  ID:
+    model:
+      - tallyo/internal/graph/model.GlobalID
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int32
+  Date:
+    model:
+      - tallyo/internal/graph/model.Date
+  DateTime:
+    model:
+      - tallyo/internal/graph/model.DateTime
+  Money:
+    model:
+      - tallyo/internal/graph/model.Money
+  Transaction:
+    fields:
+      tags:
+        resolver: true
+  Connection:
+    model: tallyo/internal/graph/model.Connection
+    fields:
+      provider:
+        resolver: true
+  SimpleFinAccessToken:
+    fields:
+      connections:
+        resolver: true
+  Account:
+    fields:
+      connection:
+        resolver: true
+      latestSnapshot:
+        resolver: true
+      accountWealthProperty:
+        resolver: true
+      typeLocked:
+        resolver: true
+      lastSyncedAt:
+        resolver: true
+  PlaidItem:
+    fields:
+      credential:
+        resolver: true
+      accounts:
+        resolver: true
+  Rule:
+    fields:
+      tags:
+        resolver: true
+      accounts:
+        resolver: true
+  Asset:
+    model: tallyo/internal/graph/model.Asset
+    fields:
+      details:
+        resolver: true
+      adapterSources:
+        resolver: true
+      latestSnapshot:
+        resolver: true
+  Holding:
+    fields:
+      account:
+        resolver: true

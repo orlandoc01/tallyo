@@ -1,0 +1,47 @@
+# =============================================================================
+# Base — scalars, directives, and shared primitives
+# =============================================================================
+
+scalar Date      # YYYY-MM-DD (UTC, no time component)
+scalar DateTime  # RFC 3339
+scalar Money     # USD amount, serialized as a JSON number of dollars (e.g. 12.34)
+
+directive @requiresScope(scope: String!) on FIELD_DEFINITION
+directive @requiresDynamicScope on FIELD_DEFINITION
+
+interface Node {
+  id: ID!
+}
+
+# Shared across multiple domains (Transactions uses it in SpendingFilter;
+# Wealth uses it in NetWorthInput).
+enum Granularity {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input DateTimeRange {
+  """Inclusive lower bound as an ISO 8601 timestamp."""
+  from: DateTime
+  """Exclusive upper bound as an ISO 8601 timestamp."""
+  to: DateTime
+}
+
+# Root types — fields are added via `extend type` in each domain file.
+type Query
+type Mutation
+
+extend type Query {
+  node(id: ID!): Node @requiresDynamicScope
+  nodes(ids: [ID!]!): [Node] @requiresDynamicScope
+}

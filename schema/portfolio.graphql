@@ -1,0 +1,66 @@
+# =============================================================================
+# Portfolio domain — investment analysis and allocation breakdowns.
+# =============================================================================
+
+enum AnalysisView {
+  COMPOSITION
+  MORNINGSTAR_CATEGORY
+  MORNINGSTAR_GROUP
+  SECTORS
+}
+
+input AnalysisInput {
+  view: AnalysisView!
+  ownerIds: [ID!]
+  accountSubtypes: [String!]
+  accountIds: [ID!]
+  includeUnclassified: Boolean = false
+}
+
+"""One segment of an analysis breakdown, e.g. 'US Equity' or 'Technology'."""
+type AnalysisSlice {
+  """Human-readable label for this segment."""
+  label: String!
+  """Total USD value attributed to this segment."""
+  valueUSD: Money!
+  """Percentage of the total analyzed portfolio (0-100)."""
+  percent: Float!
+  """Individual holdings that contribute to this segment."""
+  holdings: [AnalysisHolding!]!
+}
+
+"""A single holding's contribution to an analysis slice."""
+type AnalysisHolding {
+  asset: Asset!
+  """USD value this holding contributes to the parent slice."""
+  valueUSD: Money!
+  """Percentage of the parent slice's total value (0-100)."""
+  percent: Float!
+}
+
+"""Result of the analysis query: a full breakdown for a single view."""
+type AnalysisReport {
+  view: AnalysisView!
+  """Total USD value of all analyzed PUBLIC holdings before slicing."""
+  totalValueUSD: Money!
+  """Breakdown segments, sorted descending by valueUSD."""
+  slices: [AnalysisSlice!]!
+}
+
+extend type Asset {
+  investmentConnectivity: ConnectivityStatus!
+}
+
+extend input UpdateAssetInput {
+  investmentConnectivity: ConnectivityStatus
+}
+
+extend input AssetsInput {
+  investmentConnectivity: ConnectivityStatus
+}
+
+extend type Query {
+  """Portfolio allocation analysis across multiple views."""
+  analysis(input: AnalysisInput!): AnalysisReport!
+    @requiresScope(scope: "read:portfolio")
+}

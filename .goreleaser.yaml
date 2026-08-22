@@ -1,0 +1,98 @@
+version: 2
+
+project_name: tallyo
+
+before:
+  hooks:
+    - sh -c 'cd web && npm ci && npm run build'
+    - make -C server generate
+    - make -C server sync-web
+
+builds:
+  - id: tallyo
+    dir: server
+    main: ./cmd/tallyo
+    binary: tallyo
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: tallyo
+    ids:
+      - tallyo
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - id: archives
+    artifacts: archive
+    disable: false
+
+dockers_v2:
+  - id: tallyo
+    ids:
+      - tallyo
+    dockerfile: Dockerfile
+    images:
+      - 'ghcr.io/orlandoc01/tallyo'
+    tags:
+      - '{{ .Version }}'
+      - 'v{{ .Major }}.{{ .Minor }}'
+      - latest
+    labels:
+      org.opencontainers.image.created: '{{ .Date }}'
+      org.opencontainers.image.licenses: Apache-2.0
+      org.opencontainers.image.name: '{{ .ProjectName }}'
+      org.opencontainers.image.revision: '{{ .FullCommit }}'
+      org.opencontainers.image.version: '{{ .Version }}'
+    platforms:
+      - linux/amd64
+      - linux/arm64
+
+snapshot:
+  version_template: '0.0.0-{{ .ShortCommit }}'
+
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Maintenance
+      regexp: '^.*?(chore|ci|docs|refactor|test)(\(.+\))??!?:.+$'
+      order: 2
+    - title: Other Changes
+      order: 999
+  filters:
+    exclude:
+      - '^Merge pull request'
+      - '^Merge branch'

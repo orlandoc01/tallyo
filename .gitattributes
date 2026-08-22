@@ -1,0 +1,6 @@
+# Collapse generated code in review diffs.
+server/internal/database/dbgen/** linguist-generated=true
+server/internal/graph/generated.go linguist-generated=true
+server/internal/graph/model/models_gen.go linguist-generated=true
+web/src/graphql/schema.json linguist-generated=true
+web/src/types/graphql.ts linguist-generated=true

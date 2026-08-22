@@ -1,0 +1,19 @@
+{
+  "$schema": "https://fallow.rs/schema.json",
+  "ignorePatterns": [
+    "src/types/graphql.ts"
+  ],
+  "ignoreExports": [
+    { "file": "src/test/permissions.ts", "exports": ["allowAllPermissions"] },
+    { "file": "src/test/urql.ts", "exports": ["mockUrql"] }
+  ],
+  "ignoreDependencies": [
+    "msw",
+    "tailwindcss"
+  ],
+  "duplicates": {
+    "ignore": [
+      "src/styles/index.css"
+    ]
+  }
+}
