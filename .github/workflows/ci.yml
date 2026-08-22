@@ -21,11 +21,11 @@ jobs:
           - check_name: lint
             command: npm run lint
           - check_name: coverage
-            command: npm run test:coverage -- --pool=forks --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+            command: npm run test:coverage -- --pool=forks --maxWorkers=1 --no-file-parallelism
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -55,9 +55,9 @@ jobs:
           - check_name: coverage
             command: make coverage GO_TEST_PARALLEL="$(nproc)"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
@@ -70,14 +70,14 @@ jobs:
     name: Release build (snapshot)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: web/.nvmrc
           cache: npm

@@ -45,18 +45,18 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
     this.state = { error: null }
   }
 
-  /* v8 ignore next 3 */
+  /* v8 ignore next -- @preserve */
   static getDerivedStateFromError(error: Error) {
     return { error }
   }
 
-  /* v8 ignore next 3 */
+  /* v8 ignore next -- @preserve */
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('App render error:', error, info)
   }
 
   render() {
-    /* v8 ignore next 12 */
+    /* v8 ignore if -- @preserve */
     if (this.state.error) {
       return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-paper p-8 text-center">

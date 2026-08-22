@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { cloneElement, isValidElement } from 'react'
-import type { ComponentProps, ReactElement, ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountSidebar } from './AccountSidebar'
@@ -348,22 +347,19 @@ describe('wealth components', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Historical asset allocation chart' }))
 
     const tooltipProps = tooltipSpy.mock.calls.at(-1)?.[0] as { content?: unknown } | undefined
-    expect(tooltipProps?.content).toBeDefined()
-    expect(isValidElement(tooltipProps?.content)).toBe(true)
+    const tooltipContent = tooltipProps?.content as ((props: { active: boolean; label: string; payload: Array<{ color: string; dataKey: string; name: string; value: number }> }) => ReactNode) | undefined
+    expect(tooltipContent).toBeTypeOf('function')
+    if (!tooltipContent) throw new Error('missing tooltip content')
 
-    const tooltipContent = tooltipProps?.content as ReactElement<Record<string, unknown>>
-
-    render(
-      cloneElement(tooltipContent, {
-        active: true,
-        label: '2026-06-01',
-        payload: [
-          { color: '#10b981', dataKey: 'Cash & Equivalents', name: 'Cash & Equivalents', value: 400 },
-          { color: '#3b82f6', dataKey: 'Public Assets', name: 'Public Assets', value: 700 },
-          { color: '#f97316', dataKey: 'Cards', name: 'Cards', value: 200 },
-        ],
-      }),
-    )
+    render(tooltipContent({
+      active: true,
+      label: '2026-06-01',
+      payload: [
+        { color: '#10b981', dataKey: 'Cash & Equivalents', name: 'Cash & Equivalents', value: 400 },
+        { color: '#3b82f6', dataKey: 'Public Assets', name: 'Public Assets', value: 700 },
+        { color: '#f97316', dataKey: 'Cards', name: 'Cards', value: 200 },
+      ],
+    }))
 
     expect(screen.getAllByText(/Cash & Equivalents|Public Assets|Cards/).map((node) => node.textContent)).toEqual([
       'Public Assets',

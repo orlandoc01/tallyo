@@ -1,8 +1,7 @@
 import { AreaChart as AreaChartIcon, LineChart as LineChartIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { Payload } from 'recharts/types/component/DefaultTooltipContent'
-import type { TooltipProps } from 'recharts/types/component/Tooltip'
+import type { MouseHandlerDataParam, TooltipContentProps, TooltipPayloadEntry, TooltipValueType } from 'recharts'
 import { displayAmount } from './amountDisplay'
 import { formatCurrency, formatCurrencyCompact, formatSignedCurrency } from '../../utils/currency'
 import type { AssetClassifier, ClassifierHistoryPoint, LiabilityCategory, LiabilityHistoryPoint, NetWorthPoint, NetWorthRange } from '../../types/graphql'
@@ -18,8 +17,6 @@ const ranges: { id: NetWorthRange; label: string }[] = [
 type ChartView = 'NET_WORTH' | 'HISTORICAL_ALLOCATION'
 
 type AllocationRow = { date: string } & Record<string, string | number>
-
-type TooltipValue = string | number | Array<string | number>
 
 const classifierColors: Record<AssetClassifier, string> = {
   CASH: '#10b981',
@@ -49,7 +46,7 @@ export function NetWorthChart({ points, classifierSeries = [], liabilitySeries =
   const displayedValue = displayedPoint?.netWorthUSD ?? netWorthUSD
   const displayedDate = displayedPoint?.date ?? asOfDate
 
-  function handleChartMouseMove(state: unknown) {
+  function handleChartMouseMove(state: MouseHandlerDataParam) {
     const nextDate = hoveredDateFromState(state)
     setHoveredDate((current) => current === nextDate ? current : nextDate)
   }
@@ -92,7 +89,7 @@ export function NetWorthChart({ points, classifierSeries = [], liabilitySeries =
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} />
               <YAxis tickFormatter={(value) => displayAmount(amountsHidden, formatCurrencyCompact(Number(value)))} tick={{ fontSize: 11 }} tickLine={false} width={54} />
-              <Tooltip content={<NetWorthTooltip amountsHidden={amountsHidden} />} />
+              <Tooltip content={(props) => <NetWorthTooltip {...props} amountsHidden={amountsHidden} />} />
               <Area dataKey="netWorthUSD" fill="url(#netWorthFill)" stroke={stroke} strokeWidth={3} type="monotone" />
             </AreaChart>
           ) : (
@@ -107,7 +104,7 @@ export function NetWorthChart({ points, classifierSeries = [], liabilitySeries =
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} />
               <YAxis domain={['dataMin', 'dataMax']} tickFormatter={(value) => displayAmount(amountsHidden, formatCurrencyCompact(Number(value)))} tick={{ fontSize: 11 }} tickLine={false} width={54} />
-              <Tooltip content={<AllocationTooltip amountsHidden={amountsHidden} />} />
+              <Tooltip content={(props) => <AllocationTooltip {...props} amountsHidden={amountsHidden} />} />
               {assetConfigs.map((item) => (
                 <Area dataKey={item.label} fill={`url(#allocationFill-${item.key})`} key={item.key} stroke={item.color} strokeWidth={2} type="monotone" />
               ))}
@@ -122,7 +119,7 @@ export function NetWorthChart({ points, classifierSeries = [], liabilitySeries =
   )
 }
 
-function NetWorthTooltip({ active, payload, amountsHidden }: TooltipProps<number, string> & { amountsHidden: boolean }) {
+function NetWorthTooltip({ active, payload, amountsHidden }: TooltipContentProps & { amountsHidden: boolean }) {
   if (!active || !payload?.length) {
     return null
   }
@@ -146,12 +143,12 @@ function NetWorthTooltip({ active, payload, amountsHidden }: TooltipProps<number
   )
 }
 
-function AllocationTooltip({ active, payload, label, amountsHidden }: TooltipProps<TooltipValue, string> & { amountsHidden: boolean }) {
+function AllocationTooltip({ active, payload, label, amountsHidden }: TooltipContentProps & { amountsHidden: boolean }) {
   if (!active || !payload?.length) {
     return null
   }
 
-  const sortedPayload: Array<Payload<TooltipValue, string>> = [...payload].sort((left, right) => tooltipItemValue(right.value) - tooltipItemValue(left.value))
+  const sortedPayload: TooltipPayloadEntry[] = [...payload].sort((left, right) => tooltipItemValue(right.value) - tooltipItemValue(left.value))
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 shadow-sm">
@@ -170,7 +167,7 @@ function AllocationTooltip({ active, payload, label, amountsHidden }: TooltipPro
   )
 }
 
-function tooltipItemValue(value: TooltipValue | undefined) {
+function tooltipItemValue(value: TooltipValueType | undefined) {
   if (Array.isArray(value)) {
     return Number(value[0] ?? 0)
   }

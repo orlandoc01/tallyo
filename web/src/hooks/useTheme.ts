@@ -28,7 +28,7 @@ export function useTheme() {
     applyTheme(theme)
     if (theme !== 'system') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    /* v8 ignore next 4 */
+    /* v8 ignore next 4 -- @preserve */
     const handler = () => {
       setIsDark(mq.matches)
       applyTheme('system')

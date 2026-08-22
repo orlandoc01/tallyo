@@ -40,7 +40,7 @@ export function CashFlowChart({
               margin={{ top: 12, right: 8, bottom: 0, left: 0 }}
               onClick={(state) => {
                 const idx = state?.activeTooltipIndex
-                if (idx !== undefined) onSelectPeriod(idx)
+                if (typeof idx === 'number') onSelectPeriod(idx)
               }}
               style={{ cursor: 'pointer' }}
             >
@@ -53,10 +53,10 @@ export function CashFlowChart({
                 yAxisProps: { axisLine: false, domain: [chartDomain.min, chartDomain.max], tick: { fill: palette.axisTickFill, fontSize: isMobile ? 11 : 12 }, ticks: buildCashFlowAxisTicks(chartDomain) },
                 yAxisWidth: isMobile ? 56 : 88,
               })}
-              <Tooltip content={(props) => <CashFlowTooltip active={props.active} payload={props.payload as { payload: CashFlowChartDatum }[] | undefined} />} />
+              <Tooltip content={(props) => <CashFlowTooltip active={props.active} payload={props.payload} />} />
               <ReferenceLine stroke={palette.zeroLineStroke} strokeWidth={1.5} y={0} />
               {/* Single bar per period; custom shape draws green income (up) and red expense (down) from y=0 */}
-              {/* v8 ignore next */}
+              {/* v8 ignore next -- @preserve */}
               <Bar dataKey="income" shape={(props: unknown) => renderCashFlowBar(props as BarShapeProps, palette, selectedPeriodIndex) ?? <g />} />
               <Line
                 activeDot={{ fill: palette.netDotFill, r: 5, stroke: palette.netLineStroke, strokeWidth: 2.5 }}
@@ -136,10 +136,10 @@ function CashFlowTooltip({
   payload,
 }: {
   active?: boolean
-  payload?: { payload: CashFlowChartDatum }[]
+  payload?: ReadonlyArray<{ payload?: CashFlowChartDatum }>
 }) {
   if (!active || !payload?.length) return null
-  const d = payload[0].payload
+  const d = payload[0].payload!
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-3 text-sm shadow-lg">
       <p className="mb-2 font-semibold">{d.periodLabel}</p>
