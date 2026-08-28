@@ -15,6 +15,7 @@ import { EmptyState } from '../components/common/EmptyState'
 import { ErrorState } from '../components/common/ErrorState'
 import { Card, FormSuccess } from '../components/common/FormControls'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
+import { PageHeader } from '../components/common/PageHeader'
 import { mobileHeaderActionClass } from '../components/common/mobileHeaderActionClass'
 import { useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { useAccounts, useConnections } from '../hooks/useEntityQueries'
@@ -100,9 +101,10 @@ export function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      {canWriteAccounts ? (
-        <div className="hidden justify-end gap-3 lg:flex">
-          <Button className="gap-2" onClick={() => setLinkingStep('chooser')} type="button">
+      <PageHeader
+        actions={canWriteAccounts ? (
+          <>
+          <Button className="gap-2" onClick={() => setLinkingStep('chooser')} type="button" variant="secondary">
             <Plus className="h-4 w-4" />
             Link Connection
           </Button>
@@ -110,8 +112,10 @@ export function AccountsPage() {
             <Plus className="h-4 w-4" />
             Add
           </Button>
-        </div>
-      ) : null}
+          </>
+        ) : undefined}
+        title="Accounts"
+      />
 
       {message ? <FormSuccess>{message}</FormSuccess> : null}
       {isRepairing ? <LoadingSpinner label="Opening Plaid Link" /> : null}

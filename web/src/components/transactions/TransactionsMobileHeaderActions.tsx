@@ -34,7 +34,7 @@ export function TransactionsMobileHeaderActions({
       <button
         aria-expanded={showMobileSummary}
         aria-label="Open transaction summary"
-        className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5', showMobileSummary)}
+        className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', showMobileSummary)}
         disabled={!summaryAvailable}
         onClick={onToggleSummary}
         type="button"
@@ -45,7 +45,7 @@ export function TransactionsMobileHeaderActions({
         <button
           aria-label={isBulkMode ? 'Exit bulk select' : 'Bulk actions'}
           aria-pressed={isBulkMode}
-          className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5', isBulkMode)}
+          className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', isBulkMode)}
           onClick={onToggleBulk}
           type="button"
         >

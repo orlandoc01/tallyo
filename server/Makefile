@@ -5,7 +5,7 @@ COVER_RAW := $(COVER_DIR)/tallyo.cover
 COVER_FILTERED := $(COVER_DIR)/tallyo.handwritten.cover
 COVER_MIN := 75.0
 GO_TEST_PARALLEL ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
-GOLANGCI_LINT_VERSION := v2.12.2
+GOLANGCI_LINT_VERSION := v2.13.1
 SQLC_VERSION := v1.31.1
 GO_PACKAGES = $(shell go list ./... | grep -vE '/web(/|$$)')
 test:
@@ -54,7 +54,7 @@ test-all: check-codegen test-sql lint deadcode coverage
 
 coverage:
 	@mkdir -p $(COVER_DIR)
-	go test -race -count=1 -p=$(GO_TEST_PARALLEL) -parallel=$(GO_TEST_PARALLEL) $(GO_PACKAGES) -coverprofile=$(COVER_RAW)
+	go test -race -count=1 -p=$(GO_TEST_PARALLEL) -parallel=$(GO_TEST_PARALLEL) -coverpkg=./internal/... $(GO_PACKAGES) -coverprofile=$(COVER_RAW)
 	@awk 'NR==1 || ($$0 !~ /cmd\// && $$0 !~ /internal\/graph\/generated.go/ && $$0 !~ /internal\/graph\/model\/models_gen.go/ && $$0 !~ /internal\/database\/dbgen\//)' $(COVER_RAW) > $(COVER_FILTERED)
 	@total=$$(go tool cover -func=$(COVER_FILTERED) | awk '/^total:/ { sub(/%/, "", $$3); print $$3 }'); \
 		printf 'total: %s%% (minimum: %.1f%%)\n' "$$total" $(COVER_MIN); \

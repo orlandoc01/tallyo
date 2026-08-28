@@ -151,7 +151,7 @@ describe('PortfolioPage', () => {
 
     const filterButton = await screen.findByRole('button', { name: 'Open filters' })
 
-    expect(filterButton).toHaveClass('rounded-2xl', 'p-2.5')
+    expect(filterButton).toHaveClass('rounded-xl', 'p-2.5')
 
     await user.click(filterButton)
 

@@ -1,14 +1,14 @@
 -- Used by GraphQL tag list and node lookup paths with an optional ID filter.
 -- name: ListTags :many
-SELECT id, name, color, transaction_count
-FROM tags
+SELECT t.*
+FROM tags t
 WHERE TRUE
-  AND id = @id -- :if @id
-ORDER BY name, id;
+  AND t.id = @id -- :if @id
+ORDER BY t.name, t.id;
 
 -- Used by GraphQL mutation createTag via transactions/db.Store.CreateTag.
 -- name: CreateTag :one
-INSERT INTO tags (name, color) VALUES (@name, @color) RETURNING id, name, color, transaction_count;
+INSERT INTO tags (name, color) VALUES (@name, @color) RETURNING *;
 
 -- Used by GraphQL mutation updateTag via transactions/db.Store.UpdateTag.
 -- name: UpdateTag :one
@@ -17,7 +17,7 @@ SET name = @name,
     color = @color,
     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
 WHERE id = @id
-RETURNING id, name, color, transaction_count;
+RETURNING *;
 
 -- Used by GraphQL mutation deleteTag via transactions/db.Store.DeleteTag.
 -- name: DeleteTag :execrows
@@ -25,7 +25,7 @@ DELETE FROM tags WHERE id = @id;
 
 -- Used by the Transaction.tags dataloader (internal/graph/loaders.go) to batch-load tags for a list of transactions.
 -- name: TagsByTransactionIDs :many
-SELECT tt.transaction_id, t.id, t.name, t.color, t.transaction_count
+SELECT tt.transaction_id, sqlc.embed(t)
 FROM transaction_tags tt
 JOIN tags t ON t.id = tt.tag_id
 WHERE tt.transaction_id IN (sqlc.slice('transaction_ids'))

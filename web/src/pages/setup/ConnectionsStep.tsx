@@ -33,12 +33,12 @@ export function ConnectionsStep() {
       <SetupHeading eyebrow="Data providers" title="Connect your data provider" />
       <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Configure Plaid or SimpleFIN to start syncing transactions. You can skip this for now and add credentials later in Settings.</p>
 
-      <div className="mt-8 inline-flex rounded-2xl bg-brand-100 p-1" role="tablist" aria-label="Connection providers">
+      <div className="mt-8 inline-flex rounded-full bg-brand-100 p-1" role="tablist" aria-label="Connection providers">
         {TABS.map((tab) => (
           <button
             aria-selected={activeTab === tab.value}
             className={clsx(
-              'rounded-xl px-4 py-2 text-sm font-bold transition',
+              'rounded-full px-4 py-2 text-sm font-bold transition',
               activeTab === tab.value ? 'bg-white text-neutral-900 ring-2 ring-brand-600 shadow-sm' : 'text-brand-800 hover:bg-brand-50',
             )}
             key={tab.value}
@@ -90,10 +90,10 @@ function PlaidForm() {
         <SetupTextField label="Label" placeholder="Primary" value={label} onChange={setLabel} />
         <div>
           <span className="text-sm font-bold text-neutral-900">Environment</span>
-          <div className="mt-1 grid grid-cols-2 gap-2 rounded-2xl bg-brand-100 p-1">
+          <div className="mt-1 grid grid-cols-2 gap-2 rounded-full bg-brand-100 p-1">
             {(['SANDBOX', 'PRODUCTION'] as PlaidEnvironment[]).map((env) => (
               <button
-                className={`rounded-xl px-3 py-3 text-sm font-bold transition ${environment === env ? 'bg-white text-neutral-900 ring-2 ring-brand-600 shadow-sm' : 'text-brand-800 hover:bg-brand-50'}`}
+                className={`rounded-full px-3 py-3 text-sm font-bold transition ${environment === env ? 'bg-white text-neutral-900 ring-2 ring-brand-600 shadow-sm' : 'text-brand-800 hover:bg-brand-50'}`}
                 key={env}
                 onClick={() => setEnvironment(env)}
                 type="button"

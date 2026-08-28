@@ -97,7 +97,7 @@ export function SearchInput({ ariaLabel, placeholder, value, onChange, className
       <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
       <input
         aria-label={ariaLabel}
-        className="w-full rounded-2xl border border-neutral-200 bg-white py-2.5 pl-9 pr-4 text-sm outline-none focus:border-brand-500"
+        className="w-full rounded-xl border border-neutral-200 bg-white py-2.5 pl-9 pr-4 text-sm outline-none focus:border-brand-500"
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -120,7 +120,7 @@ export function FormSuccess({ children }: { children: ReactNode }) {
 }
 
 export function SectionLabel({ as: Component = 'h2', children, className, tone = 'default' }: HTMLAttributes<HTMLElement> & { as?: 'h2' | 'h3' | 'h4' | 'p'; tone?: 'default' | 'muted' }) {
-  return <Component className={clsx('text-xs font-semibold uppercase tracking-widest', tone === 'muted' ? 'text-neutral-400' : 'text-neutral-500', className)}>{children}</Component>
+  return <Component className={clsx('text-sm font-semibold', tone === 'muted' ? 'text-neutral-400' : 'text-neutral-500', className)}>{children}</Component>
 }
 
 export function Card({ as: Component = 'div', children, className, padded = false, compact = false, overflow = 'hidden', ...props }: HTMLAttributes<HTMLElement> & {
@@ -134,7 +134,7 @@ export function Card({ as: Component = 'div', children, className, padded = fals
       className={clsx(
         overflow === 'hidden' ? 'overflow-hidden' : 'overflow-visible',
         'border border-neutral-200 bg-white',
-        compact ? 'rounded-2xl shadow-sm' : 'rounded-3xl shadow-card',
+        compact ? 'rounded-2xl shadow-sm' : 'rounded-2xl shadow-card',
         padded && 'p-5',
         className,
       )}

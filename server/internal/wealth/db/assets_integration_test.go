@@ -647,7 +647,7 @@ func TestUpdateAssetForcedPriceLogic(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			val, set, clear, err := updateAssetForcedPrice(tc.input)
+			update, err := updateAssetForcedPrice(tc.input)
 			if tc.wantErrSubstr != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErrSubstr) {
 					t.Fatalf("error = %v, want %q", err, tc.wantErrSubstr)
@@ -657,18 +657,18 @@ func TestUpdateAssetForcedPriceLogic(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if set != tc.wantSet {
-				t.Fatalf("set = %v, want %v", set, tc.wantSet)
+			if update.Set != tc.wantSet {
+				t.Fatalf("set = %v, want %v", update.Set, tc.wantSet)
 			}
-			if clear != tc.wantClear {
-				t.Fatalf("clear = %v, want %v", clear, tc.wantClear)
+			if update.Clear != tc.wantClear {
+				t.Fatalf("clear = %v, want %v", update.Clear, tc.wantClear)
 			}
 			if tc.wantValue == nil {
-				if val != nil {
-					t.Fatalf("value = %v, want nil", val)
+				if update.Value != nil {
+					t.Fatalf("value = %v, want nil", update.Value)
 				}
-			} else if val == nil || *val != *tc.wantValue {
-				t.Fatalf("value = %v, want %v", val, *tc.wantValue)
+			} else if update.Value == nil || *update.Value != *tc.wantValue {
+				t.Fatalf("value = %v, want %v", update.Value, *tc.wantValue)
 			}
 		})
 	}

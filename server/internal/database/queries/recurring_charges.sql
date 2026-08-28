@@ -38,25 +38,14 @@ WHERE source = 'plaid'
 
 -- Used by GraphQL query recurringCharges (transactions.graphql) via transactions/db.Store.
 -- name: ListRecurringCharges :many
-SELECT
-  recurring_charges.id,
-  recurring_charges.description,
-  recurring_charges.merchant_name,
-  recurring_charges.frequency,
-  recurring_charges.status,
-  recurring_charges.is_active,
-  recurring_charges.average_amount_cents,
-  recurring_charges.last_amount_cents,
-  recurring_charges.first_date,
-  recurring_charges.last_date,
-  recurring_charges.is_user_modified
-FROM recurring_charges
-JOIN accounts ON accounts.id = recurring_charges.account_id
+SELECT rc.*
+FROM recurring_charges rc
+JOIN accounts ON accounts.id = rc.account_id
 WHERE TRUE
-  AND recurring_charges.id = @id -- :if @id
-  AND recurring_charges.status != 'TOMBSTONED'
+  AND rc.id = @id -- :if @id
+  AND rc.status != 'TOMBSTONED'
   AND accounts.is_hidden = 0
-ORDER BY recurring_charges.last_date DESC;
+ORDER BY rc.last_date DESC;
 
 -- Used by the RecurringCharge.transactions GraphQL field's dataloader (internal/graph/loaders.go) to batch-load associated transaction IDs.
 -- name: RecurringChargeTransactionIDsByChargeIDs :many
@@ -71,14 +60,6 @@ WITH ranked AS (
   SELECT
     rct.charge_id,
     cr.cat_id,
-    cr.cat_name,
-    cr.cat_emoji,
-    cr.group_name,
-    cr.group_emoji,
-    cr.group_kind,
-    cr.sort_order,
-    cr.group_id,
-    cr.plaid_pfc2_codes,
     ROW_NUMBER() OVER (
       PARTITION BY rct.charge_id
       ORDER BY COUNT(*) DESC, MAX(t.datetime) DESC
@@ -89,7 +70,8 @@ WITH ranked AS (
   WHERE rct.charge_id IN (sqlc.slice('charge_ids'))
   GROUP BY rct.charge_id, cr.cat_id
 )
-SELECT charge_id, cat_id, cat_name, cat_emoji, group_name, group_emoji, group_kind, sort_order, group_id, plaid_pfc2_codes
+SELECT ranked.charge_id, sqlc.embed(cr)
 FROM ranked
-WHERE rn = 1
-ORDER BY charge_id;
+JOIN category_rows cr ON cr.cat_id = ranked.cat_id
+WHERE ranked.rn = 1
+ORDER BY ranked.charge_id;

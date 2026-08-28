@@ -14,7 +14,7 @@ import (
 
 func (s *Store) GetAccountBalanceSnapshotByID(ctx context.Context, id int64) (*wealth.SnapshotRow, error) {
 	row, err := s.q.GetAccountBalanceSnapshotByID(ctx, dbgen.GetAccountBalanceSnapshotByIDParams{ID: id})
-	return dbutil.MapRow(row, err, snapshotRowFromSQLRow[dbgen.GetAccountBalanceSnapshotByIDRow])
+	return dbutil.MapRow(row, err, snapshotRowFromSQLRow)
 }
 
 func (s *Store) LatestAccountBalanceSnapshotInWindow(
@@ -36,7 +36,7 @@ func (s *Store) LatestAccountBalanceSnapshotInWindow(
 		StartTime: &start,
 		EndTime:   &end,
 	})
-	return dbutil.MapRow(row, err, snapshotRowFromSQLRow[dbgen.LatestAccountBalanceSnapshotInWindowRow])
+	return dbutil.MapRow(row, err, snapshotRowFromSQLRow)
 }
 
 func (s *Store) LatestAccountBalanceSnapshotForAccount(ctx context.Context, accountID int64) (*wealth.SnapshotRow, error) {
@@ -46,7 +46,7 @@ func (s *Store) LatestAccountBalanceSnapshotForAccount(ctx context.Context, acco
 			AccountID: accountID,
 		},
 	)
-	return dbutil.MapRow(row, err, snapshotRowFromSQLRow[dbgen.LatestAccountBalanceSnapshotInWindowRow])
+	return dbutil.MapRow(row, err, snapshotRowFromSQLRow)
 }
 
 func (s *Store) NewerAccountBalanceSnapshotsForAccount(ctx context.Context, accountID int64, date string) ([]*wealth.SnapshotRow, error) {
@@ -54,7 +54,7 @@ func (s *Store) NewerAccountBalanceSnapshotsForAccount(ctx context.Context, acco
 		ctx,
 		dbgen.NewerAccountBalanceSnapshotsForAccountParams{AccountID: accountID, Date: date},
 	)
-	return dbutil.MapRows(rows, err, snapshotRowFromSQLRow[dbgen.NewerAccountBalanceSnapshotsForAccountRow])
+	return dbutil.MapRows(rows, err, snapshotRowFromSQLRow)
 }
 
 func (s *Store) LatestAccountBalanceSnapshotsForAccounts(ctx context.Context, accountIDs []int64) (map[int64]*wealth.SnapshotRow, error) {

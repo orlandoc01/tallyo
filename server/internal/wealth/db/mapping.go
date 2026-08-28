@@ -30,24 +30,6 @@ func assetFromModel(a dbgen.Asset) model.Asset {
 	}
 }
 
-func assetModelFromUpsertRow(r dbgen.UpsertAssetRowRow) dbgen.Asset {
-	return dbgen.Asset{
-		ID:                     r.ID,
-		AssetType:              r.AssetType,
-		Identifier:             r.Identifier,
-		Name:                   r.Name,
-		Classifier:             r.Classifier,
-		Additional:             r.Additional,
-		LastPrice:              r.LastPrice,
-		LastPriceAt:            r.LastPriceAt,
-		ForcedUsdPrice:         r.ForcedUsdPrice,
-		TrackingTicker:         r.TrackingTicker,
-		TrackingMultiplier:     r.TrackingMultiplier,
-		PriceConnectivity:      r.PriceConnectivity,
-		InvestmentConnectivity: r.InvestmentConnectivity,
-	}
-}
-
 func assetFromAllAssetsRow(r dbgen.AssetRecordsRow) (*model.Asset, error) {
 	return assetFromRow(r.Asset)
 }

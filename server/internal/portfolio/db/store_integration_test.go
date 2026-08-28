@@ -7,7 +7,6 @@ import (
 
 	accountsdb "tallyo/internal/accounts/db"
 	admindb "tallyo/internal/admin/db"
-	"tallyo/internal/clients/yfinance"
 	"tallyo/internal/graph/model"
 	"tallyo/internal/money"
 	"tallyo/internal/portfolio"
@@ -51,9 +50,9 @@ func TestStoreReportsAndCurrentPublicHoldings(t *testing.T) {
 	assetID := asset.ID.Int64()
 	zeroWeightAssetID := zeroWeightAsset.ID.Int64()
 	fetchedAt := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
-	vtiReport := portfolio.AssetReport{AssetID: assetID, FundReport: yfinance.FundReport{Category: "Large Blend", Group: "US Equity", StockPosition: 1, SectorTechnology: 0.25}, FetchedAt: fetchedAt}
+	vtiReport := portfolio.AssetReport{AssetID: assetID, Category: "Large Blend", Group: "US Equity", StockPosition: 1, SectorTechnology: 0.25, FetchedAt: fetchedAt}
 	must.NoErr(t, store.UpsertReport(ctx, vtiReport))
-	must.NoErr(t, store.UpsertReport(ctx, portfolio.AssetReport{AssetID: zeroWeightAssetID, FundReport: yfinance.FundReport{Category: "Stable Value", Group: "Other"}, FetchedAt: fetchedAt}))
+	must.NoErr(t, store.UpsertReport(ctx, portfolio.AssetReport{AssetID: zeroWeightAssetID, Category: "Stable Value", Group: "Other", FetchedAt: fetchedAt}))
 	needing, err := store.PublicAssetsNeedingReport(ctx, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 	if err != nil || len(needing) != 3 || needing[0].Identifier != "MISSING" || needing[1].Identifier != "VTI" {
 		t.Fatalf("PublicAssetsNeedingReport() = %#v, %v", needing, err)

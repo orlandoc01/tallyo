@@ -126,14 +126,7 @@ func (r *Resolver) UpdateConfiguration(ctx context.Context, input model.UpdateCo
 	if err := r.Admin.UpdateSections(ctx, patch); err != nil {
 		return nil, err
 	}
-	payload := &model.UpdateConfigurationPayload{Configuration: r.Configuration()}
-	if input.Authorization != nil {
-		// Graceful shutdown (triggered by ScheduleRestart) drains this
-		// mutation's own in-flight response before the process exits, so no
-		// artificial delay is needed here.
-		r.ScheduleRestart()
-	}
-	return payload, nil
+	return &model.UpdateConfigurationPayload{Configuration: r.Configuration()}, nil
 }
 
 func preserveSecret(value, current *string) *string {

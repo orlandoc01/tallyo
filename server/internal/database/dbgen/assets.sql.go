@@ -720,10 +720,7 @@ ON CONFLICT(asset_type, identifier) DO UPDATE SET
     ELSE assets.last_price_at
   END,
   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
-RETURNING id, asset_type, identifier, name, classifier,
-  additional, last_price, last_price_at, forced_usd_price,
-  tracking_ticker, tracking_multiplier,
-  price_connectivity, investment_connectivity
+RETURNING additional, asset_type, classifier, created_at, forced_usd_price, id, identifier, investment_connectivity, last_price, last_price_at, name, price_connectivity, tracking_multiplier, tracking_ticker, updated_at, user_created, user_edited
 `
 
 type UpsertAssetRowParams struct {
@@ -741,24 +738,8 @@ type UpsertAssetRowParams struct {
 	LastPriceAt        *time.Time
 }
 
-type UpsertAssetRowRow struct {
-	ID                     int64
-	AssetType              string
-	Identifier             string
-	Name                   *string
-	Classifier             string
-	Additional             *string
-	LastPrice              *float64
-	LastPriceAt            *time.Time
-	ForcedUsdPrice         *float64
-	TrackingTicker         *string
-	TrackingMultiplier     float64
-	PriceConnectivity      string
-	InvestmentConnectivity string
-}
-
 // Used by wealth/db.Store.UpsertAsset (Plaid/SimpleFIN/DeBank adapter syncs, and GraphQL mutations createAsset/updateAsset) to insert or update an asset while preserving user-edited fields.
-func (q *Queries) UpsertAssetRow(ctx context.Context, arg UpsertAssetRowParams) (UpsertAssetRowRow, error) {
+func (q *Queries) UpsertAssetRow(ctx context.Context, arg UpsertAssetRowParams) (Asset, error) {
 	row := q.db.QueryRowContext(ctx, upsertAssetRow,
 		arg.AssetType,
 		arg.Identifier,
@@ -773,21 +754,25 @@ func (q *Queries) UpsertAssetRow(ctx context.Context, arg UpsertAssetRowParams) 
 		arg.LastPrice,
 		arg.LastPriceAt,
 	)
-	var i UpsertAssetRowRow
+	var i Asset
 	err := row.Scan(
-		&i.ID,
-		&i.AssetType,
-		&i.Identifier,
-		&i.Name,
-		&i.Classifier,
 		&i.Additional,
+		&i.AssetType,
+		&i.Classifier,
+		&i.CreatedAt,
+		&i.ForcedUsdPrice,
+		&i.ID,
+		&i.Identifier,
+		&i.InvestmentConnectivity,
 		&i.LastPrice,
 		&i.LastPriceAt,
-		&i.ForcedUsdPrice,
-		&i.TrackingTicker,
-		&i.TrackingMultiplier,
+		&i.Name,
 		&i.PriceConnectivity,
-		&i.InvestmentConnectivity,
+		&i.TrackingMultiplier,
+		&i.TrackingTicker,
+		&i.UpdatedAt,
+		&i.UserCreated,
+		&i.UserEdited,
 	)
 	return i, err
 }

@@ -87,24 +87,25 @@ func PlaidItemSecretByID(ctx context.Context, q *dbgen.Queries, id int64, kind a
 }
 
 func PlaidItemSecretFromSQLRow(row dbgen.PlaidItemsDueRow) accounts.PlaidItemSecret {
+	item := row.PlaidItem
 	return accounts.PlaidItemSecret{
-		ID:                  row.ID,
-		ExternalID:          row.ExternalID,
-		CredentialID:        int32(row.CredentialID),
-		AccessToken:         row.AccessToken,
+		ID:                  item.ID,
+		ExternalID:          item.ExternalID,
+		CredentialID:        int32(item.CredentialID),
+		AccessToken:         item.AccessToken,
 		OwnerID:             row.OwnerID,
 		OwnerName:           row.Owner,
-		InstitutionID:       row.InstitutionID,
+		InstitutionID:       item.InstitutionID,
 		InstitutionName:     row.InstitutionName,
-		LogoURL:             row.LogoUrl,
-		LastSyncedAt:        row.LastSyncedAt,
-		SyncCron:            row.SyncCron,
-		RecurringSyncCron:   row.RecurringSyncCron,
-		NextSyncAt:          row.NextSyncAt,
-		NextRecurringSyncAt: row.NextRecurringSyncAt,
-		NextBalanceSyncAt:   row.NextBalanceSyncAt,
-		InvestmentsEnabled:  row.PlaidInvestmentsEnabled,
-		LiabilitiesEnabled:  row.PlaidLiabilitiesEnabled,
+		LogoURL:             item.LogoUrl,
+		LastSyncedAt:        item.LastSyncedAt,
+		SyncCron:            item.SyncCron,
+		RecurringSyncCron:   item.RecurringSyncCron,
+		NextSyncAt:          item.NextSyncAt,
+		NextRecurringSyncAt: item.NextRecurringSyncAt,
+		NextBalanceSyncAt:   item.NextBalanceSyncAt,
+		InvestmentsEnabled:  item.PlaidInvestmentsEnabled,
+		LiabilitiesEnabled:  item.PlaidLiabilitiesEnabled,
 	}
 }
 

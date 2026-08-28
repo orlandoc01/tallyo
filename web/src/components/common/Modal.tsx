@@ -45,7 +45,7 @@ export function Modal({
         aria-labelledby={labelledBy}
         aria-modal="true"
         className={clsx(
-          'relative w-full rounded-3xl bg-white p-6 shadow-2xl',
+          'relative w-full rounded-2xl bg-white p-6 shadow-2xl',
           size === 'lg' ? 'max-w-lg' : 'max-w-md',
           scrollable && 'my-auto',
           className,

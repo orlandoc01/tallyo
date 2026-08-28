@@ -230,16 +230,12 @@ WHERE signature = @signature
 
 -- Used by GraphQL user queries and auth/admin user lookups.
 -- name: Users :many
-SELECT
-  id,
-  email,
-  role,
-  created_at
-FROM users
+SELECT u.*
+FROM users u
 WHERE TRUE
-  AND id = @id -- :if @id
-  AND email = @email -- :if @email
-ORDER BY role = 'admin' DESC, email ASC;
+  AND u.id = @id -- :if @id
+  AND u.email = @email -- :if @email
+ORDER BY u.role = 'admin' DESC, u.email ASC;
 
 -- Used by GraphQL mutation updateUser (admin.graphql) via admin/service.go to change a user's role.
 -- name: UpdateUserRole :exec
@@ -251,7 +247,7 @@ WHERE id = @id;
 -- name: InsertUser :one
 INSERT INTO users (email, role, invited_by)
 VALUES (@email, @role, @invited_by)
-RETURNING id;
+RETURNING *;
 
 -- Used by GraphQL mutation removeUser (admin.graphql) via admin/service.go; removal is by stable id, not email, so a re-invited user with the same email isn't accidentally removed.
 -- name: DeleteUser :exec

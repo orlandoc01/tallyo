@@ -14,12 +14,12 @@ var tagColorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 func (s *Store) Tags(ctx context.Context) ([]*model.Tag, error) {
 	rows, err := s.q.ListTags(ctx, dbgen.ListTagsParams{})
-	return dbutil.MapRows(rows, err, tagFromRow[dbgen.ListTagsRow])
+	return dbutil.MapRows(rows, err, tagFromRow)
 }
 
 func (s *Store) TagByID(ctx context.Context, id int64) (*model.Tag, error) {
 	rows, err := s.q.ListTags(ctx, dbgen.ListTagsParams{ID: &id})
-	return dbutil.MapFirstRow(rows, err, tagFromRow[dbgen.ListTagsRow])
+	return dbutil.MapFirstRow(rows, err, tagFromRow)
 }
 
 func (s *Store) CreateTag(ctx context.Context, input model.CreateTagInput) (*model.Tag, error) {
@@ -39,7 +39,7 @@ func (s *Store) UpdateTag(ctx context.Context, input model.UpdateTagInput) (*mod
 	}
 	id := input.ID.Int64()
 	row, err := s.q.UpdateTag(ctx, dbgen.UpdateTagParams{ID: id, Name: input.Name, Color: input.Color})
-	return dbutil.MapRow(row, err, tagFromRow[dbgen.UpdateTagRow])
+	return dbutil.MapRow(row, err, tagFromRow)
 }
 
 func (s *Store) DeleteTag(ctx context.Context, id int64) (bool, error) {
@@ -50,7 +50,7 @@ func (s *Store) DeleteTag(ctx context.Context, id int64) (bool, error) {
 func (s *Store) TagsByTransactionIDs(ctx context.Context, transactionIDs []int64) (map[int64][]*model.Tag, error) {
 	rows, err := s.q.TagsByTransactionIDs(ctx, dbgen.TagsByTransactionIDsParams{TransactionIds: transactionIDs})
 	toTransactionTag := func(row dbgen.TagsByTransactionIDsRow) (int64, *model.Tag) {
-		return row.TransactionID, tagFromValues(row.ID, row.Name, row.Color, row.TransactionCount)
+		return row.TransactionID, tagFromRow(row.Tag)
 	}
 	return dbutil.GroupRows(rows, err, toTransactionTag)
 }
@@ -58,26 +58,17 @@ func (s *Store) TagsByTransactionIDs(ctx context.Context, transactionIDs []int64
 func (s *Store) TagsByRuleIDs(ctx context.Context, ruleIDs []int64) (map[int64][]*model.Tag, error) {
 	rows, err := s.q.TagsByRuleIDs(ctx, dbgen.TagsByRuleIDsParams{RuleIds: ruleIDs})
 	toRuleTag := func(row dbgen.TagsByRuleIDsRow) (int64, *model.Tag) {
-		return row.RuleID, tagFromValues(row.ID, row.Name, row.Color, row.TransactionCount)
+		return row.RuleID, tagFromRow(row.Tag)
 	}
 	return dbutil.GroupRows(rows, err, toRuleTag)
 }
 
-type tagSQLRow interface {
-	dbgen.ListTagsRow | dbgen.CreateTagRow | dbgen.UpdateTagRow
-}
-
-func tagFromRow[Row tagSQLRow](sqlRow Row) *model.Tag {
-	row := dbgen.ListTagsRow(sqlRow)
-	return tagFromValues(row.ID, row.Name, row.Color, row.TransactionCount)
-}
-
-func tagFromValues(id int64, name, color string, count int64) *model.Tag {
+func tagFromRow(row dbgen.Tag) *model.Tag {
 	return &model.Tag{
-		ID:               model.New(model.GlobalIDTag, id),
-		Name:             name,
-		Color:            color,
-		TransactionCount: int32(count),
+		ID:               model.New(model.GlobalIDTag, row.ID),
+		Name:             row.Name,
+		Color:            row.Color,
+		TransactionCount: int32(row.TransactionCount),
 	}
 }
 

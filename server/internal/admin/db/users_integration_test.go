@@ -47,9 +47,9 @@ func TestUserStoreCRUD(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	adminID, err := store.q.InsertUser(ctx, dbgen.InsertUserParams{Email: "admin@example.com", Role: "admin"})
+	adminUser, err := store.q.InsertUser(ctx, dbgen.InsertUserParams{Email: "admin@example.com", Role: "admin"})
 	must.NoErr(t, err)
-	user, err := store.InsertUser(ctx, admin.InsertUserInput{Email: "user@example.com", InvitedByID: adminID, Role: "writer"})
+	user, err := store.InsertUser(ctx, admin.InsertUserInput{Email: "user@example.com", InvitedByID: adminUser.ID, Role: "writer"})
 	if err != nil || user.Role != model.RoleWriter {
 		t.Fatalf("InsertUser = %+v, %v", user, err)
 	}

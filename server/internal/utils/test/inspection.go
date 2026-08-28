@@ -5,10 +5,17 @@ import (
 	"time"
 )
 
-func (s *Store) PlaidSyncLogEntry(ctx context.Context, itemID int64) (added, modified, removed string, err error) {
-	err = s.SQL().QueryRowContext(ctx, `SELECT added, modified, removed FROM plaid_sync_log WHERE item_id = ?`, itemID).
-		Scan(&added, &modified, &removed)
-	return
+type PlaidSyncLogEntry struct {
+	Added    string
+	Modified string
+	Removed  string
+}
+
+func (s *Store) PlaidSyncLogEntry(ctx context.Context, itemID int64) (PlaidSyncLogEntry, error) {
+	entry := PlaidSyncLogEntry{}
+	err := s.SQL().QueryRowContext(ctx, `SELECT added, modified, removed FROM plaid_sync_log WHERE item_id = ?`, itemID).
+		Scan(&entry.Added, &entry.Modified, &entry.Removed)
+	return entry, err
 }
 
 func (s *Store) TransactionRawProviderJSON(ctx context.Context, id string) (string, error) {

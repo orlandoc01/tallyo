@@ -5,7 +5,8 @@ import { filterSummary } from '../components/common/filterSummary'
 import { ErrorState } from '../components/common/ErrorState'
 import { FilterListPicker } from '../components/common/FilterListPicker'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import { PageToolbar, PageToolbarActions, PageToolbarSegmentedControl } from '../components/common/PageToolbar'
+import { PageHeader } from '../components/common/PageHeader'
+import { SegmentedControl } from '../components/common/SegmentedControl'
 import { UnderlineTabs, type UnderlineTabItem } from '../components/common/UnderlineTabs'
 import { SpendingBreakdown, type SpendingCategoryFocus } from '../components/reports/SpendingBreakdown'
 import { CategoryChecklist } from '../components/reports/CategoryFilter'
@@ -182,29 +183,34 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <PageToolbar className="flex-nowrap gap-2">
+      <PageHeader
+        actions={(
+          <>
+            {activeTab !== 'comparison' ? (
+              <SegmentedControl ariaLabel="Expense grouping" options={groupingOptions} value={groupBy} onChange={setGroupBy} />
+            ) : null}
+            <ReportFilterDropdown activeFilterCount={activeFilterCount} onClear={clearFilter}>
+              <div className="space-y-4">
+                {activeTab !== 'comparison' ? (
+                  <ReportFilterSection active={dateRangeFiltered}>
+                    <DateRangeInputs dateFrom={dateFrom} dateTo={dateTo} layout="compact" onChange={handleDateRangeChange} />
+                  </ReportFilterSection>
+                ) : null}
+                <OwnerFilterSection onChange={setOwnerIds} selectedOwners={ownerIds} />
+                <CollapsibleFilterSection active={categoryIds.length > 0} expanded={desktopCategoriesOpen} label="Categories" summary={filterSummary(categoryIds.length)} onToggle={() => setDesktopCategoriesOpen((open) => !open)}>
+                  <FilterListPicker>
+                    <CategoryChecklist categoryGroups={categoryGroups} onChange={handleCategoryFilterChange} selectedCategoryIds={categoryIds} />
+                  </FilterListPicker>
+                </CollapsibleFilterSection>
+              </div>
+            </ReportFilterDropdown>
+          </>
+        )}
+        className="flex-nowrap gap-2"
+        title="Expenses"
+      >
         <UnderlineTabs ariaLabel="Expense report views" items={expenseTabs} value={tab} onChange={handleTabChange} />
-        <PageToolbarActions>
-          {activeTab !== 'comparison' ? (
-            <PageToolbarSegmentedControl ariaLabel="Expense grouping" options={groupingOptions} value={groupBy} onChange={setGroupBy} />
-          ) : null}
-          <ReportFilterDropdown activeFilterCount={activeFilterCount} onClear={clearFilter}>
-            <div className="space-y-4">
-              {activeTab !== 'comparison' ? (
-                <ReportFilterSection active={dateRangeFiltered}>
-                  <DateRangeInputs dateFrom={dateFrom} dateTo={dateTo} layout="compact" onChange={handleDateRangeChange} />
-                </ReportFilterSection>
-              ) : null}
-              <OwnerFilterSection onChange={setOwnerIds} selectedOwners={ownerIds} />
-              <CollapsibleFilterSection active={categoryIds.length > 0} expanded={desktopCategoriesOpen} label="Categories" summary={filterSummary(categoryIds.length)} onToggle={() => setDesktopCategoriesOpen((open) => !open)}>
-                <FilterListPicker>
-                  <CategoryChecklist categoryGroups={categoryGroups} onChange={handleCategoryFilterChange} selectedCategoryIds={categoryIds} />
-                </FilterListPicker>
-              </CollapsibleFilterSection>
-            </div>
-          </ReportFilterDropdown>
-        </PageToolbarActions>
-      </PageToolbar>
+      </PageHeader>
       {spending.fetching && activeTab === 'breakdown' ? <LoadingSpinner label="Loading spending report" /> : null}
       {spending.error && activeTab !== 'comparison' ? <ErrorState message="Could not load spending data." onRetry={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })} /> : null}
       {activeTab === 'breakdown' && !spending.fetching ? <SpendingBreakdown expanded={expanded} focusedCategoryId={focusedCategoryId} groupBy={groupBy} onCategoryFocusChange={handleBreakdownCategoryFocusChange} onToggleExpanded={() => setExpanded((e) => !e)} onViewChange={setBreakdownView} period={spending.period} view={breakdownView} /> : null}

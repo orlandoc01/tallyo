@@ -43,12 +43,13 @@ func New(
 	log *slog.Logger,
 ) *Adapter {
 	return &Adapter{
-		BaseAdapter: wealth.BaseAdapter{Reads: reads, Log: log},
-		Wallets:     wallets,
-		Schedules:   schedules,
-		Now:         time.Now,
-		reads:       reads,
-		client:      apiClients.NewDebank(httpClient),
+		Reads:     reads,
+		Log:       log,
+		Wallets:   wallets,
+		Schedules: schedules,
+		Now:       time.Now,
+		reads:     reads,
+		client:    apiClients.NewDebank(httpClient),
 	}
 }
 

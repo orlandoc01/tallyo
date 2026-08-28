@@ -1,5 +1,5 @@
 import type { AnalysisView } from '../../types/graphql'
-import { PageToolbarSegmentedControl } from '../common/PageToolbar'
+import { SegmentedControl } from '../common/SegmentedControl'
 
 const views: Array<{ value: AnalysisView; label: string }> = [
   { value: 'COMPOSITION', label: 'Composition' },
@@ -24,7 +24,7 @@ export function AnalysisViewToggle({ value, onChange }: { value: AnalysisView; o
       </select>
       {/* Desktop: pill buttons */}
       <div className="hidden lg:block">
-        <PageToolbarSegmentedControl ariaLabel="Analysis view" options={views} value={value} onChange={onChange} />
+        <SegmentedControl ariaLabel="Analysis view" options={views} value={value} onChange={onChange} />
       </div>
     </>
   )

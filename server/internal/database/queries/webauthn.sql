@@ -5,16 +5,10 @@ VALUES (@id, @user_id, @name, @credential);
 
 -- Used by internal/auth's WebAuthn login-begin handler and credentials-list handler to load a user's saved passkeys.
 -- name: WebAuthnCredentialsByUserID :many
-SELECT
-  id,
-  user_id,
-  name,
-  credential,
-  created_at,
-  last_used_at
-FROM webauthn_credentials
-WHERE user_id = @user_id
-ORDER BY created_at DESC;
+SELECT wc.*
+FROM webauthn_credentials wc
+WHERE wc.user_id = @user_id
+ORDER BY wc.created_at DESC;
 
 -- Used by internal/auth's WebAuthn login-finish handler to update the credential's sign counter and last-used timestamp after a successful assertion.
 -- name: UpdateWebAuthnCredential :exec
@@ -47,9 +41,9 @@ ON CONFLICT(user_id) DO UPDATE SET
 
 -- Used by internal/auth's WebAuthn registration-finish handler to retrieve the pending ceremony session for attestation verification.
 -- name: WebAuthnRegistration :one
-SELECT user_id, name, session, expires_at
-FROM webauthn_registrations
-WHERE user_id = @user_id;
+SELECT wr.*
+FROM webauthn_registrations wr
+WHERE wr.user_id = @user_id;
 
 -- Used by internal/auth's WebAuthn registration-finish handler (and the background cleanup goroutine) to remove a ceremony session once it's consumed or expired.
 -- name: DeleteWebAuthnRegistration :execrows

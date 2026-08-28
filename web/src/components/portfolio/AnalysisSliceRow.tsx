@@ -23,7 +23,7 @@ export function AnalysisSliceRow({ active, color, expanded, amountsHidden, slice
   return (
     <OneLevelGroup
       className={clsx(
-        'min-w-0 rounded-3xl',
+        'min-w-0 rounded-2xl',
         unclassified && 'border-dashed border-slate-300 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/40',
       )}
       expanded={expanded}

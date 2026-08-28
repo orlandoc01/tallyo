@@ -195,7 +195,7 @@ type fakeSpending struct {
 	err  error
 }
 
-func (s *fakeSpending) SpendingRows(context.Context, model.SpendingFilter, bool, bool) ([]transactions.SpendingRow, error) {
+func (s *fakeSpending) SpendingRows(context.Context, model.SpendingFilter, transactions.SpendingMode) ([]transactions.SpendingRow, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

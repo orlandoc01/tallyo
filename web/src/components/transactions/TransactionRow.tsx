@@ -91,7 +91,7 @@ export function TransactionRow({
       <td className="relative w-48 px-4 py-3 text-neutral-700">
         {categories && onCategoryChange ? (
           <button
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 whitespace-nowrap hover:bg-neutral-100"
+            className="inline-flex items-center gap-1 rounded-xl px-2 py-1 whitespace-nowrap hover:bg-neutral-100"
             disabled={isUpdatingCategory}
             onClick={(event) => {
               event.stopPropagation()
@@ -131,7 +131,7 @@ export function TransactionRow({
         {!hideOwners ? <span className={clsx('rounded-full px-2 py-1 text-xs font-bold text-white', ownerColor)}>{owner.charAt(0)}</span> : null}
       </td>
       <td className="px-4 py-3 text-right font-semibold">
-        <span className={transactionAmountClassName(transaction.amount)}>{formatTransactionAmount(transaction.amount)}</span>
+        <span className={clsx(transactionAmountClassName(transaction.amount), transaction.pending && 'italic')}>{formatTransactionAmount(transaction.amount)}</span>
       </td>
     </tr>
   )
@@ -227,7 +227,7 @@ export function MobileTransactionRow({
             {owner.charAt(0).toUpperCase()}
           </span>
         ) : null}
-        <span className={clsx('text-sm font-semibold tabular-nums', transactionAmountClassName(transaction.amount))}>
+        <span className={clsx('text-sm font-semibold tabular-nums', transactionAmountClassName(transaction.amount), transaction.pending && 'italic')}>
           {formatTransactionAmount(transaction.amount)}
         </span>
       </div>

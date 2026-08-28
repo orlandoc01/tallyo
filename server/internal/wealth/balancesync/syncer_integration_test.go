@@ -153,14 +153,12 @@ func (a *recordingAdapter) SyncConnectionInto(
 func (a *recordingAdapter) emit(ctx context.Context, sink wealth.PersistSink) error {
 	events, result := sink.Open(ctx)
 	draft := wealth.SnapshotDraft{
-		AccountBalanceSnapshot: wealth.AccountBalanceSnapshot{
-			AccountID:  1,
-			Source:     "test",
-			Date:       sink.Today(),
-			SyncedAt:   sink.Now().Format(time.RFC3339),
-			BalanceUSD: 12,
-		},
-		Decision: wealth.DecisionClean,
+		AccountID:  1,
+		Source:     "test",
+		Date:       sink.Today(),
+		SyncedAt:   sink.Now().Format(time.RFC3339),
+		BalanceUSD: 12,
+		Decision:   wealth.DecisionClean,
 	}
 	events <- wealth.PersistEvent{Snapshot: &draft}
 	close(events)

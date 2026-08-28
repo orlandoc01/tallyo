@@ -17,7 +17,9 @@ vi.mock('../components/institutions/AccountDetailModal', () => ({
     </div>
   ),
 }))
-vi.mock('../components/wealth/NetWorthChart', () => ({ NetWorthChart: ({ onRangeChange }: { onRangeChange: (range: 'ONE_MONTH') => void }) => <button onClick={() => onRangeChange('ONE_MONTH')} type="button">Chart</button> }))
+vi.mock('../components/wealth/NetWorthChart', () => ({
+  NetWorthChart: ({ onRangeChange }: { onRangeChange: (range: 'ONE_MONTH') => void }) => <button onClick={() => onRangeChange('ONE_MONTH')} type="button">Chart</button>,
+}))
 vi.mock('../components/wealth/AssetsDonut', () => ({ AssetsDonut: () => <div>Donut</div> }))
 vi.mock('../components/wealth/AccountSidebar', () => ({
   AccountSidebar: ({ amountsHidden, canReadHoldings = true, heading, onAccountClick, onAccountGroupClick }: { amountsHidden?: boolean; canReadHoldings?: boolean; heading?: string; onAccountClick?: (account: { id: string; name: string }) => void; onAccountGroupClick?: (groupId: 'DEPOSITS' | 'INVESTMENTS', accountIds: string[]) => void }) => (

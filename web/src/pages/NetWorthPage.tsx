@@ -3,7 +3,7 @@ import { AccountDetailModal } from '../components/institutions/AccountDetailModa
 import { useMobileHeader, useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { MobileFilterButton, MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../components/common/MobileFilterFooter'
-import { PageToolbar, PageToolbarActions } from '../components/common/PageToolbar'
+import { PageHeader } from '../components/common/PageHeader'
 import { AmountVisibilityButton } from '../components/common/AmountVisibilityButton'
 import { AnalysisFilterContent, AnalysisFilters } from '../components/portfolio/AnalysisFilters'
 import { AccountSidebar } from '../components/wealth/AccountSidebar'
@@ -115,8 +115,9 @@ export function NetWorthPage() {
   }
   return (
     <div className={pageClassName} onClick={clearAccountFiltersFromOutsideClick}>
-      <PageToolbar className="mb-6 hidden lg:flex">
-        <PageToolbarActions>
+      <PageHeader
+        actions={(
+          <>
           <AmountVisibilityButton amountsHidden={amountsHidden} onToggle={toggleAmountsHidden} variant="toolbar" />
           <div data-net-worth-filters>
             <AnalysisFilters
@@ -134,9 +135,12 @@ export function NetWorthPage() {
               onOwnerChange={setOwnerIds}
             />
           </div>
-        </PageToolbarActions>
-      </PageToolbar>
-      <div className="flex gap-6">
+          </>
+        )}
+        className="mb-4"
+        title="Net Worth"
+      />
+      <div className="flex gap-4">
         <AccountSidebar
           amountsHidden={amountsHidden}
           breakdown={visibleAccountSidebarReport.classifierBreakdown}
@@ -148,10 +152,10 @@ export function NetWorthPage() {
           onAccountClick={canReadHoldings ? modalRoutes.openAccountValuation : undefined}
           onAccountGroupClick={canReadHoldings ? toggleAccountGroup : undefined}
         />
-        <div className="min-w-0 flex-1 space-y-6 lg:space-y-0">
+        <div className="min-w-0 flex-1 space-y-4 lg:space-y-0">
           <NetWorthHero amountsHidden={amountsHidden} changePct={changePct} changeUSD={changeUSD} report={report} />
 
-          <div className="hidden lg:block lg:space-y-5">
+          <div className="hidden lg:block lg:space-y-4">
             <div data-net-worth-chart>
               <NetWorthChart amountsHidden={amountsHidden} asOfDate={report.asOfDate} classifierSeries={historicalReport?.classifierSeries} liabilitySeries={historicalReport?.liabilitySeries} netWorthUSD={report.currentNetWorthUSD} onRangeChange={setRange} points={historicalReport?.series ?? []} positive={positive} range={range} />
             </div>
@@ -166,7 +170,7 @@ export function NetWorthPage() {
               amountsHidden={amountsHidden}
               breakdown={visibleAccountSidebarReport.classifierBreakdown}
               canReadHoldings={canReadHoldings}
-              className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"
               heading="Accounts"
               liabilityBreakdown={visibleAccountSidebarReport.liabilityBreakdown}
               netWorth={visibleAccountSidebarReport.currentNetWorthUSD}

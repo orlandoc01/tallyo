@@ -89,7 +89,7 @@ export function TransactionDetailsFields({
         <dd className="relative font-medium">
           <button
             aria-expanded={isCategoryOpen}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-neutral-100"
+            className="inline-flex items-center gap-1 rounded-xl px-2 py-1 hover:bg-neutral-100"
             disabled={isSavingCategory}
             onClick={() => setIsCategoryOpen((open) => !open)}
             ref={categoryButtonRef}

@@ -58,25 +58,14 @@ func (q *Queries) InsertRecurringChargeTransactions(ctx context.Context, arg Ins
 }
 
 const listRecurringCharges = `-- name: ListRecurringCharges :many
-SELECT
-  recurring_charges.id,
-  recurring_charges.description,
-  recurring_charges.merchant_name,
-  recurring_charges.frequency,
-  recurring_charges.status,
-  recurring_charges.is_active,
-  recurring_charges.average_amount_cents,
-  recurring_charges.last_amount_cents,
-  recurring_charges.first_date,
-  recurring_charges.last_date,
-  recurring_charges.is_user_modified
-FROM recurring_charges
-JOIN accounts ON accounts.id = recurring_charges.account_id
+SELECT rc.account_id, rc.average_amount_cents, rc.description, rc.external_id, rc.first_date, rc.frequency, rc.id, rc.is_active, rc.is_user_modified, rc.last_amount_cents, rc.last_date, rc.merchant_name, rc.status, rc.updated_at
+FROM recurring_charges rc
+JOIN accounts ON accounts.id = rc.account_id
 WHERE TRUE
-  AND recurring_charges.id = ?1 -- :if $1
-  AND recurring_charges.status != 'TOMBSTONED'
+  AND rc.id = ?1 -- :if $1
+  AND rc.status != 'TOMBSTONED'
   AND accounts.is_hidden = 0
-ORDER BY recurring_charges.last_date DESC
+ORDER BY rc.last_date DESC
 `
 
 var _listRecurringChargesDynQ = dynCompile(listRecurringCharges)
@@ -85,22 +74,8 @@ type ListRecurringChargesParams struct {
 	ID *int64
 }
 
-type ListRecurringChargesRow struct {
-	ID                 int64
-	Description        string
-	MerchantName       *string
-	Frequency          string
-	Status             string
-	IsActive           bool
-	AverageAmountCents money.Cents
-	LastAmountCents    money.Cents
-	FirstDate          string
-	LastDate           string
-	IsUserModified     bool
-}
-
 // Used by GraphQL query recurringCharges (transactions.graphql) via transactions/db.Store.
-func (q *Queries) ListRecurringCharges(ctx context.Context, arg ListRecurringChargesParams) ([]ListRecurringChargesRow, error) {
+func (q *Queries) ListRecurringCharges(ctx context.Context, arg ListRecurringChargesParams) ([]RecurringCharge, error) {
 
 	dynQuery, dynArgs := _listRecurringChargesDynQ.Build([]any{arg.ID})
 	rows, err := q.db.QueryContext(ctx, dynQuery, dynArgs...)
@@ -108,21 +83,24 @@ func (q *Queries) ListRecurringCharges(ctx context.Context, arg ListRecurringCha
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListRecurringChargesRow{}
+	items := []RecurringCharge{}
 	for rows.Next() {
-		var i ListRecurringChargesRow
+		var i RecurringCharge
 		if err := rows.Scan(
-			&i.ID,
-			&i.Description,
-			&i.MerchantName,
-			&i.Frequency,
-			&i.Status,
-			&i.IsActive,
+			&i.AccountID,
 			&i.AverageAmountCents,
-			&i.LastAmountCents,
+			&i.Description,
+			&i.ExternalID,
 			&i.FirstDate,
-			&i.LastDate,
+			&i.Frequency,
+			&i.ID,
+			&i.IsActive,
 			&i.IsUserModified,
+			&i.LastAmountCents,
+			&i.LastDate,
+			&i.MerchantName,
+			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -142,14 +120,6 @@ WITH ranked AS (
   SELECT
     rct.charge_id,
     cr.cat_id,
-    cr.cat_name,
-    cr.cat_emoji,
-    cr.group_name,
-    cr.group_emoji,
-    cr.group_kind,
-    cr.sort_order,
-    cr.group_id,
-    cr.plaid_pfc2_codes,
     ROW_NUMBER() OVER (
       PARTITION BY rct.charge_id
       ORDER BY COUNT(*) DESC, MAX(t.datetime) DESC
@@ -160,10 +130,11 @@ WITH ranked AS (
   WHERE rct.charge_id IN (/*SLICE:charge_ids*/?)
   GROUP BY rct.charge_id, cr.cat_id
 )
-SELECT charge_id, cat_id, cat_name, cat_emoji, group_name, group_emoji, group_kind, sort_order, group_id, plaid_pfc2_codes
+SELECT ranked.charge_id, cr.cat_id, cr.cat_name, cr.cat_emoji, cr.group_name, cr.group_emoji, cr.group_kind, cr.sort_order, cr.group_id, cr.group_sort_order, cr.plaid_pfc2_codes
 FROM ranked
-WHERE rn = 1
-ORDER BY charge_id
+JOIN category_rows cr ON cr.cat_id = ranked.cat_id
+WHERE ranked.rn = 1
+ORDER BY ranked.charge_id
 `
 
 type MajorityCategoriesForRecurringChargesParams struct {
@@ -171,16 +142,8 @@ type MajorityCategoriesForRecurringChargesParams struct {
 }
 
 type MajorityCategoriesForRecurringChargesRow struct {
-	ChargeID       int64
-	CatID          int64
-	CatName        string
-	CatEmoji       string
-	GroupName      string
-	GroupEmoji     string
-	GroupKind      string
-	SortOrder      int64
-	GroupID        int64
-	PlaidPfc2Codes string
+	ChargeID    int64
+	CategoryRow CategoryRow
 }
 
 // Used by the RecurringCharge.category GraphQL field's dataloader (internal/graph/loaders.go) to compute each charge's most-common transaction category.
@@ -205,15 +168,16 @@ func (q *Queries) MajorityCategoriesForRecurringCharges(ctx context.Context, arg
 		var i MajorityCategoriesForRecurringChargesRow
 		if err := rows.Scan(
 			&i.ChargeID,
-			&i.CatID,
-			&i.CatName,
-			&i.CatEmoji,
-			&i.GroupName,
-			&i.GroupEmoji,
-			&i.GroupKind,
-			&i.SortOrder,
-			&i.GroupID,
-			&i.PlaidPfc2Codes,
+			&i.CategoryRow.CatID,
+			&i.CategoryRow.CatName,
+			&i.CategoryRow.CatEmoji,
+			&i.CategoryRow.GroupName,
+			&i.CategoryRow.GroupEmoji,
+			&i.CategoryRow.GroupKind,
+			&i.CategoryRow.SortOrder,
+			&i.CategoryRow.GroupID,
+			&i.CategoryRow.GroupSortOrder,
+			&i.CategoryRow.PlaidPfc2Codes,
 		); err != nil {
 			return nil, err
 		}

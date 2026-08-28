@@ -202,32 +202,34 @@ func (s *Service) resolveTrackingInput(ctx context.Context, input *model.UpdateA
 		return false, nil
 	}
 
-	identifier, ticker, multiplier, err := combineTrackingFields(*input, existing)
+	fields, err := combineTrackingFields(*input, existing)
 	if err != nil {
 		return false, err
 	}
-	if trackingPairEqual(existing, ticker, multiplier) {
+	if trackingPairEqual(existing, fields.Ticker, fields.Multiplier) {
 		input.TrackingTicker = nil
 		input.TrackingMultiplier = nil
 		return false, nil
 	}
 
-	if ticker != nil {
-		tempAsset := &model.Asset{AssetType: existing.AssetType, Identifier: identifier, TrackingTicker: ticker, TrackingMultiplier: multiplier}
+	if fields.Ticker != nil {
+		tempAsset := &model.Asset{AssetType: existing.AssetType, Identifier: fields.Identifier, TrackingTicker: fields.Ticker, TrackingMultiplier: fields.Multiplier}
 		if err := s.validateTickerPriceable(ctx, tempAsset); err != nil {
 			return false, err
 		}
 	}
-	input.TrackingTicker = new(lo.FromPtr(ticker))
-	input.TrackingMultiplier = &multiplier
+	input.TrackingTicker = new(lo.FromPtr(fields.Ticker))
+	input.TrackingMultiplier = &fields.Multiplier
 	return true, nil
 }
 
-// combineTrackingFields resolves the supplied input and the existing asset
-// into the canonical tracking pair: validate the resulting classifier and raw
-// supplied multiplier, combine omitted fields with existing values, then
-// normalize the resulting ticker/multiplier pair.
-func combineTrackingFields(input model.UpdateAssetInput, existing *model.Asset) (string, *string, float64, error) {
+type trackingFields struct {
+	Identifier string
+	Ticker     *string
+	Multiplier float64
+}
+
+func combineTrackingFields(input model.UpdateAssetInput, existing *model.Asset) (trackingFields, error) {
 	identifier := lo.FromPtrOr(input.Identifier, existing.Identifier)
 	classifier := lo.FromPtrOr(input.Classifier, existing.Classifier)
 
@@ -236,7 +238,7 @@ func combineTrackingFields(input model.UpdateAssetInput, existing *model.Asset) 
 		multiplier = *input.TrackingMultiplier
 	}
 	if err := validateTrackingMultiplier(multiplier); err != nil {
-		return "", nil, 0, err
+		return trackingFields{}, err
 	}
 
 	ticker := existing.TrackingTicker
@@ -246,16 +248,16 @@ func combineTrackingFields(input model.UpdateAssetInput, existing *model.Asset) 
 
 	if existing.AssetType != model.AssetTypeSecurity || !supportsTracking(classifier) {
 		if ticker != nil {
-			return "", nil, 0, apierror.Publicf("tracking ticker is only supported for public or company-equity security assets; clear the tracking ticker in the same request")
+			return trackingFields{}, apierror.Publicf("tracking ticker is only supported for public or company-equity security assets; clear the tracking ticker in the same request")
 		}
-		return identifier, nil, 1, nil
+		return trackingFields{Identifier: identifier, Multiplier: 1}, nil
 	}
 
 	resolvedTicker, resolvedMultiplier := NormalizeTracking(identifier, ticker, multiplier)
 	if resolvedTicker == nil && input.TrackingMultiplier != nil && multiplier != 1 {
-		return "", nil, 0, apierror.Publicf("tracking multiplier requires a tracking ticker different from the identifier")
+		return trackingFields{}, apierror.Publicf("tracking multiplier requires a tracking ticker different from the identifier")
 	}
-	return identifier, resolvedTicker, resolvedMultiplier, nil
+	return trackingFields{Identifier: identifier, Ticker: resolvedTicker, Multiplier: resolvedMultiplier}, nil
 }
 
 func trackingPairEqual(existing *model.Asset, ticker *string, multiplier float64) bool {

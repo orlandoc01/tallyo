@@ -37,6 +37,20 @@ export function formatCompactDisplayDate(value: string) {
   return format(parseLocalDate(value), 'MM-dd-yy')
 }
 
+export function formatRelativeTime(value: string, now = Date.now()) {
+  const elapsedSeconds = Math.max(1, Math.round((now - new Date(value).getTime()) / 1000))
+  if (elapsedSeconds < 60) return 'just now'
+
+  const minutes = Math.round(elapsedSeconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+
+  const days = Math.round(hours / 24)
+  return `${days}d ago`
+}
+
 export function localDateKeyFromDatetime(value: string): string {
   return toDateInputValue(parseDatetime(value))
 }

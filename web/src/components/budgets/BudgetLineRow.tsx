@@ -44,7 +44,7 @@ export function BudgetLineRow({
               <input
                 aria-label={`Budget amount for ${line.category.name}`}
                 autoFocus
-                className="w-20 rounded-md border border-neutral-200 bg-white px-2 py-1 text-right text-sm normal-case tracking-normal tabular-nums focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
+                className="w-20 rounded-xl border border-neutral-200 bg-white px-2 py-1 text-right text-sm normal-case tracking-normal tabular-nums focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
                 disabled={saving}
                 inputMode="decimal"
                 onBlur={() => commit()}
@@ -55,7 +55,7 @@ export function BudgetLineRow({
           ) : editable ? (
             <button
               aria-label={`Edit budget for ${line.category.name}`}
-              className="rounded-md px-1.5 py-0.5 text-sm font-normal normal-case tracking-normal tabular-nums text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800"
+              className="rounded-xl px-1.5 py-0.5 text-sm font-normal normal-case tracking-normal tabular-nums text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800"
               onClick={() => { setDraft(line.budgeted.toFixed(2)); setEditing(true) }}
               type="button"
             >

@@ -11,7 +11,6 @@ import (
 
 	"tallyo/internal/clients/yfinance"
 	"tallyo/internal/graph/model"
-	"tallyo/internal/utils"
 	"tallyo/internal/utils/must"
 	testutil "tallyo/internal/utils/test"
 )
@@ -23,7 +22,7 @@ func TestReportSyncerSyncAllSkipsSyntheticAssetsAndContinuesAfterErrors(t *testi
 	logger := slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	simplefin := "simplefin:sec"
 	tracking := "VTI"
-	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Holdings: fakeAssetProvider{needing: []AssetStub{{ID: 1, Identifier: "plaid:sec"}, {ID: 2, Identifier: "VTI"}, {ID: 3, Identifier: "AAPL"}, {ID: 4, Identifier: "BAD"}, {ID: 5, Identifier: "ignored", TrackingTicker: &simplefin}, {ID: 6, Identifier: "PLAID:synthetic", TrackingTicker: &tracking}}}, Connectivity: &fakeConnectivityUpdater{}, Now: fixedNow, Sleeper: utils.Sleeper{Sleep: noSleep}, Log: logger}
+	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Holdings: fakeAssetProvider{needing: []AssetStub{{ID: 1, Identifier: "plaid:sec"}, {ID: 2, Identifier: "VTI"}, {ID: 3, Identifier: "AAPL"}, {ID: 4, Identifier: "BAD"}, {ID: 5, Identifier: "ignored", TrackingTicker: &simplefin}, {ID: 6, Identifier: "PLAID:synthetic", TrackingTicker: &tracking}}}, Connectivity: &fakeConnectivityUpdater{}, Now: fixedNow, Sleep: noSleep, Log: logger}
 
 	must.NoErr(t, syncer.SyncAll(context.Background()))
 	if !strings.Contains(logBuf.String(), "BAD") {
@@ -52,7 +51,7 @@ func TestReportSyncerConnectivityUpdates(t *testing.T) {
 		funds:  map[string]*yfinance.FundReport{"VTI": {Category: "Large Blend", Group: "US Equity", StockPosition: 1}},
 		errors: map[string]error{"BAD": yfinance.YahooStatusError{StatusCode: 404, Ticker: "BAD"}},
 	}
-	syncer := &ReportSyncer{Yahoo: yahoo, Reports: &fakeReportStore{}, Connectivity: connectivity, Now: fixedNow, Sleeper: utils.Sleeper{Sleep: noSleep}, Log: testutil.Logger}
+	syncer := &ReportSyncer{Yahoo: yahoo, Reports: &fakeReportStore{}, Connectivity: connectivity, Now: fixedNow, Sleep: noSleep, Log: testutil.Logger}
 
 	must.NoErr(t, syncer.syncAsset(context.Background(), AssetStub{ID: 1, Identifier: "IGN", InvestmentConnectivity: model.ConnectivityStatusIgnore}))
 	if err := syncer.syncAsset(context.Background(), AssetStub{ID: 2, Identifier: "BAD"}); err == nil {
@@ -72,7 +71,7 @@ func TestReportSyncerConnectivityUpdates(t *testing.T) {
 func TestReportSyncerSkipsEmptyFundReport(t *testing.T) {
 	reports := &fakeReportStore{}
 	yahoo := &fakeYahoo{funds: map[string]*yfinance.FundReport{"EMPTY": {}}}
-	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Connectivity: &fakeConnectivityUpdater{}, Now: fixedNow, Sleeper: utils.Sleeper{Sleep: noSleep}, Log: testutil.Logger}
+	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Connectivity: &fakeConnectivityUpdater{}, Now: fixedNow, Sleep: noSleep, Log: testutil.Logger}
 
 	must.NoErr(t, syncer.syncAsset(context.Background(), AssetStub{ID: 1, Identifier: "EMPTY"}))
 	if len(reports.upserts) != 0 {
@@ -84,7 +83,7 @@ func TestReportSyncerSkipsEmptyEquityReport(t *testing.T) {
 	reports := &fakeReportStore{}
 	connectivity := &fakeConnectivityUpdater{}
 	yahoo := &fakeYahoo{equities: map[string]*yfinance.EquityReport{"EMPTY": {}}}
-	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Connectivity: connectivity, Now: fixedNow, Sleeper: utils.Sleeper{Sleep: noSleep}, Log: testutil.Logger}
+	syncer := &ReportSyncer{Yahoo: yahoo, Reports: reports, Connectivity: connectivity, Now: fixedNow, Sleep: noSleep, Log: testutil.Logger}
 
 	must.NoErr(t, syncer.syncAsset(context.Background(), AssetStub{ID: 1, Identifier: "EMPTY"}))
 	if len(reports.upserts) != 0 {

@@ -41,11 +41,11 @@ func (s *Store) UpdateUserRole(ctx context.Context, id int64, role string) (*mod
 
 func (s *Store) InsertUser(ctx context.Context, input admin.InsertUserInput) (*model.User, error) {
 	invitedBy := lo.EmptyableToPtr(input.InvitedByID)
-	id, err := s.q.InsertUser(ctx, dbgen.InsertUserParams{Email: input.Email, Role: input.Role, InvitedBy: invitedBy})
+	row, err := s.q.InsertUser(ctx, dbgen.InsertUserParams{Email: input.Email, Role: input.Role, InvitedBy: invitedBy})
 	if err != nil {
 		return nil, fmt.Errorf("insert user: %w", err)
 	}
-	return s.UserByID(ctx, id)
+	return userFromRow(row), nil
 }
 
 func (s *Store) UserIDByEmail(ctx context.Context, email string) (int64, error) {
@@ -54,7 +54,7 @@ func (s *Store) UserIDByEmail(ctx context.Context, email string) (int64, error) 
 	return row.ID, err
 }
 
-func userExists(dbgen.UsersRow) bool { return true }
+func userExists(dbgen.User) bool { return true }
 
 func (s *Store) UserExists(ctx context.Context, email string) (bool, error) {
 	rows, err := s.q.Users(ctx, dbgen.UsersParams{Email: &email})
@@ -81,7 +81,7 @@ func (s *Store) RemoveUser(ctx context.Context, id int64) error {
 	})
 }
 
-func userFromRow(row dbgen.UsersRow) *model.User {
+func userFromRow(row dbgen.User) *model.User {
 	return &model.User{
 		ID:        model.New(model.GlobalIDUser, row.ID),
 		Email:     row.Email,

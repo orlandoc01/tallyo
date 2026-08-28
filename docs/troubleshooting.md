@@ -45,19 +45,9 @@ A healthy HTTP process returns `204 No Content` from `/healthz`.
 
 The server creates the database directory, runs migrations and seeds, loads runtime configuration, initializes authentication, and only then starts HTTP. A failure before the `server listening` log means `/healthz` cannot be available.
 
-### Container exits after changing Authorization settings
+### Configuration changes do not seem to apply
 
-This is expected behavior. Saving the **Authorization** section, including issuer, frontend redirects, token lifetimes, master password, or disable-auth state, schedules an exit with status 1 after about two seconds. The sample Compose configuration uses `restart: unless-stopped`, so the container should return automatically with the new settings.
-
-If no restart policy or process supervisor is present, start the process again yourself:
-
-```bash
-docker compose up -d
-docker compose ps
-curl -i http://127.0.0.1:8080/healthz
-```
-
-Google, email, passkey, trusted-proxy, locale, tracking, MCP, and Ollama sections have live update paths and do not by themselves schedule this authorization restart. If an authorization restart loops, inspect the first fatal configuration error in the logs rather than repeatedly restarting.
+Every configuration section, including **Authorization**, applies live when saved; the process never exits or restarts for a settings change. If a save appears to have no effect, check the mutation's error response first: validation failures (missing issuer, invalid WebAuthn origin, no remaining sign-in method) reject the save and leave the previous settings active.
 
 ### Image has no shell
 
@@ -171,9 +161,9 @@ Diagnose these symptoms:
 - `redirect_uri` mismatch or token exchange failure: compare the frontend redirect setting with the browser address bar exactly. Remove accidental trailing slashes and old hostnames.
 - `Invalid OAuth callback state`: restart sign-in from the same browser profile. Normal PKCE state/verifier values are stored in local storage; private browsing, aggressive storage clearing, or switching profiles can remove them.
 - Callback works internally but not externally: the issuer or redirect still points at the internal origin, or the proxy is not routing `/authorize`, `/token`, and `/auth/*`.
-- Redirect loop after changing the public URL: update issuer and frontend callback together, allow the expected server restart, then start a fresh sign-in.
+- Redirect loop after changing the public URL: update issuer and frontend callback together, then start a fresh sign-in.
 
-The access token issuer/audience is the configured issuer. Changing the issuer invalidates assumptions made by already issued sessions; sign in again after the restart.
+The access token issuer/audience is the configured issuer. Changing the issuer invalidates already issued access tokens; sign in again after the change.
 
 ## Sign-In Methods
 

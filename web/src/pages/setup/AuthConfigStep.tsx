@@ -73,7 +73,7 @@ export function AuthConfigStep() {
 
       {showGoogleReminder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-lg font-black text-neutral-900">Before you continue</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-600">
               Make sure you've added the following as an authorized redirect URI in your{' '}
@@ -102,7 +102,7 @@ function ProviderSection({ icon, title, checked, onChange, children }: { icon: R
   return (
     <div>
       <button
-        className={`w-full rounded-[1.5rem] border p-4 text-left transition ${checked ? 'border-brand-600 bg-brand-50' : 'border-brand-100 bg-white hover:border-brand-300'}`}
+        className={`w-full rounded-2xl border p-4 text-left transition ${checked ? 'border-brand-600 bg-brand-50' : 'border-brand-100 bg-white hover:border-brand-300'}`}
         onClick={() => onChange(!checked)}
         type="button"
       >

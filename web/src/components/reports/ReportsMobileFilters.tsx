@@ -3,6 +3,7 @@ import { CollapsibleFilterSection } from '../common/CollapsibleFilterSection'
 import { filterSummary } from '../common/filterSummary'
 import { MobileFilterDropdown } from '../common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { useCategoryGroups } from '../../hooks/useEntityQueries'
 import { defaultDateRangeForSpendingTab, type SpendingFilterTab } from '../../hooks/useSpendingFilterParams'
 import type { Granularity } from '../../types/graphql'
@@ -10,7 +11,6 @@ import { MobileCategoryChecklist } from './CategoryFilter'
 import { DateRangeInputs } from './DateRangeSelector'
 import { OwnerFilterSection } from './OwnerFilterDropdown'
 import { ReportFilterSection } from './ReportFilterDropdown'
-import { ChartViewTogglePill } from './ChartViewTogglePill'
 
 export interface ReportsPendingFilter {
   dateFrom: string
@@ -148,7 +148,7 @@ function MobileToggleGroup<T extends string>({
   return (
     <div>
       <h3 className="mb-3 text-sm font-semibold text-neutral-700">{title}</h3>
-      <ChartViewTogglePill onChange={onChange} options={options} size="mobile" value={value} />
+      <SegmentedControl ariaLabel={title} onChange={onChange} options={options} value={value} />
     </div>
   )
 }

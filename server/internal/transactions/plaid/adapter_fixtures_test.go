@@ -14,10 +14,10 @@ import (
 
 func newHandshakeAdapter(store *handshakeStore) *Adapter {
 	return &Adapter{
-		BaseAdapter: transactions.BaseAdapter{Reads: store, Log: testutil.Logger},
-		plaid:       store,
-		clients:     testutil.StaticClientFactory{Client: handshakeClient()},
-		now:         func() time.Time { return time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC) },
+		Reads: store, Log: testutil.Logger,
+		plaid:   store,
+		clients: testutil.StaticClientFactory{Client: handshakeClient()},
+		now:     func() time.Time { return time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC) },
 	}
 }
 

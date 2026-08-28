@@ -1,7 +1,12 @@
 import clsx from 'clsx'
-import type { CategorySpending } from '../../types/domain'
+import type { Category } from '../../types/graphql'
 import { chartOpacityForFocus, spendingChartFillColor } from '../../utils/chartStyles'
 import { formatSignedCurrency } from '../../utils/currency'
+
+interface CategoryBarItem {
+  category: Pick<Category, 'emoji' | 'id' | 'name'>
+  total: number
+}
 
 export function CategoryBar({
   dimmed = false,
@@ -12,9 +17,9 @@ export function CategoryBar({
 }: {
   dimmed?: boolean
   focused?: boolean
-  item: CategorySpending
+  item: CategoryBarItem
   maxAbsTotal: number
-  onClick?: (item: CategorySpending) => void
+  onClick?: () => void
 }) {
   const percent = maxAbsTotal > 0 ? Math.max(3, (Math.abs(item.total) / maxAbsTotal) * 100) : 0
   const fillOpacity = chartOpacityForFocus(focused)
@@ -27,9 +32,9 @@ export function CategoryBar({
           <span className="truncate">{item.category.emoji} {item.category.name}</span>
           <span className={clsx('shrink-0 font-medium tabular-nums sm:hidden', dimmed ? 'text-neutral-400' : 'text-neutral-700')}>{formattedTotal}</span>
         </div>
-        <div className={clsx('relative h-9 rounded-lg sm:h-7', dimmed ? 'bg-neutral-50' : 'bg-neutral-100')}>
+        <div className={clsx('relative h-9 rounded-xl sm:h-7', dimmed ? 'bg-neutral-50' : 'bg-neutral-100')}>
           <div
-            className={`cat-bar-fill absolute top-0 h-full rounded-lg ${item.total < 0 ? 'right-0' : 'left-0'}`}
+            className={`cat-bar-fill absolute top-0 h-full rounded-xl ${item.total < 0 ? 'right-0' : 'left-0'}`}
             style={{ backgroundColor: spendingChartFillColor(item.category.id, dimmed), opacity: fillOpacity, width: `${percent}%` }}
           />
         </div>
@@ -47,10 +52,10 @@ export function CategoryBar({
       aria-pressed={focused}
       className={clsx(
         rowClass,
-        'w-full rounded-2xl px-2 py-1 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-400',
+        'w-full rounded-xl px-2 py-1 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-400',
         focused ? 'bg-brand-50' : 'hover:bg-neutral-50',
       )}
-      onClick={() => onClick(item)}
+      onClick={onClick}
       type="button"
     >
       {content}

@@ -12,7 +12,7 @@ export function ToggleRow({
   return (
     <button
       aria-checked={value}
-      className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabled}
       onClick={() => onChange(!value)}
       role="switch"

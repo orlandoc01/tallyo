@@ -298,7 +298,6 @@ function withBudgetTypenames(report: typeof budgetReport) {
 export const handlers = [
   http.get('/auth/config', () => HttpResponse.json({ master_password_status: 'ENABLED', email_auth_enabled: true, google_auth_enabled: true, webauthn_enabled: true, disable_all_auth: disableAuthForStubApi, setup_complete: setupCompleteForStubApi(), scopes: [] })),
   http.get('/auth/webauthn/credentials', () => HttpResponse.json([])),
-  http.get('/healthz', () => new HttpResponse(null, { status: 204 })),
   api.query('Categories', () => HttpResponse.json({ data: { categories: { __typename: 'CategoryList', items: categories } } })),
   api.query('CategoryGroups', () => HttpResponse.json({ data: { categoryGroups: { __typename: 'CategoryGroupList', items: categoryGroups } } })),
   api.query('PlaidPFC2Codes', () => HttpResponse.json({ data: { plaidPFC2Codes: ['FOOD_AND_DRINK_GROCERIES', 'FOOD_AND_DRINK_RESTAURANT', 'FOOD_AND_DRINK_COFFEE'] } })),

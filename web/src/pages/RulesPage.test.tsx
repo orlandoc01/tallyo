@@ -400,7 +400,7 @@ describe('RulesPage', () => {
     await screen.findAllByText(/target/i)
 
     const createButton = within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: /create rule/i })
-    expect(createButton).toHaveClass('h-10', 'w-10', 'rounded-2xl')
+    expect(createButton).toHaveClass('h-10', 'w-10', 'rounded-xl')
 
     await user.click(createButton)
 
@@ -415,7 +415,7 @@ describe('RulesPage', () => {
 
     const actions = screen.getByTestId('mobile-header-actions')
     const filterButton = within(actions).getByRole('button', { name: /open rule filters/i })
-    expect(filterButton).toHaveClass('rounded-2xl', 'p-2.5')
+    expect(filterButton).toHaveClass('rounded-xl', 'p-2.5')
 
     await user.click(filterButton)
 

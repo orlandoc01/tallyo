@@ -65,7 +65,7 @@ export function NetWorthBreakdownPanels({
 
   if (variant === 'desktop') {
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="min-w-0" data-net-worth-breakdown>{donut}</div>
         <div className="min-w-0" data-net-worth-breakdown>{table}</div>
       </div>

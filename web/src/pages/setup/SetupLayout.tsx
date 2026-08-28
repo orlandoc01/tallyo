@@ -24,7 +24,7 @@ export function SetupLayout() {
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-brand-900 text-base text-white shadow-xl">$</span>
           Tallyo
         </div>
-        <section className="w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 shadow-2xl shadow-brand-900/10 backdrop-blur">
+        <section className="w-full max-w-4xl overflow-hidden rounded-2xl border border-white/70 bg-white/85 shadow-2xl shadow-brand-900/10 backdrop-blur">
           <div className="border-b border-brand-100 bg-white/60 px-6 py-4">
             <div className="flex items-center gap-2">
               {steps.map((step, index) => (
@@ -77,6 +77,6 @@ export function SetupTextField({ label, value, onChange, type, placeholder, disa
 const setupEyebrowClass = 'text-sm font-bold uppercase tracking-[0.25em] text-brand-600'
 const setupTitleClass = 'mt-3 text-3xl font-black tracking-tight text-neutral-900'
 
-export const primaryButtonClass = 'rounded-2xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50'
-export const secondaryButtonClass = 'rounded-2xl border border-brand-200 bg-white px-5 py-3 text-sm font-bold text-brand-800 transition hover:border-brand-600 hover:text-brand-900'
-export const inputClass = 'mt-1 w-full rounded-2xl border border-brand-200 bg-white px-4 py-3 text-sm text-neutral-950 outline-none transition focus:border-brand-600 focus:ring-4 focus:ring-brand-600/10 disabled:bg-neutral-100 disabled:text-neutral-400'
+export const primaryButtonClass = 'rounded-full bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50'
+export const secondaryButtonClass = 'rounded-full border border-brand-200 bg-white px-5 py-3 text-sm font-bold text-brand-800 transition hover:border-brand-600 hover:text-brand-900'
+export const inputClass = 'mt-1 w-full rounded-xl border border-brand-200 bg-white px-4 py-3 text-sm text-neutral-950 outline-none transition focus:border-brand-600 focus:ring-4 focus:ring-brand-600/10 disabled:bg-neutral-100 disabled:text-neutral-400'

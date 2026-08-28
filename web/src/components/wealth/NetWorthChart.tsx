@@ -2,6 +2,7 @@ import { AreaChart as AreaChartIcon, LineChart as LineChartIcon } from 'lucide-r
 import { useState } from 'react'
 import { Area, AreaChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { MouseHandlerDataParam, TooltipContentProps, TooltipPayloadEntry, TooltipValueType } from 'recharts'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { displayAmount } from './amountDisplay'
 import { formatCurrency, formatCurrencyCompact, formatSignedCurrency } from '../../utils/currency'
 import type { AssetClassifier, ClassifierHistoryPoint, LiabilityCategory, LiabilityHistoryPoint, NetWorthPoint, NetWorthRange } from '../../types/graphql'
@@ -13,6 +14,10 @@ const ranges: { id: NetWorthRange; label: string }[] = [
   { id: 'ONE_YEAR', label: '1Y' },
   { id: 'ALL', label: 'All' },
 ]
+
+function NetWorthRangeSelector({ range, onChange }: { range: NetWorthRange; onChange: (range: NetWorthRange) => void }) {
+  return <SegmentedControl ariaLabel="Net worth range" onChange={onChange} options={ranges.map((item) => ({ value: item.id, label: item.label }))} size="sm" value={range} />
+}
 
 type ChartView = 'NET_WORTH' | 'HISTORICAL_ALLOCATION'
 
@@ -52,29 +57,25 @@ export function NetWorthChart({ points, classifierSeries = [], liabilitySeries =
   }
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm lg:p-5">
+    <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm lg:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">Wealth History</h2>
+          <h2 className="text-sm font-semibold text-neutral-500">Wealth history</h2>
           {displayedValue !== undefined ? <p className="mt-2 text-4xl font-bold tracking-tight text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, formatCurrency(displayedValue))}</p> : null}
           {displayedDate ? <p className="mt-1 text-xs text-neutral-500">{displayedDate}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="flex rounded-full bg-neutral-100 p-1">
-            {ranges.map((item) => (
-              <button className={`rounded-full px-3 py-1 text-xs font-semibold transition ${range === item.id ? 'bg-white text-brand-700 shadow-sm' : 'text-neutral-500'}`} key={item.id} onClick={() => onRangeChange(item.id)} type="button">
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex rounded-full bg-neutral-100 p-1">
-            <button aria-label="Net worth chart" className={`rounded-full p-2 transition ${chartView === 'NET_WORTH' ? 'bg-white text-brand-700 shadow-sm ring-1 ring-brand-200' : 'text-neutral-500 hover:text-neutral-800'}`} onClick={() => setChartView('NET_WORTH')} title="Net Worth Chart" type="button">
-              <LineChartIcon className="h-4 w-4" />
-            </button>
-            <button aria-label="Historical asset allocation chart" className={`rounded-full p-2 transition ${chartView === 'HISTORICAL_ALLOCATION' ? 'bg-white text-brand-700 shadow-sm ring-1 ring-brand-200' : 'text-neutral-500 hover:text-neutral-800'}`} onClick={() => setChartView('HISTORICAL_ALLOCATION')} title="Historical Asset Allocation Chart" type="button">
-              <AreaChartIcon className="h-4 w-4" />
-            </button>
-          </div>
+          <NetWorthRangeSelector onChange={onRangeChange} range={range} />
+          <SegmentedControl
+            ariaLabel="Net worth chart view"
+            onChange={setChartView}
+            options={[
+              { value: 'NET_WORTH', label: <LineChartIcon className="h-4 w-4" />, ariaLabel: 'Net worth chart', title: 'Net Worth Chart' },
+              { value: 'HISTORICAL_ALLOCATION', label: <AreaChartIcon className="h-4 w-4" />, ariaLabel: 'Historical asset allocation chart', title: 'Historical Asset Allocation Chart' },
+            ]}
+            size="sm"
+            value={chartView}
+          />
         </div>
       </div>
       <div className="h-80">
@@ -128,7 +129,7 @@ function NetWorthTooltip({ active, payload, amountsHidden }: TooltipContentProps
   if (!point) return null
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       <div className="space-y-1 text-sm">
         <div className="flex items-center justify-between gap-4">
           <span className="text-neutral-700">Assets</span>
@@ -151,7 +152,7 @@ function AllocationTooltip({ active, payload, label, amountsHidden }: TooltipCon
   const sortedPayload: TooltipPayloadEntry[] = [...payload].sort((left, right) => tooltipItemValue(right.value) - tooltipItemValue(left.value))
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       {label ? <p className="mb-2 text-xs text-neutral-500">{label}</p> : null}
       <div className="space-y-1">
         {sortedPayload.map((item) => (

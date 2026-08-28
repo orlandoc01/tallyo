@@ -146,7 +146,7 @@ Tallyo supports a standalone master password plus optional Google, email OTP/mag
 
 OAuth users must exist in Tallyo. Google does not grant access to an arbitrary Google account, and email send responses deliberately do not reveal whether an address is registered. Passkeys require a matching relying-party ID/origin and a browser secure context.
 
-Saving Authorization settings intentionally restarts the process. The environment `MASTER_PASSWORD` overrides the database setting. See [Troubleshooting](troubleshooting.md#sign-in-methods).
+Saving Authorization settings applies live without a restart. The environment `MASTER_PASSWORD` overrides the database setting. See [Troubleshooting](troubleshooting.md#sign-in-methods).
 
 ## Where does the browser store authentication state?
 

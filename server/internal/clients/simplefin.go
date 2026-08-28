@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
 )
 
-// SimpleFinConnection is the v2 connection object from the SimpleFIN bridge.
 type SimpleFinConnection struct {
 	ConnID  string `json:"conn_id"`
 	Name    string `json:"name"`
@@ -23,7 +23,6 @@ type SimpleFinConnection struct {
 	SfinURL string `json:"sfin_url"`
 }
 
-// SimpleFinAccount is a single account from GET /accounts?version=2.
 type SimpleFinAccount struct {
 	ID               string                 `json:"id"`
 	ConnID           string                 `json:"conn_id"`
@@ -37,7 +36,6 @@ type SimpleFinAccount struct {
 	Extra            map[string]any         `json:"extra"`
 }
 
-// SimpleFinTransaction is one transaction from the SimpleFIN API.
 type SimpleFinTransaction struct {
 	ID           string         `json:"id"`
 	Posted       int64          `json:"posted"`
@@ -50,7 +48,6 @@ type SimpleFinTransaction struct {
 	Extra        map[string]any `json:"extra"`
 }
 
-// SimpleFinHolding is a portfolio holding (investment accounts only).
 type SimpleFinHolding struct {
 	ID            string `json:"id"`
 	Symbol        string `json:"symbol"`
@@ -63,42 +60,36 @@ type SimpleFinHolding struct {
 	Created       int64  `json:"created"`
 }
 
-// SimpleFinAccountSet is the v2 response from GET /accounts.
 type SimpleFinAccountSet struct {
 	Connections []SimpleFinConnection `json:"connections"`
 	Accounts    []SimpleFinAccount    `json:"accounts"`
 	Errors      []SimpleFinError      `json:"errlist"`
 }
 
-// SimpleFinError is a per-connection error from the SimpleFIN errlist.
 type SimpleFinError struct {
 	ConnID  string `json:"conn_id"`
 	Message string `json:"message"`
 }
 
-// GetAccountsOpts carries optional parameters for GetAccounts.
 type GetAccountsOpts struct {
 	StartDate *time.Time
 	Pending   bool
 }
 
-// SimpleFinClient is the interface for the SimpleFIN HTTP adapter.
 type SimpleFinClient interface {
-	// Claim decodes the Setup Token and POSTs to the claim URL to obtain the Access URL.
 	Claim(ctx context.Context, setupToken string) (string, error)
-	// GetAccounts calls GET /accounts?version=2 on the Access URL.
 	GetAccounts(ctx context.Context, accessURL string, opts GetAccountsOpts) (SimpleFinAccountSet, error)
 }
 
-// SimpleFinHTTPClient is a stateless HTTP adapter for the SimpleFIN protocol.
 type SimpleFinHTTPClient struct {
-	HTTP *http.Client
+	HTTP        *http.Client
+	ValidateURL func(string) error
 }
 
 var _ SimpleFinClient = (*SimpleFinHTTPClient)(nil)
 
 func NewSimpleFinClient() *SimpleFinHTTPClient {
-	return &SimpleFinHTTPClient{HTTP: &http.Client{Timeout: 30 * time.Second}}
+	return &SimpleFinHTTPClient{HTTP: &http.Client{Timeout: 30 * time.Second}, ValidateURL: validateSimpleFinURL}
 }
 
 // Claim decodes the base64 Setup Token to get the claim URL, then POSTs to it.
@@ -108,6 +99,9 @@ func (c *SimpleFinHTTPClient) Claim(ctx context.Context, setupToken string) (str
 		return "", fmt.Errorf("decode setup token: %w", err)
 	}
 	claimURL := strings.TrimSpace(string(claimURLBytes))
+	if err := c.ValidateURL(claimURL); err != nil {
+		return "", errors.New("invalid simplefin claim URL")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claimURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("build claim request: %w", err)
@@ -135,7 +129,7 @@ func (c *SimpleFinHTTPClient) Claim(ctx context.Context, setupToken string) (str
 	if accessURL == "" {
 		return "", fmt.Errorf("empty access URL returned by claim endpoint")
 	}
-	if _, err := url.Parse(accessURL); err != nil {
+	if err := c.ValidateURL(accessURL); err != nil {
 		return "", errors.New("invalid simplefin access URL")
 	}
 	return accessURL, nil
@@ -143,6 +137,9 @@ func (c *SimpleFinHTTPClient) Claim(ctx context.Context, setupToken string) (str
 
 // GetAccounts calls GET /accounts?version=2 on the Access URL.
 func (c *SimpleFinHTTPClient) GetAccounts(ctx context.Context, accessURL string, opts GetAccountsOpts) (SimpleFinAccountSet, error) {
+	if err := c.ValidateURL(accessURL); err != nil {
+		return SimpleFinAccountSet{}, errors.New("invalid simplefin access URL")
+	}
 	endpoint, err := buildAccountsURL(accessURL, opts)
 	if err != nil {
 		return SimpleFinAccountSet{}, err
@@ -172,6 +169,25 @@ func (c *SimpleFinHTTPClient) GetAccounts(ctx context.Context, accessURL string,
 		return SimpleFinAccountSet{}, err
 	}
 	return result, nil
+}
+
+func validateSimpleFinURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || !strings.EqualFold(parsed.Scheme, "https") || parsed.Host == "" {
+		return errors.New("simplefin URL must use HTTPS with a host")
+	}
+	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
+	if host == "localhost" {
+		return errors.New("simplefin URL host is not allowed")
+	}
+	// DNS hostnames are not resolved, so DNS rebinding remains outside this guard.
+	if addr, err := netip.ParseAddr(strings.Split(host, "%")[0]); err == nil {
+		addr = addr.Unmap()
+		if addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsUnspecified() {
+			return errors.New("simplefin URL host is not allowed")
+		}
+	}
+	return nil
 }
 
 // buildAccountsURL appends the /accounts path and query params to the Access URL.

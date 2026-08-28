@@ -137,7 +137,7 @@ describe('SecurityConfigTab', () => {
     expect(within(googleForm).queryByRole('button', { name: 'save' })).toBeNull()
   })
 
-  it('confirms via modal and saves authorization with restart polling', async () => {
+  it('saves authorization without a restart prompt', async () => {
     mockPermissions(true)
     const reexecuteQuery = vi.fn()
     const execute = vi.fn().mockResolvedValue({ data: { updateConfiguration: { configuration } } })
@@ -154,9 +154,7 @@ describe('SecurityConfigTab', () => {
     fireEvent.change(within(authorizationForm).getByLabelText('Dev CORS allowed origins'), { target: { value: 'https://dev.example' } })
     fireEvent.click(within(authorizationForm).getByRole('button', { name: 'save' }))
 
-    expect(screen.getByText('Restart required')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Save and restart' }))
-
+    expect(screen.queryByText('Restart required')).toBeNull()
     await waitFor(() => expect(execute).toHaveBeenCalled())
     expect(execute.mock.calls[0][0].input.authorization).toMatchObject({
       masterPassword: 'new-master-password',

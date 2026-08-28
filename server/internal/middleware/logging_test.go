@@ -20,7 +20,7 @@ func TestRequestLoggerRecordsStatus(t *testing.T) {
 }
 
 func TestSecurityHeadersSet(t *testing.T) {
-	handler := SecurityHeaders(false, "")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := SecurityHeaders(func() bool { return false }, "")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	recorder := httptest.NewRecorder()

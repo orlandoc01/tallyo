@@ -30,7 +30,7 @@ const usdAsset: Asset = { id: '1', assetType: 'CURRENCY', identifier: 'USD', nam
 const aaplAsset: Asset = { id: '3', assetType: 'SECURITY', identifier: 'AAPL', name: 'Apple Inc', classifier: 'PUBLIC', trackingTicker: null, trackingMultiplier: 1, priceConnectivity: 'HEALTHY', investmentConnectivity: 'HEALTHY', adapterSources: [] }
 const homeAsset: Asset = { id: '4', assetType: 'REAL_ESTATE', identifier: 'HOME', name: 'Primary Home', classifier: 'REAL_ESTATE', trackingTicker: null, trackingMultiplier: 1, priceConnectivity: 'HEALTHY', investmentConnectivity: 'HEALTHY', adapterSources: [] }
 
-const checkingAccount: Account = { id: 'acc', name: 'Checking', type: 'DEPOSITORY', subtype: 'checking', owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-acc', accountId: 'acc', date: '2026-06-01', balanceUSD: 1200, netContributionUSD: 1200, holdings: [], flagged: false }, lastSyncedAt: '2026-06-01T20:00:00Z' }
+const checkingAccount: Account = { id: 'acc', name: 'Checking', type: 'DEPOSITORY', subtype: 'checking', connection: { id: 'connection', name: 'Chase', owner: { id: 'owner', name: 'Alex' }, isActive: true, provider: null }, owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-acc', accountId: 'acc', date: '2026-06-01', balanceUSD: 1200, netContributionUSD: 1200, holdings: [], flagged: false }, lastSyncedAt: '2026-06-01T20:00:00Z' }
 const rothAccount: Account = { id: 'invest-tax', name: 'Roth 401k', type: 'INVESTMENT', subtype: 'roth 401k', owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-invest-tax', accountId: 'invest-tax', date: '2026-06-01', balanceUSD: 300, netContributionUSD: 300, holdings: [], flagged: false } }
 const brokerageAccount: Account = { id: 'invest', name: 'Brokerage', type: 'INVESTMENT', subtype: 'brokerage', owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-invest', accountId: 'invest', date: '2026-06-01', balanceUSD: 300, netContributionUSD: 300, holdings: [], flagged: false } }
 
@@ -137,18 +137,24 @@ describe('wealth components', () => {
     expect(screen.getByText('Brokerage')).toBeInTheDocument()
   })
 
-  it('shows the account owner and subtype without sync timestamp', async () => {
+  it('shows the account institution and sync recency under the amount', async () => {
     renderSidebar()
     await userEvent.click(screen.getByRole('button', { name: 'Expand Deposits accounts' }))
-    expect(screen.getByText('Alex - checking')).toBeInTheDocument()
-    expect(screen.queryByText(/Depository/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Synced/)).not.toBeInTheDocument()
+    expect(screen.getByText('Chase')).toBeInTheDocument()
+    expect(screen.getByText(/^\d+[mhd] ago$|^just now$/)).toBeInTheDocument()
+  })
+
+  it('does not render an icon in account rows', async () => {
+    renderSidebar({ onAccountClick: vi.fn() })
+    await userEvent.click(screen.getByRole('button', { name: 'Expand Deposits accounts' }))
+
+    expect(screen.getByLabelText('Open details for Checking').querySelector('svg')).toBeNull()
   })
 
   it('falls back to account type when subtype is missing', async () => {
     renderSidebar()
     await userEvent.click(screen.getByRole('button', { name: 'Expand Cards accounts' }))
-    expect(screen.getByText('Alex - Credit')).toBeInTheDocument()
+    expect(screen.getByText('Credit')).toBeInTheDocument()
   })
 
   it('invokes onAccountClick when an account row is clicked', async () => {
@@ -221,6 +227,8 @@ describe('wealth components', () => {
 
   it('renders asset class table rows collapsed by default', async () => {
     render(<AssetClassTable breakdown={breakdown} liabilityBreakdown={liabilityBreakdown} view="ASSETS" />)
+    expect(screen.getAllByText('1 holdings')).toHaveLength(2)
+    expect(screen.getByText('2 holdings')).toBeInTheDocument()
     expect(screen.getByText('Cash & Equivalents')).toBeInTheDocument()
     expect(screen.queryByText('US Dollar')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Expand Cash & Equivalents holdings' }))
@@ -319,13 +327,15 @@ describe('wealth components', () => {
         <NetWorthChart onRangeChange={onRangeChange} points={points} positive range="YTD" />
       </>,
     )
-    expect(screen.getByText('Break Down')).toBeInTheDocument()
+    expect(screen.getByText('Breakdown')).toBeInTheDocument()
     expect(screen.getByText('Cash & Equivalents')).toBeInTheDocument()
     await userEvent.click(screen.getByText('Cash & Equivalents'))
     expect(onSelectClassifier).toHaveBeenCalledWith(null)
     await userEvent.click(screen.getAllByTestId('pie-cell')[0])
     expect(onSelectClassifier).toHaveBeenLastCalledWith(null)
-    await userEvent.click(screen.getByText('1Y'))
+    const rangeControl = screen.getByRole('radio', { name: '1Y' })
+    expect(rangeControl.closest('section')).toContainElement(screen.getByText('Wealth history'))
+    await userEvent.click(rangeControl)
     expect(onRangeChange).toHaveBeenCalledWith('ONE_YEAR')
   })
 
@@ -344,7 +354,7 @@ describe('wealth components', () => {
       />,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: 'Historical asset allocation chart' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Historical asset allocation chart' }))
 
     const tooltipProps = tooltipSpy.mock.calls.at(-1)?.[0] as { content?: unknown } | undefined
     const tooltipContent = tooltipProps?.content as ((props: { active: boolean; label: string; payload: Array<{ color: string; dataKey: string; name: string; value: number }> }) => ReactNode) | undefined

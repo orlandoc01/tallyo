@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { GRANULARITIES } from '../../hooks/useReportFilterParamCore'
 import type { Granularity } from '../../types/graphql'
 import { formatCompactDisplayDate } from '../../utils/dates'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { dateRangePresets, getDateRangePresetDates, type DateRangePresetOption } from './dateRangePresets'
 
 export function DateRangeSelector({
@@ -31,31 +32,27 @@ export function DateRangeSelector({
 }
 
 export function GranularitySelector({
-  buttonClassName = 'rounded-xl px-4 py-2 text-sm font-semibold',
-  className = 'flex rounded-2xl bg-neutral-100 p-1',
   granularity,
   labelVariant = 'long',
   onChange,
+  size = 'md',
 }: {
-  buttonClassName?: string
-  className?: string
   granularity: Granularity
   labelVariant?: 'long' | 'short'
   onChange: (granularity: Granularity) => void
+  size?: 'sm' | 'md'
 }) {
   return (
-    <div className={className}>
-      {GRANULARITIES.map((g) => (
-        <button
-          className={`${buttonClassName} ${granularity === g ? 'bg-white shadow-sm' : 'text-neutral-500'}`}
-          key={g}
-          onClick={() => onChange(g)}
-          type="button"
-        >
-          {labelVariant === 'short' ? shortGranularityLabel(g) : g[0] + g.slice(1).toLowerCase()}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      ariaLabel="Granularity"
+      onChange={onChange}
+      options={GRANULARITIES.map((value) => ({
+        value,
+        label: labelVariant === 'short' ? shortGranularityLabel(value) : value[0] + value.slice(1).toLowerCase(),
+      }))}
+      size={size}
+      value={granularity}
+    />
   )
 }
 

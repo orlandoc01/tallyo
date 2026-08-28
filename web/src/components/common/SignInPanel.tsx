@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { SignInButton } from './Button'
 import { FormError } from './FormControls'
 
 type SignInPanelProps = {
@@ -8,7 +9,6 @@ type SignInPanelProps = {
   appVersion?: string
   error?: string | null
   loadingMessage?: string
-  googleAutoFocus?: boolean
   googleEnabled: boolean
   emailEnabled: boolean
   passkeyEnabled: boolean
@@ -25,7 +25,6 @@ export function SignInPanel({
   appVersion,
   error,
   loadingMessage,
-  googleAutoFocus = false,
   googleEnabled,
   emailEnabled,
   passkeyEnabled,
@@ -66,19 +65,19 @@ export function SignInPanel({
       {!loadingMessage ? (
         <div className="space-y-3">
           {googleEnabled ? (
-            <button autoFocus={googleAutoFocus} className="w-full rounded-xl bg-brand-500 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-brand-600" onClick={onGoogle} type="button">
+            <SignInButton onClick={onGoogle}>
               Sign in with Google
-            </button>
+            </SignInButton>
           ) : null}
           {emailEnabled ? (
-            <button className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50" onClick={onEmail} type="button">
+            <SignInButton onClick={onEmail}>
               Sign in with email
-            </button>
+            </SignInButton>
           ) : null}
           {showPasskey ? (
-            <button className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60" disabled={isPasskeyLoading} onClick={continueWithPasskey} type="button">
+            <SignInButton disabled={isPasskeyLoading} onClick={continueWithPasskey}>
               {isPasskeyLoading ? 'Waiting for passkey...' : 'Sign in with Passkey'}
-            </button>
+            </SignInButton>
           ) : null}
           {children}
           {!displayError && !googleEnabled && !emailEnabled && !showPasskey && !children ? <p className="text-sm text-neutral-500">No supported sign-in methods are enabled.</p> : null}
@@ -91,7 +90,7 @@ export function SignInPanel({
 export function AuthPageShell({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper px-4">
-      <section className="w-full max-w-md rounded-3xl border border-neutral-200 bg-white p-8 shadow-card">{children}</section>
+      <section className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-8 shadow-card">{children}</section>
     </main>
   )
 }

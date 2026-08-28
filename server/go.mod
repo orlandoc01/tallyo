@@ -1,9 +1,10 @@
 module tallyo
 
-go 1.26.6
+go 1.27.0
 
 require (
 	github.com/99designs/gqlgen v0.17.94
+	github.com/descope/virtualwebauthn v1.0.5
 	github.com/felixge/httpsnoop v1.1.0
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/go-chi/httprate v0.16.0

@@ -104,5 +104,5 @@ func (s *Service) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "save login", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, s.cfg.IssuerURL+"/authorize?session_id="+url.QueryEscape(session.ID), http.StatusFound)
+	http.Redirect(w, r, s.IssuerURL()+"/authorize?session_id="+url.QueryEscape(session.ID), http.StatusFound)
 }

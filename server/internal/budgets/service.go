@@ -10,6 +10,7 @@ import (
 	"tallyo/internal/apierror"
 	"tallyo/internal/graph/model"
 	"tallyo/internal/money"
+	"tallyo/internal/transactions"
 	u "tallyo/internal/utils"
 
 	"github.com/samber/lo"
@@ -180,7 +181,7 @@ func (s *Service) actualAmountsByCategory(ctx context.Context, month string, fil
 // granularity, the default), so a multi-month history needs no per-month
 // query.
 func (s *Service) actualAmountsByMonthCategory(ctx context.Context, filter model.SpendingFilter) (map[string]map[int64]money.Cents, error) {
-	rows, err := s.Spending.SpendingRows(ctx, filter, true, false)
+	rows, err := s.Spending.SpendingRows(ctx, filter, transactions.SpendingMode{ByCategory: true})
 	if err != nil {
 		return nil, err
 	}

@@ -14,9 +14,10 @@ func (s *Service) Token(w http.ResponseWriter, r *http.Request) {
 	session := newFositeSession()
 
 	ctx := r.Context()
-	accessRequest, err := s.provider.NewAccessRequest(ctx, r, session)
+	provider := s.oauthProvider()
+	accessRequest, err := provider.NewAccessRequest(ctx, r, session)
 	if err != nil {
-		s.provider.WriteAccessError(ctx, w, accessRequest, err)
+		provider.WriteAccessError(ctx, w, accessRequest, err)
 		return
 	}
 
@@ -34,13 +35,13 @@ func (s *Service) Token(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	accessResponse, err := s.provider.NewAccessResponse(ctx, accessRequest)
+	accessResponse, err := provider.NewAccessResponse(ctx, accessRequest)
 	if err != nil {
-		s.provider.WriteAccessError(ctx, w, accessRequest, err)
+		provider.WriteAccessError(ctx, w, accessRequest, err)
 		return
 	}
 
-	s.provider.WriteAccessResponse(ctx, w, accessRequest, accessResponse)
+	provider.WriteAccessResponse(ctx, w, accessRequest, accessResponse)
 }
 
 func newFositeSession() *oauth2.JWTSession {

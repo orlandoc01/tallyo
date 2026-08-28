@@ -164,9 +164,9 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
 
         <div className="space-y-2">
           <span className="text-sm font-medium text-neutral-700">Environment</span>
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-neutral-100 p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-full bg-neutral-100 p-1">
             {ENVIRONMENTS.map((env) => (
-              <button className={clsx('rounded-xl px-3 py-2 text-sm font-semibold transition', environment === env ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-800')} key={env} onClick={() => setEnvironment(env)} type="button">
+              <button className={clsx('rounded-full px-3 py-2 text-sm font-semibold transition', environment === env ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-800')} key={env} onClick={() => setEnvironment(env)} type="button">
                 {env.toLowerCase()}
               </button>
             ))}

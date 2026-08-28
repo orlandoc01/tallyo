@@ -34,9 +34,10 @@ func New(
 	log *slog.Logger,
 ) *Adapter {
 	return &Adapter{
-		BaseAdapter: wealth.BaseAdapter{Reads: store, Log: log},
-		store:       store,
-		client:      client,
+		Reads:  store,
+		Log:    log,
+		store:  store,
+		client: client,
 	}
 }
 

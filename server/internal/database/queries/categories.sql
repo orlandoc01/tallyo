@@ -1,23 +1,14 @@
 -- Used by category list, lookup, spending report, and category-group display paths with optional filters and ordering.
 -- name: ListCategories :many
-SELECT
-  cat_id,
-  cat_name,
-  cat_emoji,
-  group_name,
-  group_emoji,
-  group_kind,
-  sort_order,
-  group_id,
-  plaid_pfc2_codes
-FROM category_rows
+SELECT cr.*
+FROM category_rows cr
 WHERE TRUE
-  AND group_kind = 'EXPENSE' -- :if @expense_only
-  AND cat_id IN (sqlc.slice('category_ids')) -- :if @category_ids
-  AND group_id = @group_id -- :if @group_id
+  AND cr.group_kind = 'EXPENSE' -- :if @expense_only
+  AND cr.cat_id IN (sqlc.slice('category_ids')) -- :if @category_ids
+  AND cr.group_id = @group_id -- :if @group_id
 ORDER BY
-  group_sort_order, -- :if @group_order
-  sort_order;
+  cr.group_sort_order, -- :if @group_order
+  cr.sort_order;
 
 -- Used by the GraphQL node resolver to resolve a CategoryGroup, and internally after createCategoryGroup/updateCategoryGroup.
 -- name: CategoryGroupByID :one

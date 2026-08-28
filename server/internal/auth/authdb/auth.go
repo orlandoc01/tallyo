@@ -167,7 +167,7 @@ func (s *Store) UpdateAuthCodePKCE(ctx context.Context, signature, challenge, me
 	return wrapDB(err, "update pkce request session")
 }
 
-func userExists(dbgen.UsersRow) bool { return true }
+func userExists(dbgen.User) bool { return true }
 
 func (s *Store) IsEmailAllowed(ctx context.Context, email string) (bool, error) {
 	rows, err := s.q.Users(ctx, dbgen.UsersParams{Email: &email})

@@ -19,7 +19,7 @@ type Store interface {
 }
 
 type SpendingProvider interface {
-	SpendingRows(ctx context.Context, filter model.SpendingFilter, byCategory, excludeIncome bool) ([]transactions.SpendingRow, error)
+	SpendingRows(ctx context.Context, filter model.SpendingFilter, mode transactions.SpendingMode) ([]transactions.SpendingRow, error)
 }
 
 type CategoryProvider interface {

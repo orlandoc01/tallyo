@@ -38,7 +38,7 @@ func (s *Store) SpendingByCategory(ctx context.Context, filter model.SpendingFil
 func (s *Store) spendingReportCategories(ctx context.Context, filter model.SpendingFilter) ([]*model.Category, error) {
 	params := dbgen.ListCategoriesParams{ExpenseOnly: true, CategoryIds: model.LocalInt64IDsPtr(filter.CategoryIds)}
 	rows, err := s.q.ListCategories(ctx, params)
-	return dbutil.MapRows(rows, err, categoryFromListRow)
+	return dbutil.MapRows(rows, err, CategoryFromRow)
 }
 
 func buildSpendingReport(transactions []spendingTransaction, categories []*model.Category, filter model.SpendingFilter, loc *time.Location) *model.SpendingByCategoryReport {

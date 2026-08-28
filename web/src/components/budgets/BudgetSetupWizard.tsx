@@ -7,7 +7,7 @@ import type { Category } from '../../types/graphql'
 
 export function FirstBudgetIntro({ onStart }: { onStart: () => void }) {
   return (
-    <section className="overflow-hidden rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-emerald-50 p-6 shadow-sm dark:border-brand-900/60 dark:from-brand-950/30 dark:via-neutral-900 dark:to-emerald-950/20">
+    <section className="overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-emerald-50 p-6 shadow-sm dark:border-brand-900/60 dark:from-brand-950/30 dark:via-neutral-900 dark:to-emerald-950/20">
       <div className="max-w-2xl">
         <p className="text-sm font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">First budget</p>
         <h2 className="mt-2 text-3xl font-bold tracking-tight text-neutral-950 dark:text-neutral-50">Set up your first monthly budget</h2>
@@ -50,7 +50,7 @@ export function EmptyMonthOptions({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="max-w-2xl space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -147,7 +147,7 @@ export function BudgetSetupWizard({
                 <label className="sr-only" htmlFor={`setup-budget-${category.id}`}>Budget amount for {category.name}</label>
                 <span aria-hidden className="text-neutral-400">$</span>
                 <input
-                  className="w-28 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
+                  className="w-28 rounded-xl border border-neutral-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
                   id={`setup-budget-${category.id}`}
                   inputMode="decimal"
                   onChange={(event) => onChangeAmount(category.id, event.target.value)}
@@ -155,7 +155,7 @@ export function BudgetSetupWizard({
                 />
                 <button
                   aria-label={`Remove ${category.name}`}
-                  className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100 hover:text-rose-600 dark:hover:bg-neutral-800"
+                  className="rounded-xl p-2 text-neutral-400 hover:bg-neutral-100 hover:text-rose-600 dark:hover:bg-neutral-800"
                   onClick={() => onRemoveCategory(category.id)}
                   type="button"
                 >

@@ -13,6 +13,10 @@ import (
 	"tallyo/internal/transactions/categorizer"
 )
 
+// Every section the effective auth state derives from: OAuthEnabled follows the providers,
+// DisableAllAuth follows setup completion and the master password.
+var authRuntimeSections = []SectionID{SectionAuth, SectionGoogle, SectionEmail, SectionWebAuthn, SectionSetupComplete}
+
 type llmConfigurationStore interface {
 	CategoriesForLLM(ctx context.Context) ([]categorizer.CategoryRef, error)
 }
@@ -53,6 +57,10 @@ func (m *Manager) RegisterRuntimeConfigurationCallbacks(
 			config.Fields.RPName,
 			config.Fields.RPOrigins,
 		)
+		return commit, apierror.Public(err)
+	})
+	m.onPrepare(authRuntimeSections, func(ctx context.Context, prospective Sections) (func(), error) {
+		commit, err := authService.PrepareAuthConfig(ctx, m.resolved(prospective))
 		return commit, apierror.Public(err)
 	})
 	m.onPrepare([]SectionID{SectionLLM}, func(ctx context.Context, prospective Sections) (func(), error) {

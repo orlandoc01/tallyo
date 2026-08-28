@@ -25,7 +25,7 @@ func transactionFromRow(row dbgen.TransactionRecordsRow) *model.Transaction {
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 		Account:        accountsdb.AccountFromRow(row.Account, row.OwnerName),
-		Category:       categoryFromRow(row.CategoryRow),
+		Category:       CategoryFromRow(row.CategoryRow),
 	}
 }
 

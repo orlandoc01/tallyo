@@ -168,23 +168,10 @@ WHERE id = @id;
 -- Used by Plaid sync loops to select due active items, and by one-off item sync to fetch a single item secret.
 -- name: PlaidItemsDue :many
 SELECT
-  pi.id,
-  pi.external_id,
-  pi.credential_id,
-  pi.access_token,
+  sqlc.embed(pi),
   c.owner_id,
   o.name AS owner,
-  pi.institution_id,
-  c.name AS institution_name,
-  pi.logo_url,
-  pi.last_synced_at,
-  pi.sync_cron,
-  pi.recurring_sync_cron,
-  pi.next_sync_at,
-  pi.next_recurring_sync_at,
-  pi.next_balance_sync_at,
-  pi.plaid_investments_enabled,
-  pi.plaid_liabilities_enabled
+  c.name AS institution_name
 FROM plaid_items pi
 JOIN connections c ON c.source_id = pi.id AND c.source_table = 'plaid_items'
 JOIN owners o ON o.id = c.owner_id

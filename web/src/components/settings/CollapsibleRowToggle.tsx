@@ -4,7 +4,7 @@ export function CollapsibleRowToggle({ open, title, onToggle }: { open: boolean;
   return (
     <button
       aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
-      className="rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+      className="rounded-xl p-1 text-neutral-500 hover:bg-neutral-100"
       onClick={onToggle}
       type="button"
     >

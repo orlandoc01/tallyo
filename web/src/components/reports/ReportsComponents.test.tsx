@@ -5,6 +5,7 @@ import type { Category } from '../../types/graphql'
 import type { SpendingPeriod } from '../../types/domain'
 import { categories, spendingPeriod } from '../../mocks/fixtures'
 import { GraphqlTestProvider } from '../../test/renderWithProviders'
+import { chartOpacityForFocus, spendingChartFillColor } from '../../utils/chartStyles'
 import { CategoryBar } from './CategoryBar'
 import { SpendingBreakdown } from './SpendingBreakdown'
 import { SpendingComparison } from './SpendingComparison'
@@ -61,7 +62,7 @@ const trendsPeriods: SpendingPeriod[] = [
 
 describe('report components', () => {
   it('renders positive and negative category bars', () => {
-    render(
+    const { container } = render(
       <>
         <CategoryBar item={spendingPeriod.categories[0]} maxAbsTotal={150} />
         <CategoryBar item={spendingPeriod.categories[6]} maxAbsTotal={150} />
@@ -70,6 +71,14 @@ describe('report components', () => {
 
     expect(screen.getByText(/Restaurants & Bars/)).toBeInTheDocument()
     expect(screen.getAllByText('-$24.99')).not.toHaveLength(0)
+    expect(screen.queryByText('(40.7%)')).not.toBeInTheDocument()
+    const fills = container.querySelectorAll('.cat-bar-fill')
+    expect(fills[0]).toHaveClass('left-0')
+    expect(fills[1]).toHaveClass('right-0')
+    expect(fills[0]).toHaveStyle({
+      backgroundColor: spendingChartFillColor(spendingPeriod.categories[0].category.id, false),
+      opacity: chartOpacityForFocus(false),
+    })
   })
 
   it('toggles the spending breakdown to pie view and handles empty data', async () => {
@@ -77,7 +86,7 @@ describe('report components', () => {
     const { rerender } = render(<SpendingBreakdown period={spendingPeriod} />)
 
     expect(screen.getByText(/Restaurants & Bars/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^pie$/i }))
+    await user.click(screen.getByRole('radio', { name: /^pie$/i }))
     expect(screen.getByText('Total')).toBeInTheDocument()
 
     rerender(<SpendingBreakdown />)
@@ -107,7 +116,7 @@ describe('report components', () => {
 
     render(<SpendingBreakdown focusedCategoryId={null} onCategoryFocusChange={onCategoryFocusChange} period={spendingPeriod} />)
 
-    await user.click(screen.getByRole('button', { name: /^pie$/i }))
+    await user.click(screen.getByRole('radio', { name: /^pie$/i }))
     await user.click(screen.getByRole('button', { name: /Groceries.*\$62\.30/ }))
 
     expect(onCategoryFocusChange).toHaveBeenCalledWith({ id: '1', categoryIds: ['1'] })
@@ -126,7 +135,7 @@ describe('report components', () => {
 
     render(<SpendingBreakdown expanded={false} onToggleExpanded={() => {}} period={periodWithCredit} />)
 
-    await user.click(screen.getByRole('button', { name: /^pie$/i }))
+    await user.click(screen.getByRole('radio', { name: /^pie$/i }))
 
     expect(screen.getAllByText('Everything else')).toHaveLength(1)
     expect(screen.queryByText('$0.00 (0.0%)')).not.toBeInTheDocument()
@@ -261,7 +270,7 @@ describe('report components', () => {
 
     const { rerender } = render(<SpendingBreakdown expanded={false} onToggleExpanded={onToggleExpanded} period={manyCatsPeriod} />)
 
-    await user.click(screen.getByRole('button', { name: /^pie$/i }))
+    await user.click(screen.getByRole('radio', { name: /^pie$/i }))
     await user.click(screen.getByRole('button', { name: /show all 13 categories/i }))
     expect(onToggleExpanded).toHaveBeenCalled()
 
@@ -303,7 +312,7 @@ describe('report components', () => {
     const user = userEvent.setup()
     render(<SpendingTrends periods={[makeManyCategoriesPeriod()]} />)
 
-    await user.click(screen.getByRole('button', { name: 'Line' }))
+    await user.click(screen.getByRole('radio', { name: 'Line' }))
     expect(screen.getByText(/Rent/)).toBeInTheDocument()
     expect(screen.getByText(/Groceries/)).toBeInTheDocument()
     expect(screen.getByText(/Insurance/)).toBeInTheDocument()
@@ -317,7 +326,7 @@ describe('report components', () => {
 
     render(<SpendingTrends onCategoryFocusChange={onCategoryFocusChange} periods={[makeManyCategoriesPeriod()]} />)
 
-    await user.click(screen.getByRole('button', { name: 'Line' }))
+    await user.click(screen.getByRole('radio', { name: 'Line' }))
     await user.click(screen.getByRole('button', { name: /Rent/ }))
 
     expect(onCategoryFocusChange).toHaveBeenCalledWith('10')
@@ -348,7 +357,7 @@ describe('report components', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Line' }))
+    await user.click(screen.getByRole('radio', { name: 'Line' }))
     await user.click(screen.getByRole('button', { name: /Restaurants & Bars/ }))
 
     expect(onCategoryFocusChange).toHaveBeenCalledWith('2')
@@ -369,7 +378,7 @@ describe('report components', () => {
     const user = userEvent.setup()
     render(<SpendingBreakdown period={spendingPeriod} />)
 
-    await user.click(screen.getByRole('button', { name: /^pie$/i }))
+    await user.click(screen.getByRole('radio', { name: /^pie$/i }))
     expect(screen.getByText('Total')).toBeInTheDocument()
   })
 

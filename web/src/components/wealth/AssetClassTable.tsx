@@ -33,14 +33,13 @@ export function AssetClassTable({ breakdown, liabilityBreakdown, selectedClassif
   const shouldShowQuantity = (assetType: Asset['assetType']) => assetType !== 'CURRENCY' && assetType !== 'REAL_ESTATE'
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white shadow-sm">
+    <section className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-neutral-200 p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">Detailed</h2>
+        <h2 className="text-sm font-semibold text-neutral-500">Details</h2>
         <div className="flex items-center gap-2">
           <AssetBreakdownViewToggle onViewChange={onViewChange} view={view} />
         </div>
       </div>
-
       {showLiabilities ? (
         <div className="space-y-3 p-4">
           {liabilityBreakdown.map((item) => {

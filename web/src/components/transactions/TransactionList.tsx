@@ -27,6 +27,7 @@ export function TransactionList({
   onSortChange,
   selectedIds,
   selectedTransactionId,
+  showTitle = true,
   sort,
   toggleSelected,
   transactions,
@@ -44,6 +45,7 @@ export function TransactionList({
   reexecuteQuery?: (opts?: { requestPolicy?: 'network-only' | 'cache-and-network' | 'cache-first' }) => void
   selectedIds?: Set<string>
   selectedTransactionId?: string
+  showTitle?: boolean
   sort?: TransactionSort
   toggleSelected?: (id: string) => void
   transactions: Transaction[]
@@ -155,8 +157,8 @@ export function TransactionList({
       <Card>
         {/* Desktop table view */}
         <div className="hidden lg:block">
-          <div className="flex items-center justify-between gap-4 border-b border-neutral-100 p-5">
-            <h2 className="text-xl font-bold">Transactions</h2>
+          <div className="flex items-center justify-end gap-4 border-b border-neutral-100 p-5">
+            {showTitle ? <h2 className="mr-auto text-xl font-bold">Transactions</h2> : null}
             <div className="flex items-center gap-3">
               {headerActions}
               {onSortChange ? (
@@ -188,7 +190,7 @@ export function TransactionList({
         <div className="lg:hidden">
           {onSortChange ? (
             <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3">
-              <h2 className="text-lg font-bold">Transactions</h2>
+              {showTitle ? <h2 className="text-lg font-bold">Transactions</h2> : null}
               <div className="flex items-center gap-2">
                 {headerActions}
                 <TransactionSortSelect ariaLabel="Sort" onSortChange={onSortChange} sort={sort} />

@@ -23,7 +23,7 @@ export function ModalTitleRow({ title, onClose }: { title: string; onClose: () =
 
 export function ModalCloseButton({ className = '', label = 'Close', onClick }: { className?: string; label?: string; onClick: () => void }) {
   return (
-    <button aria-label={label} className={`rounded-lg p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 ${className}`} onClick={onClick} type="button">
+    <button aria-label={label} className={`rounded-xl p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 ${className}`} onClick={onClick} type="button">
       <X className="h-5 w-5" />
     </button>
   )

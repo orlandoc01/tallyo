@@ -16,27 +16,23 @@ func TestSnapshotPersisterDecisionsAndAssetUpdates(t *testing.T) {
 
 	events, result := p.Open(ctx)
 	events <- PersistEvent{Snapshot: &SnapshotDraft{
-		AccountBalanceSnapshot: AccountBalanceSnapshot{
-			AccountID: 1,
-			Source:    "plaid",
-			Date:      "2026-06-01",
-			SyncedAt:  syncedAt.Format(time.RFC3339),
-			Holdings:  []AssetDailyHolding{{Asset: &AssetUpsert{Identifier: "VTI"}, ValueUSD: 10}},
-		},
-		Decision: DecisionClean,
-		Anchor:   LastUnflaggedBalanceResult{Found: true, Date: "2026-05-31"},
+		AccountID: 1,
+		Source:    "plaid",
+		Date:      "2026-06-01",
+		SyncedAt:  syncedAt.Format(time.RFC3339),
+		Holdings:  []AssetDailyHolding{{Asset: &AssetUpsert{Identifier: "VTI"}, ValueUSD: 10}},
+		Decision:  DecisionClean,
+		Anchor:    LastUnflaggedBalanceResult{Found: true, Date: "2026-05-31"},
 	}}
 	events <- PersistEvent{Snapshot: &SnapshotDraft{
-		AccountBalanceSnapshot: AccountBalanceSnapshot{
-			AccountID:  2,
-			Source:     "debank",
-			Date:       "2026-06-01",
-			SyncedAt:   syncedAt.Format(time.RFC3339),
-			BalanceUSD: 999,
-			FlagReason: "spike",
-		},
-		Decision: DecisionFlagged,
-		CarryUSD: 100,
+		AccountID:  2,
+		Source:     "debank",
+		Date:       "2026-06-01",
+		SyncedAt:   syncedAt.Format(time.RFC3339),
+		BalanceUSD: 999,
+		FlagReason: "spike",
+		Decision:   DecisionFlagged,
+		CarryUSD:   100,
 		Review: &BalanceReviewUpsert{
 			AccountID:          2,
 			ProviderBalanceUSD: 999,
@@ -48,31 +44,27 @@ func TestSnapshotPersisterDecisionsAndAssetUpdates(t *testing.T) {
 		},
 	}}
 	events <- PersistEvent{Snapshot: &SnapshotDraft{
-		AccountBalanceSnapshot: AccountBalanceSnapshot{
-			AccountID:  3,
-			Source:     "plaid",
-			Date:       "2026-06-01",
-			SyncedAt:   syncedAt.Format(time.RFC3339),
-			BalanceUSD: 999,
-			Holdings:   []AssetDailyHolding{{AssetID: 1, ValueUSD: 100, CountsTowardValue: true}},
-		},
-		Decision: DecisionFlagged,
-		CarryUSD: 100,
+		AccountID:  3,
+		Source:     "plaid",
+		Date:       "2026-06-01",
+		SyncedAt:   syncedAt.Format(time.RFC3339),
+		BalanceUSD: 999,
+		Holdings:   []AssetDailyHolding{{AssetID: 1, ValueUSD: 100, CountsTowardValue: true}},
+		Decision:   DecisionFlagged,
+		CarryUSD:   100,
 		ProviderState: &SnapshotProviderState{
 			ProviderBalanceUSD:   999,
 			ProviderHoldingsJSON: "[]",
 		},
 	}}
 	events <- PersistEvent{Snapshot: &SnapshotDraft{
-		AccountBalanceSnapshot: AccountBalanceSnapshot{
-			AccountID:  4,
-			Source:     "debank",
-			Date:       "2026-06-01",
-			SyncedAt:   syncedAt.Format(time.RFC3339),
-			BalanceUSD: 999,
-		},
-		Decision: DecisionApprovedCarryForward,
-		CarryUSD: 100,
+		AccountID:  4,
+		Source:     "debank",
+		Date:       "2026-06-01",
+		SyncedAt:   syncedAt.Format(time.RFC3339),
+		BalanceUSD: 999,
+		Decision:   DecisionApprovedCarryForward,
+		CarryUSD:   100,
 	}}
 	events <- PersistEvent{Asset: &AssetUpdate{AssetID: 1, Price: 2, PriceAt: syncedAt}}
 	close(events)
@@ -104,7 +96,7 @@ func TestSnapshotPersisterRejectsBadSyncedAt(t *testing.T) {
 	store := &persisterStore{assets: map[int64]*model.Asset{1: {ID: model.New(model.GlobalIDAsset, 1)}}}
 	p := (&SnapshotPersister{Wealth: store}).WithRun("2026-06-01", time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC))
 	events, result := p.Open(ctx)
-	events <- PersistEvent{Snapshot: &SnapshotDraft{AccountBalanceSnapshot: AccountBalanceSnapshot{AccountID: 1, Source: "test", Date: "2026-06-01", SyncedAt: "bad-date"}}}
+	events <- PersistEvent{Snapshot: &SnapshotDraft{AccountID: 1, Source: "test", Date: "2026-06-01", SyncedAt: "bad-date"}}
 	events <- PersistEvent{Asset: &AssetUpdate{AssetID: 1, Price: 1, PriceAt: time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)}}
 	close(events)
 	if got := <-result; got == nil {
@@ -162,8 +154,8 @@ func TestSnapshotPersisterSessionHelpersAndErrors(t *testing.T) {
 
 	events, result = p.Open(ctx)
 	events <- PersistEvent{Snapshot: &SnapshotDraft{
-		AccountBalanceSnapshot: AccountBalanceSnapshot{AccountID: 1, Source: "test", Date: "2026-06-01"},
-		Decision:               SnapshotDecision(99),
+		AccountID: 1, Source: "test", Date: "2026-06-01",
+		Decision: SnapshotDecision(99),
 	}}
 	close(events)
 	if got := <-result; got == nil {

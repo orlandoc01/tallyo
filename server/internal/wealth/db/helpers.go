@@ -9,13 +9,9 @@ import (
 	"tallyo/internal/graph/model"
 )
 
-func ownerFromRow(row dbgen.OwnersRow) *model.Owner {
-	return &model.Owner{ID: model.New(model.GlobalIDOwner, row.ID), Name: row.Name}
-}
-
 func (s *Store) OwnerByID(ctx context.Context, id int64) (*model.Owner, error) {
 	rows, err := s.q.Owners(ctx, dbgen.OwnersParams{ID: &id})
-	return dbutil.MapFirstRow(rows, err, ownerFromRow)
+	return dbutil.MapFirstRow(rows, err, accountsdb.OwnerFromRow)
 }
 
 func (s *Store) AccountByID(ctx context.Context, id int64) (*model.Account, error) {

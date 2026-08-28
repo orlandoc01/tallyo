@@ -12,12 +12,10 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
-	"github.com/samber/lo"
 )
 
 type Config struct {
-	AllowedOrigins []string
-	Logger         *slog.Logger
+	Logger *slog.Logger
 }
 
 type Server struct {
@@ -45,15 +43,12 @@ func New(cfg Config, resolver *graph.Resolver) http.Handler {
 		mcpserver.WithEndpointPath("/mcp"),
 		mcpserver.WithStateLess(false),
 		mcpserver.WithSessionIdleTTL(30*time.Minute),
-		mcpserver.WithStreamableHTTPCORS(mcpserver.WithCORSAllowedOrigins(s.corsOrigins(cfg.AllowedOrigins)...)),
+		// Dev origins are served live by auth.Service.DevCORS, which wraps this handler.
+		mcpserver.WithStreamableHTTPCORS(mcpserver.WithCORSAllowedOrigins("https://claude.ai")),
 	)
 }
 
 const instructions = "Personal finance tracker for a household. Amounts are USD; positive means money spent, negative means refund or credit. Spending reports exclude transfers and income unless a tool description says otherwise."
-
-func (s *Server) corsOrigins(configured []string) []string {
-	return lo.Ternary(len(configured) > 0, configured, []string{"https://claude.ai"})
-}
 
 func toolResult(value any, summary string) *mcp.CallToolResult {
 	data, err := json.Marshal(value)

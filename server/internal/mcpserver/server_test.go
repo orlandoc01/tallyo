@@ -9,9 +9,9 @@ import (
 	"tallyo/internal/utils/test"
 )
 
-func TestNewWithCustomOrigins(t *testing.T) {
+func TestNewServesMCP(t *testing.T) {
 	resolver := &graph.Resolver{}
-	cfg := Config{AllowedOrigins: []string{"http://example.com"}, Logger: test.Logger}
+	cfg := Config{Logger: test.Logger}
 	srv := New(cfg, resolver)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/mcp", nil))

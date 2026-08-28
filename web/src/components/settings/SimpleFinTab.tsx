@@ -99,10 +99,10 @@ export function SimpleFinTab() {
                   </div>
                   {canWrite('accounts') ? (
                     <div className="flex shrink-0 gap-1">
-                      <button className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800" onClick={() => void handleReset(token)} title="Reset sync" type="button">
+                      <button className="rounded-xl p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800" onClick={() => void handleReset(token)} title="Reset sync" type="button">
                         <RefreshCcw className="h-4 w-4" />
                       </button>
-                      <button className={clsx('rounded-lg p-2 hover:bg-red-50', confirmDeleteID === token.id ? 'text-red-700' : 'text-neutral-500 hover:text-red-600')} onClick={() => void handleDelete(token)} title={confirmDeleteID === token.id ? 'Confirm delete' : 'Delete'} type="button">
+                      <button className={clsx('rounded-xl p-2 hover:bg-red-50', confirmDeleteID === token.id ? 'text-red-700' : 'text-neutral-500 hover:text-red-600')} onClick={() => void handleDelete(token)} title={confirmDeleteID === token.id ? 'Confirm delete' : 'Delete'} type="button">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

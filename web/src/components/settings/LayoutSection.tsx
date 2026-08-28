@@ -42,7 +42,7 @@ function NavItemRow({ item, overlay }: { item: NavItemDef; overlay?: boolean }) 
   return (
     <div
       className={clsx(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
+        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
         overlay && 'rounded-xl bg-white shadow-xl ring-1 ring-neutral-200',
       )}
     >

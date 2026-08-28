@@ -3,7 +3,7 @@
 Tallyo has two configuration layers:
 
 - Startup configuration controls values needed before or while opening SQLite. It comes from environment variables or YAML and requires a restart to change.
-- Application configuration lives in the SQLite `configurations` table. Administrators manage it through the setup wizard or Settings. Most of it applies without a restart.
+- Application configuration lives in the SQLite `configurations` table. Administrators manage it through the setup wizard or Settings. All of it applies live, without a restart.
 
 See [Installing Tallyo](install.md) for deployment examples, [Plaid Setup](plaid-setup.md), [SimpleFIN Setup](simplefin-setup.md), [Crypto Tracking](crypto-tracking.md), and [Security and Deployment Notes](security.md) before publishing an instance.
 
@@ -86,13 +86,13 @@ Defaults need one distinction: an absent database section generally resolves to 
 | Refresh token lifetime | `168h0m0s` when written by the wizard | Go duration string; must parse and be greater than zero when OAuth is active. |
 | Development CORS allowed origins | Empty list | Comma-separated origins in the UI. Intended for a separate development frontend, not general reverse-proxy access. |
 
-Saving the Authorization card does not immediately hot-reload the authorization routes. Instead, after persisting the update and returning the API response, the Tallyo server waits two seconds and exits with status 1. It is expected that Docker's restart policy, systemd, or another supervisor will restart the process with the updates now taking effect. Without a supervisor, start it manually.
+Saving the Authorization card applies immediately: the server rebuilds its OAuth provider, token issuer, frontend redirect client, and CORS rules in place. No process restart is involved. Access tokens issued under a previous issuer URL stop validating, so users sign in again after an issuer change.
 
 ### Google Sign-In
 
 | Field | Default | Validation and behavior |
 |---|---|---|
-| Enabled | `false` | Provider changes apply live when OAuth is already initialized. Enabling the first OAuth provider also requires valid Authorization settings and an authorization restart. |
+| Enabled | `false` | Provider changes apply live; enabling the first OAuth provider requires valid Authorization settings but no restart. |
 | Google client ID | Empty | Tallyo stores the value but does not test it when saved. |
 | Google client secret | Empty | Stored as a secret and obfuscated when read; connectivity is tested only by an actual sign-in. |
 
@@ -102,7 +102,7 @@ The Google authorized redirect URI is exactly `<public-origin>/auth/google/callb
 
 | Field | Default or initial value | Validation and behavior |
 |---|---|---|
-| Enabled | `false`; the OAuth wizard initially selects email when OAuth is chosen | Provider changes apply live when OAuth is already initialized. Enabling the first OAuth provider also requires valid Authorization settings and an authorization restart. |
+| Enabled | `false`; the OAuth wizard initially selects email when OAuth is chosen | Provider changes apply live; enabling the first OAuth provider requires valid Authorization settings but no restart. |
 | SMTP host | Empty in storage; wizard initially suggests `smtp.gmail.com` | An empty host jst writes OTP and magic-link data to server logs so do not rely on that mode in production. |
 | SMTP port | Empty in storage; wizard initially uses `587` | Stored as text. SMTP connectivity is not tested when saved. |
 | SMTP from | Empty in storage; wizard initially uses `Tallyo` | Passed to the SMTP sender. Use a value accepted by the provider. |
@@ -115,7 +115,7 @@ Provider completeness and SMTP delivery are not validated at save time. Test a s
 
 | Field | Default or initial value | Validation and behavior |
 |---|---|---|
-| Enabled | `false` | Provider changes apply live when OAuth is already initialized. Enabling the first OAuth provider also requires valid Authorization settings and an authorization restart. |
+| Enabled | `false` | Provider changes apply live; enabling the first OAuth provider requires valid Authorization settings but no restart. |
 | Relying-party ID | Wizard uses the browser hostname | If empty, Tallyo derives it from the OAuth issuer host. It must be valid for the public site used by the browser. |
 | Relying-party name | `Tallyo` | Display name shown by authenticators. Empty values fall back to `Tallyo`. |
 | Relying-party origins | Wizard uses the browser origin | If empty, Tallyo derives the issuer origin. The WebAuthn library validates the resulting configuration. |
@@ -183,7 +183,7 @@ The setup wizard sequence is:
 5. Register the initial admin email and, when selected, an initial passkey.
 6. Create at least one household owner.
 7. Optionally store Plaid credentials or a SimpleFIN token.
-8. Finish setup and wait for the authorization restart when authorization was changed.
+8. Finish setup. Sign-in settings take effect immediately; no restart is needed.
 
 The Plaid step stores credentials only. Link bank accounts after setup from Accounts > Link Connection.
 
@@ -198,7 +198,7 @@ The following must agree:
 - WebAuthn relying-party ID and origin.
 - Google Cloud authorized redirect URI: `<public-origin>/auth/google/callback`.
 
-Changing Authorization later is supported, but it exits the process and requires the supervisor restart.
+Changing Authorization later is supported and applies live.
 
 ## Database encryption and maintenance
 

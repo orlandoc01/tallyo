@@ -310,7 +310,7 @@ describe('App integration', () => {
     await user.click(screen.getByRole('button', { name: /^filters$/i }))
     fireEvent.change(screen.getByLabelText(/start date/i, { selector: 'input' }), { target: { value: '2026-05-01' } })
 
-    const mobileQuarterlyButton = screen.getAllByRole('button', { name: 'Quarterly' }).at(-1)
+    const mobileQuarterlyButton = screen.getAllByRole('radio', { name: 'Quarterly' }).at(-1)
     if (mobileQuarterlyButton) {
       await user.click(mobileQuarterlyButton)
     }

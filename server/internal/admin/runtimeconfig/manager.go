@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/samber/lo"
+
 	u "tallyo/internal/utils"
 )
 
@@ -17,6 +19,8 @@ type RuntimeAuthService interface {
 	UpdateEmailConfig(enabled bool, host, port, from, username, password string)
 	UpdateGoogleConfig(enabled bool, clientID, secret string)
 	PrepareWebAuthnConfig(enabled bool, issuer, rpID, rpName string, rpOrigins []string) (func(), error)
+	// PrepareAuthConfig receives the prospective sections with env overrides applied.
+	PrepareAuthConfig(ctx context.Context, resolved Sections) (func(), error)
 	SetTimezone(timezone string)
 }
 
@@ -91,6 +95,11 @@ func resolveRuntimeConfig(sections Sections, masterPassword string, disableAllAu
 		sections.Auth.Enabled = false
 	}
 	return sections
+}
+
+// Caller holds m.mu: reads the env-override flags directly instead of via Sections().
+func (m *Manager) resolved(prospective Sections) Sections {
+	return resolveRuntimeConfig(prospective, lo.Ternary(m.envMasterPasswordAuth, "configured", ""), m.authlessConfigAllowed)
 }
 
 func (m *Manager) Timezone() string {

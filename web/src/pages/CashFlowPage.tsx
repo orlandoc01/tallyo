@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
 import { MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../components/common/MobileFilterFooter'
-import { PageToolbar, PageToolbarActions, PageToolbarSegmentedControl } from '../components/common/PageToolbar'
+import { PageHeader } from '../components/common/PageHeader'
+import { SegmentedControl } from '../components/common/SegmentedControl'
 import { CashFlowCategoryBreakdown } from '../components/reports/CashFlowCategoryBreakdown'
 import { CashFlowChart } from '../components/reports/CashFlowChart'
 import { DateRangeInputs, DateRangeSelector } from '../components/reports/DateRangeSelector'
@@ -84,9 +85,10 @@ export function CashFlowPage() {
 
   return (
     <div className="space-y-6">
-      <PageToolbar>
-        <PageToolbarActions>
-          <PageToolbarSegmentedControl ariaLabel="Cash flow granularity" options={granularityOptions} value={granularity} onChange={handleGranularityChange} />
+      <PageHeader
+        actions={(
+          <>
+          <SegmentedControl ariaLabel="Cash flow granularity" options={granularityOptions} value={granularity} onChange={handleGranularityChange} />
           <ReportFilterDropdown activeFilterCount={activeFilterCount} onClear={clearFilter}>
             <div className="space-y-4">
               <ReportFilterSection active={dateRangeFiltered}>
@@ -95,8 +97,10 @@ export function CashFlowPage() {
               <OwnerFilterSection onChange={setOwnerIds} selectedOwners={ownerIds} />
             </div>
           </ReportFilterDropdown>
-        </PageToolbarActions>
-      </PageToolbar>
+          </>
+        )}
+        title="Cash Flow"
+      />
       <CashFlowPeriodContent key={periodsKey} cashFlow={cashFlow} />
 
       {mobile.filterOpen && (
@@ -203,9 +207,9 @@ function CashFlowMobileFilters({ dateFrom, dateTo, granularity, ownerIds, preset
 
 function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: 'green' | 'red' }) {
   return (
-    <div className="rounded-3xl border border-neutral-200 bg-white p-4 text-center shadow-card md:p-6">
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center shadow-card md:p-6">
       <div className={`text-2xl font-bold ${tone === 'green' ? 'text-emerald-700' : tone === 'red' ? 'text-red-600' : ''}`}>{value}</div>
-      <div className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{label}</div>
+      <div className="mt-2 text-sm font-semibold text-neutral-500">{label}</div>
     </div>
   )
 }

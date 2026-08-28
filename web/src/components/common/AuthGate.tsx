@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { TextLinkButton } from './Button'
+import { SignInButton, TextLinkButton } from './Button'
 import { TextField } from './FormControls'
 import { SignInPanel } from './SignInPanel'
 
@@ -55,7 +55,6 @@ export function AuthGate({
     <SignInPanel
       appVersion={appVersion}
       emailEnabled={emailAuthEnabled}
-      googleAutoFocus={!showMasterPassword}
       googleEnabled={googleAuthEnabled}
       onEmail={onLoginWithEmail}
       onGoogle={onLogin}
@@ -65,13 +64,9 @@ export function AuthGate({
     >
       {masterPasswordEnabled ? (
         !showMasterPassword ? (
-          <button
-            className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50"
-            onClick={() => setShowMasterPassword(true)}
-            type="button"
-          >
+          <SignInButton onClick={() => setShowMasterPassword(true)}>
             Sign in with Master Password
-          </button>
+          </SignInButton>
         ) : (
           <form className="space-y-3" onSubmit={submitMasterPassword}>
             <TextField autoFocus id="master-password" label="Master Password" onChange={setPassword} required type="password" value={password} />

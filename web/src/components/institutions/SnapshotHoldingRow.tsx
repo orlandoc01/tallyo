@@ -24,7 +24,7 @@ export function SnapshotHoldingRow({
   const inputLabel = assetInputLabel(line.asset)
   const quantity = line.quantity
   const unitLabel = quantity == null ? null : cash ? 'Cash' : line.price == null ? null : `Price ${formatUnitPrice(line.price)}`
-  const inputClass = 'w-full rounded-lg border border-neutral-200 px-2 py-1.5 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-neutral-50 disabled:text-neutral-500'
+  const inputClass = 'w-full rounded-xl border border-neutral-200 px-2 py-1.5 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-neutral-50 disabled:text-neutral-500'
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-neutral-100 px-3 py-2 text-sm sm:items-center">
       <div className="min-w-0">
@@ -83,7 +83,7 @@ export function SnapshotHoldingRow({
         {onRemove && !disabled ? (
           <button
             aria-label={`Remove ${inputLabel}`}
-            className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/30"
+            className="rounded-xl p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/30"
             onClick={() => onRemove(line.asset.id)}
             type="button"
           >

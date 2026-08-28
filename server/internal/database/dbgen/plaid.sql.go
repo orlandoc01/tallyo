@@ -246,23 +246,10 @@ func (q *Queries) PlaidCredentialSecretByID(ctx context.Context, arg PlaidCreden
 
 const plaidItemsDue = `-- name: PlaidItemsDue :many
 SELECT
-  pi.id,
-  pi.external_id,
-  pi.credential_id,
-  pi.access_token,
+  pi.access_token, pi.created_at, pi.credential_id, pi.cursor, pi.external_id, pi.health_error_code, pi.health_error_message, pi.health_state, pi.health_updated_at, pi.id, pi.institution_id, pi.last_recurring_synced_at, pi.last_synced_at, pi.logo_url, pi.next_balance_sync_at, pi.next_recurring_sync_at, pi.next_sync_at, pi.plaid_investments_enabled, pi.plaid_liabilities_enabled, pi.recurring_sync_cron, pi.sync_cron, pi.updated_at,
   c.owner_id,
   o.name AS owner,
-  pi.institution_id,
-  c.name AS institution_name,
-  pi.logo_url,
-  pi.last_synced_at,
-  pi.sync_cron,
-  pi.recurring_sync_cron,
-  pi.next_sync_at,
-  pi.next_recurring_sync_at,
-  pi.next_balance_sync_at,
-  pi.plaid_investments_enabled,
-  pi.plaid_liabilities_enabled
+  c.name AS institution_name
 FROM plaid_items pi
 JOIN connections c ON c.source_id = pi.id AND c.source_table = 'plaid_items'
 JOIN owners o ON o.id = c.owner_id
@@ -299,23 +286,10 @@ type PlaidItemsDueParams struct {
 }
 
 type PlaidItemsDueRow struct {
-	ID                      int64
-	ExternalID              string
-	CredentialID            int64
-	AccessToken             string
-	OwnerID                 int64
-	Owner                   string
-	InstitutionID           *string
-	InstitutionName         *string
-	LogoUrl                 *string
-	LastSyncedAt            *time.Time
-	SyncCron                string
-	RecurringSyncCron       string
-	NextSyncAt              *time.Time
-	NextRecurringSyncAt     *time.Time
-	NextBalanceSyncAt       *time.Time
-	PlaidInvestmentsEnabled bool
-	PlaidLiabilitiesEnabled bool
+	PlaidItem       PlaidItem
+	OwnerID         int64
+	Owner           string
+	InstitutionName *string
 }
 
 // Used by Plaid sync loops to select due active items, and by one-off item sync to fetch a single item secret.
@@ -331,23 +305,31 @@ func (q *Queries) PlaidItemsDue(ctx context.Context, arg PlaidItemsDueParams) ([
 	for rows.Next() {
 		var i PlaidItemsDueRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.ExternalID,
-			&i.CredentialID,
-			&i.AccessToken,
+			&i.PlaidItem.AccessToken,
+			&i.PlaidItem.CreatedAt,
+			&i.PlaidItem.CredentialID,
+			&i.PlaidItem.Cursor,
+			&i.PlaidItem.ExternalID,
+			&i.PlaidItem.HealthErrorCode,
+			&i.PlaidItem.HealthErrorMessage,
+			&i.PlaidItem.HealthState,
+			&i.PlaidItem.HealthUpdatedAt,
+			&i.PlaidItem.ID,
+			&i.PlaidItem.InstitutionID,
+			&i.PlaidItem.LastRecurringSyncedAt,
+			&i.PlaidItem.LastSyncedAt,
+			&i.PlaidItem.LogoUrl,
+			&i.PlaidItem.NextBalanceSyncAt,
+			&i.PlaidItem.NextRecurringSyncAt,
+			&i.PlaidItem.NextSyncAt,
+			&i.PlaidItem.PlaidInvestmentsEnabled,
+			&i.PlaidItem.PlaidLiabilitiesEnabled,
+			&i.PlaidItem.RecurringSyncCron,
+			&i.PlaidItem.SyncCron,
+			&i.PlaidItem.UpdatedAt,
 			&i.OwnerID,
 			&i.Owner,
-			&i.InstitutionID,
 			&i.InstitutionName,
-			&i.LogoUrl,
-			&i.LastSyncedAt,
-			&i.SyncCron,
-			&i.RecurringSyncCron,
-			&i.NextSyncAt,
-			&i.NextRecurringSyncAt,
-			&i.NextBalanceSyncAt,
-			&i.PlaidInvestmentsEnabled,
-			&i.PlaidLiabilitiesEnabled,
 		); err != nil {
 			return nil, err
 		}

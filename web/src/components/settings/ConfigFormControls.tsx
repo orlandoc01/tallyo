@@ -36,7 +36,7 @@ export function TextInput({ label, value, dirty, disabled, placeholder, onChange
     <label className={`block text-sm font-semibold ${disabled ? 'text-neutral-400' : 'text-neutral-700'}`}>
       <LabelText dirty={dirty} label={label} />
       <input
-        className={`mt-1 w-full rounded-lg border px-3 py-2 font-mono text-sm transition-colors ${disabled ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400' : 'border-neutral-200 text-neutral-950'}`}
+        className={`mt-1 w-full rounded-xl border px-3 py-2 font-mono text-sm transition-colors ${disabled ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400' : 'border-neutral-200 text-neutral-950'}`}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

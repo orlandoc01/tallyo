@@ -20,7 +20,7 @@ type spendingTransaction struct {
 }
 
 func (s *Store) CashFlow(ctx context.Context, filter model.SpendingFilter) ([]*model.CashFlowPeriod, error) {
-	rows, err := s.spendingRows(ctx, filter, true, false)
+	rows, err := s.spendingRows(ctx, filter, transactions.SpendingMode{ByCategory: true})
 	if err != nil {
 		return nil, err
 	}
@@ -28,8 +28,8 @@ func (s *Store) CashFlow(ctx context.Context, filter model.SpendingFilter) ([]*m
 }
 
 // SpendingRows exposes the aggregated spending data publicly. Used by BudgetReport.
-func (s *Store) SpendingRows(ctx context.Context, filter model.SpendingFilter, byCategory, excludeIncome bool) ([]transactions.SpendingRow, error) {
-	return s.spendingRows(ctx, filter, byCategory, excludeIncome)
+func (s *Store) SpendingRows(ctx context.Context, filter model.SpendingFilter, mode transactions.SpendingMode) ([]transactions.SpendingRow, error) {
+	return s.spendingRows(ctx, filter, mode)
 }
 
 func buildCashFlowPeriods(rows []transactions.SpendingRow) []*model.CashFlowPeriod {
@@ -78,7 +78,7 @@ func buildCashFlowPeriods(rows []transactions.SpendingRow) []*model.CashFlowPeri
 	return result
 }
 
-func (s *Store) spendingRows(ctx context.Context, filter model.SpendingFilter, byCategory, excludeIncome bool) ([]transactions.SpendingRow, error) {
+func (s *Store) spendingRows(ctx context.Context, filter model.SpendingFilter, mode transactions.SpendingMode) ([]transactions.SpendingRow, error) {
 	loc, err := spendingLocation(ctx)
 	if err != nil {
 		return nil, err
@@ -86,11 +86,11 @@ func (s *Store) spendingRows(ctx context.Context, filter model.SpendingFilter, b
 	if err := validateSpendingPeriodCount(filter, loc); err != nil {
 		return nil, err
 	}
-	txns, err := s.spendingTransactions(ctx, filter, excludeIncome)
+	txns, err := s.spendingTransactions(ctx, filter, mode.ExcludeIncome)
 	if err != nil {
 		return nil, err
 	}
-	return aggregateSpendingRows(txns, spendingGranularity(filter), loc, byCategory), nil
+	return aggregateSpendingRows(txns, spendingGranularity(filter), loc, mode.ByCategory), nil
 }
 
 func (s *Store) spendingTransactions(ctx context.Context, filter model.SpendingFilter, excludeIncome bool) ([]spendingTransaction, error) {
@@ -103,9 +103,9 @@ func (s *Store) spendingTransactions(ctx context.Context, filter model.SpendingF
 		IsHidden:      filter.IsHidden != nil && *filter.IsHidden,
 		Untagged:      filter.Untagged != nil && *filter.Untagged,
 		ExcludeIncome: excludeIncome,
+		CategoryIds:   model.LocalInt64IDsPtr(filter.CategoryIds),
+		TagIds:        model.LocalInt64IDsPtr(filter.TagIds),
 	}
-	params.CategoryIds = model.LocalInt64IDsPtr(filter.CategoryIds)
-	params.TagIds = model.LocalInt64IDsPtr(filter.TagIds)
 	ownerIDs, err := model.LocalInt64IDsOfTypePtr(filter.OwnerIds, model.GlobalIDOwner)
 	if err != nil {
 		return nil, err
@@ -121,7 +121,7 @@ func (s *Store) spendingTransactions(ctx context.Context, filter model.SpendingF
 		return nil, fmt.Errorf("query spending transactions: %w", err)
 	}
 	toTransaction := func(row dbgen.SpendingTransactionsRow) spendingTransaction {
-		return spendingTransaction{AmountCents: row.AmountCents, Datetime: row.Datetime, Category: categoryFromRow(row.CategoryRow)}
+		return spendingTransaction{AmountCents: row.AmountCents, Datetime: row.Datetime, Category: CategoryFromRow(row.CategoryRow)}
 	}
 	return u.Map(rows, toTransaction), nil
 }

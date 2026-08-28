@@ -123,7 +123,4 @@ type Resolver struct {
 	RealEstate        RealEstateService
 	ManualSnapshot    ManualSnapshotter
 	Config            config.Config
-	// ScheduleRestart triggers a graceful process restart (e.g. after an
-	// authorization configuration change). Required — wired in cmd/tallyo.
-	ScheduleRestart func()
 }

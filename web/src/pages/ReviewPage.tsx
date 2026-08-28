@@ -1,5 +1,6 @@
 import { Navigate, useParams } from 'react-router'
 import { SegmentedNavTabs, type SegmentedNavTab } from '../components/common/SegmentedNavTabs'
+import { PageHeader } from '../components/common/PageHeader'
 import { ConnectionReviewQueue } from '../components/institutions/ConnectionReviewQueue'
 import { UncategorizedQueue } from '../components/transactions/UncategorizedQueue'
 import { AssetReviewQueue } from '../components/wealth/AssetReviewQueue'
@@ -72,7 +73,9 @@ export function ReviewPage() {
 
   return (
     <div className="space-y-6">
-      <SegmentedNavTabs ariaLabel="Review sections" items={tabItems} />
+      <PageHeader title="Review">
+        <SegmentedNavTabs ariaLabel="Review sections" items={tabItems} />
+      </PageHeader>
       {tab === 'assets' ? <AssetReviewQueue /> : null}
       {tab === 'balances' ? <BalanceReviewQueue /> : null}
       {tab === 'accounts' ? <ConnectionReviewQueue /> : null}

@@ -37,9 +37,9 @@ export function AssetsDonut({ breakdown, liabilityBreakdown, selectedClassifier,
   })
 
   return (
-    <section className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">Break Down</h2>
+        <h2 className="text-sm font-semibold text-neutral-500">Breakdown</h2>
         <AssetBreakdownViewToggle onViewChange={onViewChange} view={view} />
       </div>
       {showLiabilities ? (
@@ -203,7 +203,7 @@ function BreakdownLegendRow({
         {expandable ? (
           <button
             aria-label={`${open ? 'Collapse' : 'Expand'} ${label}`}
-            className="rounded-lg p-1 text-neutral-400 transition hover:bg-white dark:hover:bg-neutral-700"
+            className="rounded-xl p-1 text-neutral-400 transition hover:bg-white dark:hover:bg-neutral-700"
             onClick={onToggleExpand}
             type="button"
           >

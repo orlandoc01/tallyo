@@ -33,6 +33,21 @@ func RunHourlyCron(ctx context.Context, fn func(context.Context)) {
 	}
 }
 
+func RunPeriodic(ctx context.Context, interval time.Duration, fn func(context.Context)) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	fn(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fn(ctx)
+		}
+	}
+}
+
 func nextHourlyRun(after time.Time) time.Time {
 	return cronexpr.MustParse(hourlyCronExpr).Next(after)
 }

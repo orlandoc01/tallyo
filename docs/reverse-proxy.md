@@ -267,8 +267,7 @@ the client still impose their own limits.
 6. If every user appears to share one rate limit, inspect Tallyo's direct peer,
    the `X-Forwarded-For` chain, and the narrow trusted-proxy entry.
 7. If authentication returns `401`, verify `Authorization` and `X-API-Key`
-   reach the upstream unchanged and that an authorization-setting restart
-   completed under a process supervisor.
+   reach the upstream unchanged.
 8. If an API request returns the SPA HTML, remove proxy path rewrites and
    forward all named routes to Tallyo unchanged.
 9. If uploads return `413`, raise the proxy body limit. If long GraphQL calls

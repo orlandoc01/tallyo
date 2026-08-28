@@ -7,7 +7,7 @@ import (
 
 	"tallyo/internal/auth/authtypes"
 	"tallyo/internal/database/dbgen"
-	u "tallyo/internal/utils"
+	"tallyo/internal/database/dbutil"
 
 	"github.com/samber/lo"
 )
@@ -33,13 +33,7 @@ func (s *Store) ConsumeWebAuthnRegistration(ctx context.Context, credential auth
 
 func (s *Store) WebAuthnCredentialsByUserID(ctx context.Context, userID int64) ([]authtypes.WebAuthnCredential, error) {
 	rows, err := s.q.WebAuthnCredentialsByUserID(ctx, dbgen.WebAuthnCredentialsByUserIDParams{UserID: userID})
-	if err != nil {
-		return nil, err
-	}
-	fromRow := func(row dbgen.WebAuthnCredentialsByUserIDRow) authtypes.WebAuthnCredential {
-		return webAuthnCredentialFromSQL(row.ID, row.UserID, row.Name, row.Credential, row.CreatedAt, row.LastUsedAt)
-	}
-	return u.Map(rows, fromRow), nil
+	return dbutil.MapRows(rows, err, webAuthnCredentialFromRow)
 }
 
 func (s *Store) UpdateWebAuthnCredential(ctx context.Context, id, credentialJSON string, lastUsedAt time.Time) error {
@@ -68,7 +62,7 @@ func (s *Store) WebAuthnRegistration(ctx context.Context, userID int64) (authtyp
 	if err != nil {
 		return authtypes.WebAuthnRegistration{}, err
 	}
-	return webAuthnRegistrationFromSQL(row.UserID, row.Name, row.Session, row.ExpiresAt), nil
+	return webAuthnRegistrationFromRow(row), nil
 }
 
 func (s *Store) DeleteWebAuthnRegistration(ctx context.Context, userID int64) error {
@@ -76,10 +70,10 @@ func (s *Store) DeleteWebAuthnRegistration(ctx context.Context, userID int64) er
 	return wrapAffectedRows(err, rows, "delete webauthn registration")
 }
 
-func webAuthnCredentialFromSQL(id string, userID int64, name, credentialJSON string, createdAt time.Time, lastUsedAtRaw *time.Time) authtypes.WebAuthnCredential {
-	return authtypes.WebAuthnCredential{ID: id, UserID: userID, Name: name, CredentialJSON: credentialJSON, CreatedAt: createdAt, LastUsedAt: lo.FromPtr(lastUsedAtRaw)}
+func webAuthnCredentialFromRow(row dbgen.WebauthnCredential) authtypes.WebAuthnCredential {
+	return authtypes.WebAuthnCredential{ID: row.ID, UserID: row.UserID, Name: row.Name, CredentialJSON: row.Credential, CreatedAt: row.CreatedAt, LastUsedAt: lo.FromPtr(row.LastUsedAt)}
 }
 
-func webAuthnRegistrationFromSQL(userID int64, name, sessionJSON string, expiresAt time.Time) authtypes.WebAuthnRegistration {
-	return authtypes.WebAuthnRegistration{UserID: userID, Name: name, SessionJSON: sessionJSON, ExpiresAt: expiresAt}
+func webAuthnRegistrationFromRow(row dbgen.WebauthnRegistration) authtypes.WebAuthnRegistration {
+	return authtypes.WebAuthnRegistration{UserID: row.UserID, Name: row.Name, SessionJSON: row.Session, ExpiresAt: row.ExpiresAt}
 }

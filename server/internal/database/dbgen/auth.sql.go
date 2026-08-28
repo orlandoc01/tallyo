@@ -438,7 +438,7 @@ func (q *Queries) IncrementEmailOTPAttempts(ctx context.Context, arg IncrementEm
 const insertUser = `-- name: InsertUser :one
 INSERT INTO users (email, role, invited_by)
 VALUES (?1, ?2, ?3)
-RETURNING id
+RETURNING created_at, email, id, invited_by, role
 `
 
 type InsertUserParams struct {
@@ -448,11 +448,17 @@ type InsertUserParams struct {
 }
 
 // Used by GraphQL mutation addUser (admin.graphql) via admin/service.go to create and invite a new user (invitation reuses the email magic-link flow per server/AGENTS.md).
-func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (int64, error) {
+func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, insertUser, arg.Email, arg.Role, arg.InvitedBy)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var i User
+	err := row.Scan(
+		&i.CreatedAt,
+		&i.Email,
+		&i.ID,
+		&i.InvitedBy,
+		&i.Role,
+	)
+	return i, err
 }
 
 const invalidateAuthCode = `-- name: InvalidateAuthCode :execrows
@@ -921,16 +927,12 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 }
 
 const users = `-- name: Users :many
-SELECT
-  id,
-  email,
-  role,
-  created_at
-FROM users
+SELECT u.created_at, u.email, u.id, u.invited_by, u.role
+FROM users u
 WHERE TRUE
-  AND id = ?1 -- :if $1
-  AND email = ?2 -- :if $2
-ORDER BY role = 'admin' DESC, email ASC
+  AND u.id = ?1 -- :if $1
+  AND u.email = ?2 -- :if $2
+ORDER BY u.role = 'admin' DESC, u.email ASC
 `
 
 var _usersDynQ = dynCompile(users)
@@ -940,15 +942,8 @@ type UsersParams struct {
 	Email *string
 }
 
-type UsersRow struct {
-	ID        int64
-	Email     string
-	Role      string
-	CreatedAt time.Time
-}
-
 // Used by GraphQL user queries and auth/admin user lookups.
-func (q *Queries) Users(ctx context.Context, arg UsersParams) ([]UsersRow, error) {
+func (q *Queries) Users(ctx context.Context, arg UsersParams) ([]User, error) {
 
 	dynQuery, dynArgs := _usersDynQ.Build([]any{arg.ID, arg.Email})
 	rows, err := q.db.QueryContext(ctx, dynQuery, dynArgs...)
@@ -956,14 +951,15 @@ func (q *Queries) Users(ctx context.Context, arg UsersParams) ([]UsersRow, error
 		return nil, err
 	}
 	defer rows.Close()
-	items := []UsersRow{}
+	items := []User{}
 	for rows.Next() {
-		var i UsersRow
+		var i User
 		if err := rows.Scan(
-			&i.ID,
-			&i.Email,
-			&i.Role,
 			&i.CreatedAt,
+			&i.Email,
+			&i.ID,
+			&i.InvitedBy,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}

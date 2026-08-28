@@ -18,6 +18,12 @@ type SigningKey struct {
 	Public  *ecdsa.PublicKey
 }
 
+type signingKeyMaterial struct {
+	Key        *SigningKey
+	PrivatePEM string
+	PublicPEM  string
+}
+
 type claims struct {
 	Email  string      `json:"email"`
 	Scope  string      `json:"scope"`
@@ -46,22 +52,22 @@ func codeChallenge(verifier string) string {
 	return tokenSignature(verifier)
 }
 
-func newSigningKey() (*SigningKey, string, string, error) {
+func newSigningKey() (signingKeyMaterial, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, "", "", err
+		return signingKeyMaterial{}, err
 	}
 	privateDER, err := x509.MarshalECPrivateKey(key)
 	if err != nil {
-		return nil, "", "", err
+		return signingKeyMaterial{}, err
 	}
 	publicDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
 	if err != nil {
-		return nil, "", "", err
+		return signingKeyMaterial{}, err
 	}
 	privatePEM := string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: privateDER}))
 	publicPEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicDER}))
-	return &SigningKey{Private: key, Public: &key.PublicKey}, privatePEM, publicPEM, nil
+	return signingKeyMaterial{Key: &SigningKey{Private: key, Public: &key.PublicKey}, PrivatePEM: privatePEM, PublicPEM: publicPEM}, nil
 }
 
 func parseSigningKey(privatePEM string, publicPEM string) (*SigningKey, error) {
@@ -90,12 +96,13 @@ func parseSigningKey(privatePEM string, publicPEM string) (*SigningKey, error) {
 
 func (s *Service) verifyAccessToken(token string) (*claims, error) {
 	tokenClaims := &claims{}
+	issuer := s.IssuerURL()
 	parsed, err := jwt.ParseWithClaims(token, tokenClaims, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodES256 {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return s.signingKey.Public, nil
-	}, jwt.WithIssuer(s.cfg.IssuerURL), jwt.WithAudience(s.cfg.IssuerURL))
+	}, jwt.WithIssuer(issuer), jwt.WithAudience(issuer))
 	if err != nil {
 		return nil, err
 	}

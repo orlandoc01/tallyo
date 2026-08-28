@@ -75,12 +75,12 @@ function BudgetYearLabel({ emoji, name }: { emoji: string; name: string }) {
     <span className="relative inline-flex items-center gap-2">
       <button
         aria-label={name}
-        className="group/year-label relative rounded-lg px-1 py-0.5 text-base leading-none outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [@media_(orientation:landscape)_and_(min-width:640px)]:pointer-events-none"
+        className="group/year-label relative rounded-xl px-1 py-0.5 text-base leading-none outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [@media_(orientation:landscape)_and_(min-width:640px)]:pointer-events-none"
         title={name}
         type="button"
       >
         <span aria-hidden>{emoji}</span>
-        <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-neutral-950 px-2 py-1 text-xs font-semibold normal-case tracking-normal text-white opacity-0 shadow-lg transition group-active/year-label:opacity-100 group-focus-visible/year-label:opacity-100 dark:bg-neutral-100 dark:text-neutral-950">
+        <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-xl bg-neutral-950 px-2 py-1 text-xs font-semibold normal-case tracking-normal text-white opacity-0 shadow-lg transition group-active/year-label:opacity-100 group-focus-visible/year-label:opacity-100 dark:bg-neutral-100 dark:text-neutral-950">
           {name}
         </span>
       </button>

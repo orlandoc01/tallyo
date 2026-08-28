@@ -36,7 +36,7 @@ func TestSimpleFinHTTPClientClaimAndGetAccounts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &SimpleFinHTTPClient{HTTP: server.Client()}
+	client := &SimpleFinHTTPClient{HTTP: server.Client(), ValidateURL: allowSimpleFinURL}
 	setupToken := base64.StdEncoding.EncodeToString([]byte(server.URL + "/claim"))
 	accessURL, err := client.Claim(context.Background(), setupToken)
 	must.NoErr(t, err)
@@ -95,7 +95,7 @@ func TestSimpleFinHTTPClientRejectsNonUSDCurrencies(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &SimpleFinHTTPClient{HTTP: srv.Client()}
+	client := &SimpleFinHTTPClient{HTTP: srv.Client(), ValidateURL: allowSimpleFinURL}
 	for _, response = range []string{
 		`{"accounts":[{"currency":"EUR"}]}`,
 		`{"accounts":[{"holdings":[{"currency":"EUR"}]}]}`,
@@ -106,12 +106,35 @@ func TestSimpleFinHTTPClientRejectsNonUSDCurrencies(t *testing.T) {
 	}
 	client = &SimpleFinHTTPClient{HTTP: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusBadGateway, Body: failingBody{}, Header: http.Header{}}, nil
-	})}}
+	})}, ValidateURL: allowSimpleFinURL}
 	setupToken := base64.StdEncoding.EncodeToString([]byte("http://example.com"))
 	if _, err := client.Claim(context.Background(), setupToken); !errors.Is(err, errResponseRead) {
 		t.Fatalf("Claim() error = %v, want response read error", err)
 	}
 }
+
+func TestValidateSimpleFinURL(t *testing.T) {
+	tests := []struct {
+		url     string
+		wantErr bool
+	}{
+		{url: "http://example.com", wantErr: true},
+		{url: "https://localhost", wantErr: true},
+		{url: "https://127.0.0.1", wantErr: true},
+		{url: "https://[::1]", wantErr: true},
+		{url: "https://169.254.169.254", wantErr: true},
+		{url: "", wantErr: true},
+		{url: "https://example.com"},
+		{url: "https://10.0.0.5"},
+	}
+	for _, tc := range tests {
+		if err := validateSimpleFinURL(tc.url); (err != nil) != tc.wantErr {
+			t.Errorf("validateSimpleFinURL(%q) error = %v, want error = %v", tc.url, err, tc.wantErr)
+		}
+	}
+}
+
+func allowSimpleFinURL(string) error { return nil }
 
 var errResponseRead = errors.New("response read failed")
 

@@ -44,7 +44,7 @@ export function CategoryPicker({
             <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{groupName}</div>
             {groupCategories.map((category) => (
               <button
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-brand-50 ${firstVisibleCategory?.id === category.id ? 'bg-neutral-50' : ''}`}
+                className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm hover:bg-brand-50 ${firstVisibleCategory?.id === category.id ? 'bg-neutral-50' : ''}`}
                 key={category.id}
                 onClick={() => onSelect(category)}
                 type="button"

@@ -89,14 +89,13 @@ func (a *Adapter) handleEmptyInvestmentHoldings(
 	events chan<- wealth.PersistEvent,
 ) (bool, error) {
 	if plaidBalance != nil && *plaidBalance == 0 {
-		draft := wealth.SnapshotDraft{AccountBalanceSnapshot: wealth.AccountBalanceSnapshot{
+		draft := wealth.SnapshotDraft{
 			AccountID:  accountID,
 			Source:     a.Source().Str(),
 			Date:       today,
 			SyncedAt:   syncedAt,
 			BalanceUSD: 0,
-			RawPayload: rawPayload,
-		}, Decision: wealth.DecisionClean}
+			RawPayload: rawPayload, Decision: wealth.DecisionClean}
 		events <- wealth.PersistEvent{Snapshot: &draft}
 		return true, nil
 	}
@@ -136,7 +135,7 @@ func (a *Adapter) carryForwardEmptyInvestmentHoldings(
 	}
 	holdings, repricedUSD := a.repricePriorInvestmentHoldings(ctx, prior.Holdings, today)
 	balanceUSD := money.FromDollars(repricedUSD)
-	draft := wealth.SnapshotDraft{AccountBalanceSnapshot: wealth.AccountBalanceSnapshot{
+	draft := wealth.SnapshotDraft{
 		AccountID:  accountID,
 		Source:     a.Source().Str(),
 		Date:       today,
@@ -145,8 +144,7 @@ func (a *Adapter) carryForwardEmptyInvestmentHoldings(
 		RawPayload: rawPayload,
 		Holdings:   holdings,
 		Flagged:    true,
-		FlagReason: flagReason,
-	}, Decision: wealth.DecisionApprovedCarryForward, CarryUSD: balanceUSD}
+		FlagReason: flagReason, Decision: wealth.DecisionApprovedCarryForward, CarryUSD: balanceUSD}
 	if upsertReview {
 		draft.Decision = wealth.DecisionFlagged
 		draft.ProviderState = &wealth.SnapshotProviderState{

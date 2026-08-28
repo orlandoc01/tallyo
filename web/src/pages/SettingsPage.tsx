@@ -8,6 +8,7 @@ import { useIsMobile } from '../hooks/useIsMobile'
 import { usePermissions } from '../hooks/usePermissions'
 import { isOneOf } from '../hooks/urlParams'
 import { Card, SectionLabel } from '../components/common/FormControls'
+import { PageHeader } from '../components/common/PageHeader'
 import { mobileHeaderActionClass } from '../components/common/mobileHeaderActionClass'
 import { useMobileHeader } from '../components/layout/useMobileHeader'
 import { AiIntegrationTab } from '../components/settings/AiIntegrationTab'
@@ -126,10 +127,13 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[max-content_minmax(0,1fr)]">
-      <SettingsSidebar tabs={visibleTabs} />
-      <div className="min-w-0">
-        <SettingsTabPanel tab={activeTab} />
+    <div className="space-y-6">
+      <PageHeader title="Settings" />
+      <div className="grid gap-8 lg:grid-cols-[max-content_minmax(0,1fr)]">
+        <SettingsSidebar tabs={visibleTabs} />
+        <div className="min-w-0">
+          <SettingsTabPanel tab={activeTab} />
+        </div>
       </div>
     </div>
   )
@@ -138,15 +142,12 @@ export function SettingsPage() {
 function SettingsSidebar({ tabs }: { tabs: SettingsTab[] }) {
   return (
     <aside className="hidden w-56 lg:block">
-      <nav aria-label="Settings sections" className="sticky top-6 rounded-3xl border border-neutral-200 bg-white p-2 shadow-card">
-        <div className="px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-600">Settings</p>
-        </div>
+      <nav aria-label="Settings sections" className="sticky top-6 rounded-2xl border border-neutral-200 bg-white p-2 shadow-card">
         <div className="space-y-1">
           {tabs.map((tab) => (
             <NavLink
               className={({ isActive }) => clsx(
-                'flex items-center rounded-2xl px-3 py-3 text-sm font-semibold transition',
+                'flex items-center rounded-xl px-3 py-3 text-sm font-semibold transition',
                 isActive ? 'bg-brand-50 text-brand-700' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950',
               )}
               key={tab.value}

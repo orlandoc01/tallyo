@@ -307,7 +307,7 @@ describe('setup wizard pages', () => {
     expect(updateConfiguration).toHaveBeenCalledWith(expect.objectContaining({ setupComplete: true }))
   })
 
-  it('waits for updated auth config before redirecting setup auth users to accounts', async () => {
+  it('redirects setup auth users to accounts as soon as the configuration saves, without polling', async () => {
     const user = userEvent.setup()
     const assign = vi.fn()
     const originalLocation = window.location
@@ -333,7 +333,7 @@ describe('setup wizard pages', () => {
 
       await waitFor(() => expect(assign).toHaveBeenCalledWith('/accounts'))
       expect(updateConfiguration.input).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password' } })
-      expect(authConfigRequests).toBeGreaterThan(0)
+      expect(authConfigRequests).toBe(0)
       expect(document.cookie).toContain(`st_post_login=${encodeURIComponent('/accounts')}`)
     } finally {
       Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })

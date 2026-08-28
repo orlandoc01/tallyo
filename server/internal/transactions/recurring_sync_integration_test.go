@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"tallyo/internal/utils/test"
-
 	plaidapi "github.com/plaid/plaid-go/v20/plaid"
 	"tallyo/internal/utils/must"
 )
@@ -68,7 +66,7 @@ func TestRecurringRunWaitsUntilDueTime(t *testing.T) {
 		return plaidapi.TransactionsRecurringGetResponse{}, fmt.Errorf("unreachable")
 	}
 	done := make(chan struct{})
-	syncer := newTestSyncer(store, fakeClient{PlaidClientStub: test.PlaidClientStub{TransactionsRecurringGetFn: failFast}}, withNow(func() time.Time { return now }))
+	syncer := newTestSyncer(store, fakeClient{TransactionsRecurringGetFn: failFast}, withNow(func() time.Time { return now }))
 	go func() {
 		defer close(done)
 		syncer.RecurringRun(ctx)

@@ -1028,6 +1028,17 @@ func TestRecurringChargesCRUD(t *testing.T) {
 	}
 
 	must.NoErr(t, tx.ReplaceChargeTxns(ctx, charge.ID.Int64(), []string{"rc-tx-1"}))
+	var categoryID int64
+	must.NoErr(t, testStore.SQL().QueryRowContext(
+		ctx,
+		`SELECT category_id FROM transactions WHERE external_id = ?`,
+		"rc-tx-1",
+	).Scan(&categoryID))
+	reloadedCharge, err := tx.RecurringChargeByID(ctx, charge.ID.Int64())
+	must.NoErr(t, err)
+	if reloadedCharge.Category == nil || reloadedCharge.Category.ID.Int64() != categoryID {
+		t.Fatalf("recurring charge category = %#v, want category %d", reloadedCharge.Category, categoryID)
+	}
 	must.NoErr(t, tx.MarkRecurringFromStreams(ctx, 1))
 	if !recurringFlag("rc-tx-1") {
 		t.Fatal("expected active stream association to mark transaction recurring")
@@ -1296,7 +1307,7 @@ func TestFilterByAccountAndCategoryIDs(t *testing.T) {
 
 func TestSpendingRows(t *testing.T) {
 	tx, filter := spendingReportFixture(t, syncedTxn("sr-tx", 20, "2026-05-10T12:00:00Z", ""))
-	rows, err := tx.SpendingRows(context.Background(), filter, true, true)
+	rows, err := tx.SpendingRows(context.Background(), filter, transactions.SpendingMode{ByCategory: true, ExcludeIncome: true})
 	must.NoErr(t, err)
 	if len(rows) != 1 || rows[0].PeriodLabel != "2026-05" || rows[0].TotalCents != money.FromDollars(20) || rows[0].TransactionCount != 1 {
 		t.Fatalf("SpendingRows() = %#v", rows)

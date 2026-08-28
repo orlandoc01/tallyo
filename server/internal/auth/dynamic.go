@@ -1,36 +1,91 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 
 	webauthnlib "github.com/go-webauthn/webauthn/webauthn"
+	"github.com/ory/fosite"
+	"github.com/samber/lo"
+
+	"tallyo/internal/admin/runtimeconfig"
 )
 
-func (s *Service) GoogleEnabled() bool {
+func (s *Service) config() Config {
 	s.dynMu.RLock()
 	defer s.dynMu.RUnlock()
-	return s.cfg.GoogleAuthnEnabled
+	return s.cfg
 }
 
-func (s *Service) OAuthEnabled() bool {
-	s.dynMu.RLock()
-	defer s.dynMu.RUnlock()
-	return s.cfg.OAuthEnabled
+func (s *Service) IssuerURL() string {
+	return s.config().IssuerURL
 }
 
-func (s *Service) EmailEnabled() bool {
+func (s *Service) oauthProvider() fosite.OAuth2Provider {
 	s.dynMu.RLock()
 	defer s.dynMu.RUnlock()
-	return s.cfg.EmailCodeAuthnEnabled
+	return s.provider
 }
 
-func (s *Service) PassKeyEnabled() bool {
+func (s *Service) devOriginAllowed(origin string) bool {
 	s.dynMu.RLock()
 	defer s.dynMu.RUnlock()
-	return s.cfg.PassKeyAuthnEnabled
+	_, ok := s.devOrigins[origin]
+	return ok
 }
+
+func (s *Service) PrepareAuthConfig(ctx context.Context, resolved runtimeconfig.Sections) (func(), error) {
+	next := resolved.Auth.Fields
+	cfg := s.config()
+	cfg.IssuerURL = next.OAuthIssuerURL
+	cfg.OAuthEnabled = resolved.OAuthEnabled()
+	cfg.DisableAllAuth = resolved.DisableAllAuth()
+	if !cfg.MasterPasswordFromEnv {
+		cfg.MasterPassword = lo.FromPtr(next.MasterPassword)
+	}
+	cfg.FrontendRedirectURIs = next.FrontendRedirectURIs
+	cfg.AccessTokenLifetime = next.AccessTokenLifetime()
+	cfg.RefreshTokenLifetime = next.RefreshTokenLifetime()
+	cfg.DevCORSAllowedOrigins = next.DevCORSAllowedOrigins
+	if err := normalizeAuthConfig(&cfg); err != nil {
+		return nil, err
+	}
+	if err := s.store.UpsertFrontendClient(ctx, cfg.FrontendRedirectURIs); err != nil {
+		return nil, err
+	}
+	fositeStore := NewFositeStore(s.store, cfg.IssuerURL)
+	provider := newOAuthProvider(cfg, fositeStore, s.signingKey)
+	devOrigins := normalizeOriginSet(cfg.DevCORSAllowedOrigins)
+	return func() {
+		s.dynMu.Lock()
+		defer s.dynMu.Unlock()
+		s.cfg.IssuerURL = cfg.IssuerURL
+		s.cfg.OAuthEnabled = cfg.OAuthEnabled
+		s.cfg.DisableAllAuth = cfg.DisableAllAuth
+		s.cfg.MasterPassword = cfg.MasterPassword
+		s.cfg.FrontendRedirectURIs = cfg.FrontendRedirectURIs
+		s.cfg.AccessTokenLifetime = cfg.AccessTokenLifetime
+		s.cfg.RefreshTokenLifetime = cfg.RefreshTokenLifetime
+		s.cfg.DevCORSAllowedOrigins = cfg.DevCORSAllowedOrigins
+		s.fositeStore = fositeStore
+		s.provider = provider
+		s.devOrigins = devOrigins
+		if s.cfg.GoogleAuthnEnabled {
+			s.googleConfig = newGoogleConfig(s.cfg)
+		}
+		warnIfAuthDisabled(s.cfg)
+	}, nil
+}
+
+func (s *Service) GoogleEnabled() bool { return s.config().GoogleAuthnEnabled }
+
+func (s *Service) OAuthEnabled() bool { return s.config().OAuthEnabled }
+
+func (s *Service) EmailEnabled() bool { return s.config().EmailCodeAuthnEnabled }
+
+func (s *Service) PassKeyEnabled() bool { return s.config().PassKeyAuthnEnabled }
 
 func (s *Service) GetGoogleConfig() googleOAuthConfig {
 	s.dynMu.RLock()

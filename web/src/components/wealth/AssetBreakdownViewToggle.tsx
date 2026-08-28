@@ -1,4 +1,4 @@
-import { PageToolbarSegmentedControl } from '../common/PageToolbar'
+import { SegmentedControl } from '../common/SegmentedControl'
 
 type AssetBreakdownView = 'ASSETS' | 'LIABILITIES'
 
@@ -11,6 +11,6 @@ export function AssetBreakdownViewToggle({ view, onViewChange }: { view: AssetBr
   if (!onViewChange) return null
 
   return (
-    <PageToolbarSegmentedControl ariaLabel="Asset breakdown view" onChange={onViewChange} options={views} size="sm" value={view} />
+    <SegmentedControl ariaLabel="Asset breakdown view" onChange={onViewChange} options={views} size="sm" value={view} />
   )
 }

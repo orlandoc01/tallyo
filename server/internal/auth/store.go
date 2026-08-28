@@ -93,15 +93,14 @@ func (s *Store) LoadOrCreateSigningKey(ctx context.Context) (*SigningKey, error)
 	if !errors.Is(err, ErrNotFound) {
 		return nil, fmt.Errorf("load signing key: %w", err)
 	}
-	var privatePEM, publicPEM string
-	key, privatePEM, publicPEM, err := newSigningKey()
+	material, err := newSigningKey()
 	if err != nil {
 		return nil, err
 	}
-	if err := s.db.SaveSigningKeyPEM(ctx, SigningKeyPEM{PrivatePEM: privatePEM, PublicPEM: publicPEM}); err != nil {
+	if err := s.db.SaveSigningKeyPEM(ctx, SigningKeyPEM{PrivatePEM: material.PrivatePEM, PublicPEM: material.PublicPEM}); err != nil {
 		return nil, err
 	}
-	return key, nil
+	return material.Key, nil
 }
 
 func (s *Store) CreateLoginSession(ctx context.Context, session LoginSession) error {

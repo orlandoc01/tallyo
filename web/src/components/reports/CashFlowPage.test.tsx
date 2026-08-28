@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { cashFlowPeriods, normalizeTransactionForGraphql, recurringCharges, transactionsSummary } from '../../mocks/fixtures'
 import { CashFlowPage } from '../../pages/CashFlowPage'
 import { buildCashFlowChartData, formatCashFlowAxisValue, getCashFlowChartDomain, getCashFlowPalette } from './cashFlowChart'
+import { CashFlowCategoryBreakdown } from './CashFlowCategoryBreakdown'
 import { RecurringPage } from '../../pages/RecurringPage'
 import { useSpendingByCategory } from '../../hooks/useSpending'
 import { mockQuery } from '../../test/msw'
@@ -42,6 +43,22 @@ describe('CashFlowPage', () => {
     expect(await screen.findByText(/Groceries/)).toBeInTheDocument()
   })
 
+  it('uses tone colors and total-share widths for category breakdowns', () => {
+    const onItemClick = () => undefined
+    const { container, rerender } = renderWithProviders(
+      <CashFlowCategoryBreakdown items={cashFlowPeriods[0].expensesByCategory} onItemClick={onItemClick} title="Expenses" tone="red" />,
+    )
+
+    const expenseFills = container.querySelectorAll<HTMLElement>('[style*="--bar-fill"]')
+    expect(expenseFills[0]).toHaveStyle({ width: '66%' })
+    expect(expenseFills[0].style.getPropertyValue('--bar-fill')).toBe(getCashFlowPalette(false).expenseBreakdownFill)
+
+    rerender(<CashFlowCategoryBreakdown items={cashFlowPeriods[0].incomeByCategory} onItemClick={onItemClick} title="Income" tone="green" />)
+    const incomeFill = container.querySelector<HTMLElement>('[style*="--bar-fill"]')
+    expect(incomeFill).toHaveStyle({ width: '100%' })
+    expect(incomeFill?.style.getPropertyValue('--bar-fill')).toBe(getCashFlowPalette(false).incomeBreakdownFill)
+  })
+
   it('changes date range via date range selector', async () => {
     const user = userEvent.setup()
     renderCashFlow(<CashFlowPage />)
@@ -60,7 +77,7 @@ describe('CashFlowPage', () => {
     expect(await screen.findByRole('heading', { name: 'Date Range' })).toBeInTheDocument()
 
     // Click granularity in the mobile sheet
-    const quarterlyButtons = screen.getAllByRole('button', { name: /quarterly/i })
+    const quarterlyButtons = screen.getAllByRole('radio', { name: /quarterly/i })
     await user.click(quarterlyButtons[quarterlyButtons.length - 1])
 
     await user.click(screen.getByRole('button', { name: /apply/i }))

@@ -131,6 +131,28 @@ func (s *DB) Backup(ctx context.Context, dst string) error {
 	return nil
 }
 
+func BackupPlainDataPath(dbPath, dst string) (string, error) {
+	if dbPath == ":memory:" {
+		return "", fmt.Errorf("cannot back up in-memory database")
+	}
+	if dst != "" {
+		info, err := os.Stat(dst)
+		if err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("stat backup path: %w", err)
+		}
+		if err == nil && info.IsDir() {
+			return filepath.Join(dst, BackupPlainDataName(dbPath)), nil
+		}
+		return dst, nil
+	}
+	return filepath.Join(filepath.Dir(dbPath), BackupPlainDataName(dbPath)), nil
+}
+
+func BackupPlainDataName(dbPath string) string {
+	ext := filepath.Ext(dbPath)
+	return strings.TrimSuffix(filepath.Base(dbPath), ext) + ".plain" + ext
+}
+
 func ValidateEncryptionKey(key string) error {
 	if key == "" {
 		return nil
@@ -211,6 +233,7 @@ func openDSN(path, encryptionKey string) string {
 		"_timefmt="+url.QueryEscape("2006-01-02T15:04:05Z07:00"),
 		"_pragma="+url.QueryEscape("foreign_keys(on)"),
 		"_pragma="+url.QueryEscape("journal_mode(wal)"),
+		"_pragma="+url.QueryEscape("synchronous(normal)"),
 		"_pragma="+url.QueryEscape("busy_timeout(30000)"),
 	)
 	if encryptionKey != "" {

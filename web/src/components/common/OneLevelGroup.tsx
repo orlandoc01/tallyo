@@ -58,7 +58,7 @@ export function OneLevelGroup({
         {canExpand ? (
           <button
             aria-label={expandButtonLabel}
-            className="rounded-lg p-1 text-neutral-400 transition hover:text-neutral-700 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/40 dark:hover:text-neutral-200 dark:focus-visible:ring-brand-400/30"
+            className="rounded-xl p-1 text-neutral-400 transition hover:text-neutral-700 focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-500/40 dark:hover:text-neutral-200 dark:focus-visible:ring-brand-400/30"
             onClick={onToggle}
             type="button"
           >

@@ -99,7 +99,7 @@ export function AssetMergePicker({
             </div>
             {canEdit ? (
               <button
-                className="rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="rounded-xl border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 onClick={() => handleOpenMergePicker(source)}
                 type="button"
               >
@@ -132,7 +132,7 @@ export function AssetMergePicker({
             <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
               {mergeTargetAssets.map((target) => (
                 <button
-                  className="block w-full rounded-lg border border-neutral-200 px-3 py-2 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
+                  className="block w-full rounded-xl border border-neutral-200 px-3 py-2 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
                   disabled={mergePicker.isMerging}
                   key={target.id}
                   onClick={() => handleMergeTarget(target)}

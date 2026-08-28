@@ -163,20 +163,21 @@ func optionalRuleSearch(value *string) string {
 }
 
 func ruleFromRow(row dbgen.ListRulesRow) *model.Rule {
+	ruleRow := row.Rule
 	rule := &model.Rule{
-		ID:                model.New(model.GlobalIDRule, row.RuleID),
-		OriginalPattern:   lo.EmptyableToPtr(row.OriginalPattern),
-		MerchantName:      row.MerchantName,
-		AmountMin:         row.AmountMinCents,
-		AmountMax:         row.AmountMaxCents,
-		ShouldHide:        row.ShouldHide,
-		ShouldBeRecurring: row.ShouldBeRecurring,
-		Priority:          int32(row.Priority),
-		CreatedAt:         row.RuleCreatedAt,
+		ID:                model.New(model.GlobalIDRule, ruleRow.ID),
+		OriginalPattern:   lo.EmptyableToPtr(ruleRow.OriginalPattern),
+		MerchantName:      ruleRow.MerchantName,
+		AmountMin:         ruleRow.AmountMinCents,
+		AmountMax:         ruleRow.AmountMaxCents,
+		ShouldHide:        ruleRow.ShouldHide,
+		ShouldBeRecurring: ruleRow.ShouldBeRecurring,
+		Priority:          int32(ruleRow.Priority),
+		CreatedAt:         ruleRow.CreatedAt,
 		Category:          ruleCategoryFromRow(row),
 	}
-	if row.MerchantPattern != "" {
-		rule.MerchantPattern = &row.MerchantPattern
+	if ruleRow.MerchantPattern != "" {
+		rule.MerchantPattern = &ruleRow.MerchantPattern
 	}
 	return rule
 }
@@ -185,7 +186,7 @@ func ruleCategoryFromRow(row dbgen.ListRulesRow) *model.Category {
 	if row.CatID == nil || row.CatName == nil || row.CatEmoji == nil || row.GroupName == nil || row.GroupEmoji == nil || row.GroupKind == nil || row.SortOrder == nil || row.PlaidPfc2Codes == nil {
 		return nil
 	}
-	return categoryFromRow(dbgen.CategoryRow{
+	return CategoryFromRow(dbgen.CategoryRow{
 		CatID: *row.CatID, CatName: *row.CatName, CatEmoji: *row.CatEmoji,
 		GroupName: *row.GroupName, GroupEmoji: *row.GroupEmoji, GroupKind: *row.GroupKind,
 		SortOrder: *row.SortOrder, PlaidPfc2Codes: *row.PlaidPfc2Codes,

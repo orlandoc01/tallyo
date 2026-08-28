@@ -169,18 +169,20 @@ func snapshotsByAccount[Row any, Snapshot any](
 }
 
 func forwardFillClassifierSnapshots(snaps []classifierSnapshot, dateKey string) map[model.AssetClassifier]money.Cents {
+	localDate := func(snap classifierSnapshot) string { return snap.LocalDate }
+	index := latestSnapshotIndex(snaps, dateKey, localDate)
+	if index < 0 {
+		return map[model.AssetClassifier]money.Cents{}
+	}
+	for index > 0 && snaps[index-1].LocalDate == snaps[index].LocalDate && snaps[index-1].SyncedAt == snaps[index].SyncedAt {
+		index--
+	}
 	current := map[model.AssetClassifier]money.Cents{}
-	for i := 0; i < len(snaps); {
-		localDate, syncedAt := snaps[i].LocalDate, snaps[i].SyncedAt
-		if localDate > dateKey {
+	for _, snap := range snaps[index:] {
+		if snap.LocalDate != snaps[index].LocalDate || snap.SyncedAt != snaps[index].SyncedAt {
 			break
 		}
-		next := map[model.AssetClassifier]money.Cents{}
-		for i < len(snaps) && snaps[i].LocalDate == localDate && snaps[i].SyncedAt == syncedAt {
-			next[snaps[i].Classifier] += snaps[i].Value
-			i++
-		}
-		current = next
+		current[snap.Classifier] += snap.Value
 	}
 	if len(snaps) > 0 && snaps[0].Closed && dateKey > snaps[len(snaps)-1].LocalDate {
 		// Classifier history intentionally keeps its original first-row closed check.

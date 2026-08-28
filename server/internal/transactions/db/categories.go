@@ -14,17 +14,13 @@ import (
 	u "tallyo/internal/utils"
 )
 
-func categoryFromRow(row dbgen.CategoryRow) *model.Category {
+func CategoryFromRow(row dbgen.CategoryRow) *model.Category {
 	return &model.Category{ID: model.New(model.GlobalIDCategory, row.CatID), Name: row.CatName, Emoji: row.CatEmoji, GroupName: row.GroupName, GroupEmoji: row.GroupEmoji, Kind: model.CategoryKind(row.GroupKind), SortOrder: int32(row.SortOrder), PlaidPFC2Codes: dbutil.SplitCSV(row.PlaidPfc2Codes)}
-}
-
-func categoryFromListRow(row dbgen.ListCategoriesRow) *model.Category {
-	return categoryFromRow(dbgen.CategoryRow{CatID: row.CatID, CatName: row.CatName, CatEmoji: row.CatEmoji, GroupName: row.GroupName, GroupEmoji: row.GroupEmoji, GroupKind: row.GroupKind, SortOrder: row.SortOrder, GroupID: row.GroupID, PlaidPfc2Codes: row.PlaidPfc2Codes})
 }
 
 func (s *Store) Categories(ctx context.Context) ([]*model.Category, error) {
 	rows, err := s.q.ListCategories(ctx, dbgen.ListCategoriesParams{})
-	return dbutil.MapRows(rows, err, categoryFromListRow)
+	return dbutil.MapRows(rows, err, CategoryFromRow)
 }
 
 func (s *Store) CategoryGroups(ctx context.Context) ([]*model.CategoryGroup, error) {
@@ -35,7 +31,7 @@ func (s *Store) CategoryGroups(ctx context.Context) ([]*model.CategoryGroup, err
 	groups := make([]*model.CategoryGroup, 0)
 	index := make(map[int64]*model.CategoryGroup)
 	for _, row := range rows {
-		cat := categoryFromListRow(row)
+		cat := CategoryFromRow(row)
 		groupID := row.GroupID
 		group := index[groupID]
 		if group == nil {
@@ -50,7 +46,7 @@ func (s *Store) CategoryGroups(ctx context.Context) ([]*model.CategoryGroup, err
 
 func (s *Store) Category(ctx context.Context, id int64) (*model.Category, error) {
 	rows, err := s.q.ListCategories(ctx, dbgen.ListCategoriesParams{CategoryIds: []int64{id}})
-	return dbutil.MapFirstRow(rows, err, categoryFromListRow)
+	return dbutil.MapFirstRow(rows, err, CategoryFromRow)
 }
 
 func (s *Store) CategoryGroupByID(ctx context.Context, id int64) (*model.CategoryGroup, error) {
@@ -65,8 +61,13 @@ func (s *Store) CategoryGroupByID(ctx context.Context, id int64) (*model.Categor
 	if err != nil {
 		return nil, err
 	}
-	group := model.CategoryGroup{ID: model.New(model.GlobalIDCategoryGroup, row.ID), Name: row.Name, Emoji: row.Emoji, Kind: model.CategoryKind(row.Kind)}
-	group.Categories = u.Map(catRows, categoryFromListRow)
+	group := model.CategoryGroup{
+		ID:         model.New(model.GlobalIDCategoryGroup, row.ID),
+		Name:       row.Name,
+		Emoji:      row.Emoji,
+		Kind:       model.CategoryKind(row.Kind),
+		Categories: u.Map(catRows, CategoryFromRow),
+	}
 	return &group, nil
 }
 

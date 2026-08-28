@@ -27,7 +27,7 @@ export function CashFlowCategoryBreakdown({
   return (
     <Card as="section" overflow="visible">
       <div className="border-b border-neutral-100 p-5"><h2 className="text-xl font-bold">{title}</h2></div>
-      <div className="space-y-2 p-5">
+      <div className="space-y-3 p-5">
         {sorted.map((item) => {
           const percent = total ? (Math.abs(item.total) / total) * 100 : 0
           const barStyle = {
@@ -35,15 +35,6 @@ export function CashFlowCategoryBreakdown({
             ['--bar-fill' as string]: fillColor,
             ['--bar-hover-fill' as string]: fillHoverColor,
           }
-          const inner = (
-            <>
-              <div className="absolute inset-y-0 left-0 [background-color:var(--bar-fill)] group-hover:[background-color:var(--bar-hover-fill)]" style={barStyle} />
-              <div className="relative flex justify-between gap-4">
-                <span>{item.category.emoji} {item.category.name}</span>
-                <span className="font-semibold">{formatCurrency(Math.abs(item.total))} ({percent.toFixed(1)}%)</span>
-              </div>
-            </>
-          )
           return (
             <button
               className="group relative w-full overflow-hidden rounded-xl bg-neutral-50 p-3 text-left"
@@ -51,7 +42,11 @@ export function CashFlowCategoryBreakdown({
               onClick={() => onItemClick(item.category.id)}
               type="button"
             >
-              {inner}
+              <div className="absolute inset-y-0 left-0 [background-color:var(--bar-fill)] group-hover:[background-color:var(--bar-hover-fill)]" style={barStyle} />
+              <div className="relative flex justify-between gap-4">
+                <span>{item.category.emoji} {item.category.name}</span>
+                <span className="font-semibold">{formatCurrency(Math.abs(item.total))} ({percent.toFixed(1)}%)</span>
+              </div>
             </button>
           )
         })}

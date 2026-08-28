@@ -1,13 +1,10 @@
-import { useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 
 import type { Configuration } from '../../types/graphql'
-import { waitForHealthz } from '../../utils/healthz'
 import { EmptyState } from '../common/EmptyState'
 import { SectionLabel } from '../common/FormControls'
 import { ConfigCard, ConfigStatus, pickDirtyFields, TextInput, ToggleInput } from './ConfigFormControls'
 import { nullIfBlank, splitCSV } from './configParsing'
-import { type RestartPhase, ServerRestartOverlay } from './ServerRestartOverlay'
 import { useConfigurationForm } from './useConfigFormState'
 
 type FormState = {
@@ -65,35 +62,20 @@ const emptyState: FormState = {
 
 export function SecurityConfigTab() {
   const { masterPasswordStatus } = useAuth()
-  const { canReadSettings, canWriteSettings, configuration, dirtyFields, error, fetching, mutationResult, refetch, save, setState, state, updateConfiguration } = useConfigurationForm(makeFormState)
-  const [restartPhase, setRestartPhase] = useState<RestartPhase>('idle')
+  const { canReadSettings, canWriteSettings, configuration, dirtyFields, error, fetching, mutationResult, save, setState, state } = useConfigurationForm(makeFormState)
 
   if (!canReadSettings) {
     return <EmptyState title="Settings access required" description="Your account cannot view server configuration." />
   }
 
-  async function confirmSaveAuthorization() {
-    setRestartPhase('restarting')
-    const result = await updateConfiguration({
-      input: {
-        authorization: {
-          masterPassword: state.masterPasswordEnabled ? nullIfBlank(state.masterPassword) : null,
-          disableAllAuth: state.disableAllAuth,
-          oauthIssuerUrl: state.oauthIssuerUrl.trim(),
-          frontendRedirectUris: splitCSV(state.frontendRedirectUris),
-          accessTokenLifetime: state.accessTokenLifetime.trim(),
-          refreshTokenLifetime: state.refreshTokenLifetime.trim(),
-          devCorsAllowedOrigins: splitCSV(state.devCorsAllowedOrigins),
-        },
-      },
-    })
-    if (result.error) {
-      setRestartPhase('idle')
-      return
-    }
-    await waitForHealthz()
-    setRestartPhase('idle')
-    refetch({ requestPolicy: 'network-only' })
+  const authorizationInput = {
+    masterPassword: state.masterPasswordEnabled ? nullIfBlank(state.masterPassword) : null,
+    disableAllAuth: state.disableAllAuth,
+    oauthIssuerUrl: state.oauthIssuerUrl.trim(),
+    frontendRedirectUris: splitCSV(state.frontendRedirectUris),
+    accessTokenLifetime: state.accessTokenLifetime.trim(),
+    refreshTokenLifetime: state.refreshTokenLifetime.trim(),
+    devCorsAllowedOrigins: splitCSV(state.devCorsAllowedOrigins),
   }
 
   const sectionDirtyFields = {
@@ -108,15 +90,13 @@ export function SecurityConfigTab() {
 
   return (
     <section className="space-y-5">
-      <p className="max-w-2xl text-sm text-neutral-500">Secret fields are obfuscated. Some changes may require a server restart.</p>
+      <p className="max-w-2xl text-sm text-neutral-500">Secret fields are obfuscated. Changes apply immediately; no server restart is needed.</p>
 
       <ConfigStatus configuration={configuration} error={error} fetching={fetching} mutationError={mutationResult.error} />
 
-      <ServerRestartOverlay onCancel={() => setRestartPhase('idle')} onConfirm={confirmSaveAuthorization} phase={restartPhase} />
-
       {!fetching && !error && configuration ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <ConfigCard dirty={sectionDirtyFields.authorization.size > 0} title="Authorization" disabled={!canWriteSettings || mutationResult.fetching || (state.masterPasswordEnabled && !state.masterPassword.trim())} onSubmit={() => setRestartPhase('confirm')}>
+          <ConfigCard dirty={sectionDirtyFields.authorization.size > 0} title="Authorization" disabled={!canWriteSettings || mutationResult.fetching || (state.masterPasswordEnabled && !state.masterPassword.trim())} onSubmit={() => save({ authorization: authorizationInput })}>
             <ToggleInput dirty={sectionDirtyFields.authorization.has('disableAllAuth')} label="Disable all auth" checked={state.disableAllAuth} onChange={(disableAllAuth) => setState((s) => ({ ...s, disableAllAuth }))} />
             <div className={`space-y-4${state.disableAllAuth ? ' pointer-events-none select-none opacity-40' : ''}`}>
             <SectionLabel as="h4" tone="muted">Master Password</SectionLabel>
@@ -129,7 +109,7 @@ export function SecurityConfigTab() {
             />
             <input
               aria-label="Master password value"
-              className={`w-full rounded-lg border px-3 py-2 font-mono text-sm transition-colors ${state.masterPasswordEnabled ? 'border-neutral-200 text-neutral-950' : 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400'}`}
+              className={`w-full rounded-xl border px-3 py-2 font-mono text-sm transition-colors ${state.masterPasswordEnabled ? 'border-neutral-200 text-neutral-950' : 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400'}`}
               disabled={!state.masterPasswordEnabled}
               onChange={(e) => setState((s) => ({ ...s, masterPassword: e.target.value }))}
               placeholder={state.masterPasswordEnabled ? 'Enter new password' : '—'}

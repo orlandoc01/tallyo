@@ -2,7 +2,6 @@ package graph
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"testing"
 
@@ -215,7 +214,7 @@ func TestUpdateConfigurationPreservesObfuscatedSecrets(t *testing.T) {
 	}}
 	svc := admin.NewService(store, runtimeconfig.New(store))
 	must.NoErr(t, svc.LoadConfiguration(ctx, true, false))
-	resolver := &Resolver{Admin: svc, ScheduleRestart: func() {}}
+	resolver := &Resolver{Admin: svc}
 	secret := obfuscatedSecret
 
 	if _, err := resolver.UpdateConfiguration(ctx, model.UpdateConfigurationInput{
@@ -239,17 +238,11 @@ func TestUpdateConfigurationPreservesObfuscatedSecrets(t *testing.T) {
 	}
 }
 
-func TestUpdateConfigurationSchedulesRestartAfterAuthorizationChange(t *testing.T) {
+func TestUpdateConfigurationReturnsAuthorizationChange(t *testing.T) {
 	ctx := context.Background()
 	issuerURL := "https://issuer.example.com"
 	redirectURI := "https://app.example.com/callback"
-	restarted := false
-	resolver := &Resolver{
-		Admin: &updateConfigurationAdminStub{},
-		ScheduleRestart: func() {
-			restarted = true
-		},
-	}
+	resolver := &Resolver{Admin: &updateConfigurationAdminStub{}}
 
 	payload, err := resolver.UpdateConfiguration(ctx, model.UpdateConfigurationInput{
 		Authorization: &model.AuthorizationConfigurationInput{
@@ -261,9 +254,6 @@ func TestUpdateConfigurationSchedulesRestartAfterAuthorizationChange(t *testing.
 		},
 	})
 	must.NoErr(t, err)
-	if !restarted {
-		t.Fatal("expected authorization update to schedule a restart")
-	}
 	if payload.Configuration.Authorization.OauthIssuerURL != issuerURL {
 		t.Fatalf("OauthIssuerURL = %q", payload.Configuration.Authorization.OauthIssuerURL)
 	}
@@ -272,36 +262,12 @@ func TestUpdateConfigurationSchedulesRestartAfterAuthorizationChange(t *testing.
 	}
 }
 
-func TestUpdateConfigurationDoesNotScheduleRestartWhenLaterUpdateFails(t *testing.T) {
-	ctx := context.Background()
-	issuerURL := "https://issuer.example.com"
-	restarted := false
-	resolver := &Resolver{
-		Admin: &updateConfigurationAdminStub{err: errors.New("google update failed")},
-		ScheduleRestart: func() {
-			restarted = true
-		},
-	}
-
-	_, err := resolver.UpdateConfiguration(ctx, model.UpdateConfigurationInput{
-		Authorization: &model.AuthorizationConfigurationInput{OauthIssuerURL: issuerURL},
-		GoogleAuthn:   &model.GoogleAuthnConfigurationInput{Enabled: true},
-	})
-	if err == nil {
-		t.Fatal("expected UpdateConfiguration() to return an error")
-	}
-	if restarted {
-		t.Fatal("expected restart to remain unscheduled after a failed update")
-	}
-}
-
 func TestUpdateConfigurationMarksSetupComplete(t *testing.T) {
 	ctx := context.Background()
 	store := &graphConfigStore{}
 	svc := admin.NewService(store, runtimeconfig.New(store))
 	must.NoErr(t, svc.LoadConfiguration(ctx, true, false))
-	restarted := false
-	resolver := &Resolver{Admin: svc, ScheduleRestart: func() { restarted = true }}
+	resolver := &Resolver{Admin: svc}
 	setupComplete := true
 
 	if _, err := resolver.UpdateConfiguration(ctx, model.UpdateConfigurationInput{
@@ -318,9 +284,6 @@ func TestUpdateConfigurationMarksSetupComplete(t *testing.T) {
 	}
 	if !svc.Sections().SetupComplete.Enabled {
 		t.Fatalf("SetupComplete() = false")
-	}
-	if !restarted {
-		t.Fatalf("authorization update did not schedule restart")
 	}
 	if cfg := store.sections.SetupComplete; !cfg.Stored || !cfg.Enabled || !reflect.DeepEqual(cfg.Fields, runtimeconfig.SetupCompleteConfig{}) {
 		t.Fatalf("stored setup complete = %#v", cfg)

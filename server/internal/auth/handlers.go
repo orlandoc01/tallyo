@@ -29,23 +29,24 @@ func (s *Service) Routes(mux interface {
 	Post(string, http.HandlerFunc)
 }) {
 	mux.HandleFunc("/auth/config", s.AuthConfig)
-	if !s.OAuthEnabled() {
-		return
+	oauthOnly := func(handler http.HandlerFunc) http.HandlerFunc { return s.RequireOAuth(handler).ServeHTTP }
+	rateLimit := func(handler http.HandlerFunc) http.HandlerFunc {
+		return rateLimited(20, 10*time.Minute, s.cfg.ClientIPResolver, handler)
 	}
-	mux.HandleFunc("/.well-known/oauth-authorization-server", s.AuthorizationMetadata)
-	mux.HandleFunc("/.well-known/oauth-protected-resource", s.ProtectedResourceMetadata)
-	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", s.MCPProtectedResourceMetadata)
+	mux.HandleFunc("/.well-known/oauth-authorization-server", oauthOnly(s.AuthorizationMetadata))
+	mux.HandleFunc("/.well-known/oauth-protected-resource", oauthOnly(s.ProtectedResourceMetadata))
+	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", oauthOnly(s.MCPProtectedResourceMetadata))
 	// Return 404 so MCP clients that probe OIDC discovery get a definitive
 	// "not an OIDC server" signal instead of the SPA catch-all HTML (200).
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	})
-	mux.Post("/register", limitAuthBody(rateLimited(20, 10*time.Minute, s.cfg.ClientIPResolver, s.Register)))
-	mux.HandleFunc("/authorize", limitAuthBody(rateLimited(20, 10*time.Minute, s.cfg.ClientIPResolver, s.Authorize)))
-	mux.Get("/consent", s.ConsentForm)
-	mux.Post("/consent", limitAuthBody(s.Consent))
-	mux.HandleFunc("/auth/google", s.GoogleLogin)
-	mux.HandleFunc("/auth/google/callback", s.GoogleCallback)
+	mux.Post("/register", oauthOnly(limitAuthBody(rateLimit(s.Register))))
+	mux.HandleFunc("/authorize", oauthOnly(limitAuthBody(rateLimit(s.Authorize))))
+	mux.Get("/consent", oauthOnly(rateLimit(s.ConsentForm)))
+	mux.Post("/consent", oauthOnly(limitAuthBody(rateLimit(s.Consent))))
+	mux.HandleFunc("/auth/google", rateLimit(s.GoogleLogin))
+	mux.HandleFunc("/auth/google/callback", rateLimit(s.GoogleCallback))
 }
 
 func limitAuthBody(handler http.HandlerFunc) http.HandlerFunc {
@@ -88,7 +89,7 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, uri := range req.RedirectURIs {
-		if !isAllowedDynamicRedirectURI(uri, s.cfg.IssuerURL, dcr.DynamicRedirectHosts) {
+		if !isAllowedDynamicRedirectURI(uri, s.IssuerURL(), dcr.DynamicRedirectHosts) {
 			http.Error(
 				w,
 				"redirect_uri must target the issuer host, an allowed host, localhost, or a private app scheme",
@@ -102,16 +103,14 @@ func (s *Service) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := Client{
-		OAuthClient: OAuthClient{
-			ID:              clientID,
-			RedirectURIs:    req.RedirectURIs,
-			GrantTypes:      lo.CoalesceSliceOrEmpty(req.GrantTypes, []string{"authorization_code", "refresh_token"}),
-			ResponseTypes:   lo.CoalesceSliceOrEmpty(req.ResponseTypes, []string{"code"}),
-			Scopes:          ClientAllowedScopes,
-			ApplicationType: lo.CoalesceOrEmpty(req.ApplicationType, "native"),
-			ClientName:      req.ClientName,
-			Public:          true,
-		},
+		ID:              clientID,
+		RedirectURIs:    req.RedirectURIs,
+		GrantTypes:      lo.CoalesceSliceOrEmpty(req.GrantTypes, []string{"authorization_code", "refresh_token"}),
+		ResponseTypes:   lo.CoalesceSliceOrEmpty(req.ResponseTypes, []string{"code"}),
+		Scopes:          ClientAllowedScopes,
+		ApplicationType: lo.CoalesceOrEmpty(req.ApplicationType, "native"),
+		ClientName:      req.ClientName,
+		Public:          true,
 	}
 	if err := s.store.SaveClient(r.Context(), client); err != nil {
 		http.Error(w, "save client", http.StatusInternalServerError)
@@ -139,9 +138,10 @@ func (s *Service) Authorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use Fosite to validate the OAuth authorize request
-	authorizeRequest, err := s.provider.NewAuthorizeRequest(r.Context(), r)
+	provider := s.oauthProvider()
+	authorizeRequest, err := provider.NewAuthorizeRequest(r.Context(), r)
 	if err != nil {
-		s.provider.WriteAuthorizeError(r.Context(), w, authorizeRequest, err)
+		provider.WriteAuthorizeError(r.Context(), w, authorizeRequest, err)
 		return
 	}
 
@@ -193,13 +193,13 @@ func (s *Service) Authorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unsupported auth method", http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, s.cfg.IssuerURL+"/auth/login?login_session="+url.QueryEscape(sessionID), http.StatusFound)
+	http.Redirect(w, r, s.IssuerURL()+"/auth/login?login_session="+url.QueryEscape(sessionID), http.StatusFound)
 }
 
 func (s *Service) authMethodHandlers() map[string]authMethodHandler {
 	redirect := func(path string) func(http.ResponseWriter, *http.Request, string) {
 		return func(w http.ResponseWriter, r *http.Request, sessionID string) {
-			http.Redirect(w, r, s.cfg.IssuerURL+path+"?login_session="+url.QueryEscape(sessionID), http.StatusFound)
+			http.Redirect(w, r, s.IssuerURL()+path+"?login_session="+url.QueryEscape(sessionID), http.StatusFound)
 		}
 	}
 	webAuthn := func(w http.ResponseWriter, _ *http.Request, sessionID string) {
@@ -255,7 +255,7 @@ func (s *Service) completeAuthorize(w http.ResponseWriter, r *http.Request, sess
 	authorizeRequest.ResponseTypes = fosite.Arguments{"code"}
 	authorizeRequest.RequestedScope = scopes
 	authorizeRequest.GrantedScope = scopes
-	authorizeRequest.GrantedAudience = fosite.Arguments{s.cfg.IssuerURL}
+	authorizeRequest.GrantedAudience = fosite.Arguments{s.IssuerURL()}
 	authorizeRequest.Session = &fositeSession
 	authorizeRequest.Form = url.Values{
 		"redirect_uri":          {session.RedirectURI},
@@ -272,9 +272,10 @@ func (s *Service) completeAuthorize(w http.ResponseWriter, r *http.Request, sess
 		return
 	}
 
-	resp, err := s.provider.NewAuthorizeResponse(r.Context(), authorizeRequest, &fositeSession)
+	provider := s.oauthProvider()
+	resp, err := provider.NewAuthorizeResponse(r.Context(), authorizeRequest, &fositeSession)
 	if err != nil {
-		s.provider.WriteAuthorizeError(r.Context(), w, authorizeRequest, err)
+		provider.WriteAuthorizeError(r.Context(), w, authorizeRequest, err)
 		return
 	}
 
@@ -293,5 +294,5 @@ func (s *Service) completeAuthorize(w http.ResponseWriter, r *http.Request, sess
 		return
 	}
 
-	s.provider.WriteAuthorizeResponse(r.Context(), w, authorizeRequest, resp)
+	provider.WriteAuthorizeResponse(r.Context(), w, authorizeRequest, resp)
 }

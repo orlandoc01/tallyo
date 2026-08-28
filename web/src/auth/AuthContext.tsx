@@ -205,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       <Provider value={client}>{children}</Provider>
       {showIdleWarning ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 p-4">
-          <section aria-modal="true" className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl" role="dialog">
+          <section aria-modal="true" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" role="dialog">
             <h2 className="text-lg font-bold text-neutral-950">Still there?</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-600">You will be signed out in about a minute because of inactivity.</p>
             <DialogButtonRow

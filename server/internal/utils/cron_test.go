@@ -63,6 +63,16 @@ func TestRunHourlyCronReturnsWhenCancelled(t *testing.T) {
 	}
 }
 
+func TestRunPeriodicReturnsWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	runs := 0
+	RunPeriodic(ctx, time.Hour, func(context.Context) { runs++ })
+	if runs != 1 {
+		t.Fatalf("RunPeriodic immediate runs = %d, want 1", runs)
+	}
+}
+
 func TestNextAfterInZone(t *testing.T) {
 	after := time.Date(2026, 5, 26, 6, 59, 0, 0, time.UTC)
 	next, err := NextAfterInZone("0 0 * * *", "America/Los_Angeles", after)

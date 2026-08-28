@@ -7,6 +7,7 @@ import (
 	"tallyo/internal/database/dbgen"
 	"tallyo/internal/database/dbutil"
 	"tallyo/internal/graph/model"
+	transactionsdb "tallyo/internal/transactions/db"
 )
 
 func (s *Store) SetBudget(ctx context.Context, input model.SetBudgetInput) (int64, error) {
@@ -32,7 +33,7 @@ func (s *Store) DeleteBudget(ctx context.Context, input model.DeleteBudgetInput)
 }
 
 func budgetFromRow(row dbgen.BudgetByIDRow) *model.Budget {
-	category := categoryFromRow(row.CategoryRow)
+	category := transactionsdb.CategoryFromRow(row.CategoryRow)
 	return &model.Budget{ID: model.New(model.GlobalIDBudget, row.ID), Month: row.Month, Category: category, Amount: row.AmountCents}
 }
 

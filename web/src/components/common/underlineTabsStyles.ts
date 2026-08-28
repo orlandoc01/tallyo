@@ -6,7 +6,7 @@ export function underlineTabsClassName(className?: string) {
 
 export function underlineTabClassName(isActive: boolean) {
   return clsx(
-    '-mb-px flex shrink-0 items-center justify-center whitespace-nowrap border-b-4 px-5 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-300 dark:focus-visible:outline-neutral-600',
+    '-mb-px flex shrink-0 items-center justify-center whitespace-nowrap border-b-2 px-5 py-2.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-300 dark:focus-visible:outline-neutral-600',
     isActive
       ? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
       : 'border-transparent text-neutral-500 hover:bg-brand-50/70 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-brand-950/20 dark:hover:text-neutral-100',

@@ -8,7 +8,6 @@ package dbgen
 import (
 	"context"
 	"strings"
-	"time"
 
 	"tallyo/internal/money"
 )
@@ -206,16 +205,7 @@ func (q *Queries) InsertRuleTag(ctx context.Context, arg InsertRuleTagParams) er
 
 const listRules = `-- name: ListRules :many
 SELECT
-  r.id AS rule_id,
-  r.merchant_pattern,
-  r.original_pattern,
-  r.merchant_name,
-  r.amount_min_cents,
-  r.amount_max_cents,
-  r.should_hide,
-  r.should_be_recurring,
-  r.priority,
-  r.created_at AS rule_created_at,
+  r.amount_max_cents, r.amount_min_cents, r.category_id, r.created_at, r.id, r.merchant_name, r.merchant_pattern, r.original_pattern, r.priority, r.should_be_recurring, r.should_hide,
   cr.cat_id,
   cr.cat_name,
   cr.cat_emoji,
@@ -248,24 +238,15 @@ type ListRulesParams struct {
 }
 
 type ListRulesRow struct {
-	RuleID            int64
-	MerchantPattern   string
-	OriginalPattern   string
-	MerchantName      *string
-	AmountMinCents    *money.Cents
-	AmountMaxCents    *money.Cents
-	ShouldHide        *bool
-	ShouldBeRecurring *bool
-	Priority          int64
-	RuleCreatedAt     time.Time
-	CatID             *int64
-	CatName           *string
-	CatEmoji          *string
-	GroupName         *string
-	GroupEmoji        *string
-	GroupKind         *string
-	SortOrder         *int64
-	PlaidPfc2Codes    *string
+	Rule           Rule
+	CatID          *int64
+	CatName        *string
+	CatEmoji       *string
+	GroupName      *string
+	GroupEmoji     *string
+	GroupKind      *string
+	SortOrder      *int64
+	PlaidPfc2Codes *string
 }
 
 // Used by GraphQL rule list/node resolvers and internally by transactions/db.Store.CreateRule/UpdateRule to return rules after mutations.
@@ -281,16 +262,17 @@ func (q *Queries) ListRules(ctx context.Context, arg ListRulesParams) ([]ListRul
 	for rows.Next() {
 		var i ListRulesRow
 		if err := rows.Scan(
-			&i.RuleID,
-			&i.MerchantPattern,
-			&i.OriginalPattern,
-			&i.MerchantName,
-			&i.AmountMinCents,
-			&i.AmountMaxCents,
-			&i.ShouldHide,
-			&i.ShouldBeRecurring,
-			&i.Priority,
-			&i.RuleCreatedAt,
+			&i.Rule.AmountMaxCents,
+			&i.Rule.AmountMinCents,
+			&i.Rule.CategoryID,
+			&i.Rule.CreatedAt,
+			&i.Rule.ID,
+			&i.Rule.MerchantName,
+			&i.Rule.MerchantPattern,
+			&i.Rule.OriginalPattern,
+			&i.Rule.Priority,
+			&i.Rule.ShouldBeRecurring,
+			&i.Rule.ShouldHide,
 			&i.CatID,
 			&i.CatName,
 			&i.CatEmoji,
@@ -372,12 +354,7 @@ func (q *Queries) RetroactiveRuleTransactionIDs(ctx context.Context, arg Retroac
 const tagsByRuleIDs = `-- name: TagsByRuleIDs :many
 SELECT
   rt.rule_id,
-  t.id,
-  t.name,
-  t.color,
-  t.created_at,
-  t.updated_at,
-  t.transaction_count
+  t.color, t.created_at, t.id, t.name, t.transaction_count, t.updated_at
 FROM tags t
 JOIN rule_tags rt ON rt.tag_id = t.id
 WHERE rt.rule_id IN (/*SLICE:rule_ids*/?)
@@ -389,13 +366,8 @@ type TagsByRuleIDsParams struct {
 }
 
 type TagsByRuleIDsRow struct {
-	RuleID           int64
-	ID               int64
-	Name             string
-	Color            string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	TransactionCount int64
+	RuleID int64
+	Tag    Tag
 }
 
 // Used by transactions/db.Store to batch-populate rule tags when returning rules via GraphQL.
@@ -420,12 +392,12 @@ func (q *Queries) TagsByRuleIDs(ctx context.Context, arg TagsByRuleIDsParams) ([
 		var i TagsByRuleIDsRow
 		if err := rows.Scan(
 			&i.RuleID,
-			&i.ID,
-			&i.Name,
-			&i.Color,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.TransactionCount,
+			&i.Tag.Color,
+			&i.Tag.CreatedAt,
+			&i.Tag.ID,
+			&i.Tag.Name,
+			&i.Tag.TransactionCount,
+			&i.Tag.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

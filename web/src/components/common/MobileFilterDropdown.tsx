@@ -19,7 +19,7 @@ export function MobileFilterButton({ active = false, ariaLabel = 'Open filters',
     <button
       aria-expanded={active}
       aria-label={ariaLabel}
-      className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5', active || highlighted)}
+      className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', active || highlighted)}
       onClick={onClick}
       type="button"
     >

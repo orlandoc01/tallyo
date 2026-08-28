@@ -139,13 +139,13 @@ func TestAuthUserStoreAndCleanup(t *testing.T) {
 	if err != nil || !allowed {
 		t.Fatalf("IsEmailAllowed = %v, %v", allowed, err)
 	}
-	userID, err := store.q.InsertUser(ctx, dbgen.InsertUserParams{Email: "user@example.com", Role: "readonly"})
+	user, err := store.q.InsertUser(ctx, dbgen.InsertUserParams{Email: "user@example.com", Role: "readonly"})
 	must.NoErr(t, err)
 	role, err := store.UserRole(ctx, "user@example.com")
 	if err != nil || role != "readonly" {
 		t.Fatalf("UserRole = %q, %v", role, err)
 	}
-	if id, err := store.UserIDByEmail(ctx, "user@example.com"); err != nil || id != userID {
+	if id, err := store.UserIDByEmail(ctx, "user@example.com"); err != nil || id != user.ID {
 		t.Fatalf("UserIDByEmail = %d, %v", id, err)
 	}
 	exists, err := store.UserExists(ctx, "user@example.com")

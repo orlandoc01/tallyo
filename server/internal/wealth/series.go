@@ -1,6 +1,7 @@
 package wealth
 
 import (
+	"sort"
 	"time"
 
 	"tallyo/internal/graph/model"
@@ -94,17 +95,16 @@ func forwardFillSnapshot(snaps []accountSnapshot, dateKey string) (assets, liabi
 }
 
 func forwardFilledSnapshot(snaps []accountSnapshot, dateKey string) (*accountSnapshot, bool) {
-	var current *accountSnapshot
-	for i := range snaps {
-		if snaps[i].LocalDate > dateKey {
-			break
-		}
-		current = &snaps[i]
-	}
-	if current == nil || (current.Closed && dateKey > snaps[len(snaps)-1].LocalDate) {
+	localDate := func(snap accountSnapshot) string { return snap.LocalDate }
+	index := latestSnapshotIndex(snaps, dateKey, localDate)
+	if index < 0 || (snaps[index].Closed && dateKey > snaps[len(snaps)-1].LocalDate) {
 		return nil, false
 	}
-	return current, true
+	return &snaps[index], true
+}
+
+func latestSnapshotIndex[S any](snaps []S, dateKey string, localDate func(S) string) int {
+	return sort.Search(len(snaps), func(i int) bool { return localDate(snaps[i]) > dateKey }) - 1
 }
 
 func sampleDates(input model.HistoricalNetWorthInput, earliestTS *time.Time, now time.Time) []time.Time {

@@ -110,7 +110,7 @@ export function RuleFormFields({
             <div className="text-sm font-semibold text-neutral-950">Tags</div>
             <div className="mt-2 max-h-36 space-y-1 overflow-auto rounded-xl border border-neutral-100 p-2">
               {tags.length ? tags.map((tag) => (
-                <label key={tag.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-50">
+                <label key={tag.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-50">
                   <input checked={fields.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} type="checkbox" />
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
                   {tag.name}

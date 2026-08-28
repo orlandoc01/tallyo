@@ -333,7 +333,7 @@ func TestDynamicClientRequiresConsentAndGrantsRequestedScopes(t *testing.T) {
 	verifier := testOAuthVerifier
 	redirectURI := "https://client.example.com/callback"
 	clientID := "dynamic-client"
-	must.NoErr(t, service.store.SaveClient(ctx, Client{OAuthClient: OAuthClient{
+	must.NoErr(t, service.store.SaveClient(ctx, Client{
 		ID:              clientID,
 		RedirectURIs:    []string{redirectURI},
 		GrantTypes:      []string{"authorization_code", "refresh_token"},
@@ -342,7 +342,7 @@ func TestDynamicClientRequiresConsentAndGrantsRequestedScopes(t *testing.T) {
 		ApplicationType: "web",
 		ClientName:      "Dynamic Client",
 		Public:          true,
-	}}))
+	}))
 	session := seedLoginSession(
 		t,
 		service,
@@ -413,7 +413,7 @@ func TestAuthorizeRoleLookupFailureFailsClosed(t *testing.T) {
 	assertStatus(t, rec, http.StatusInternalServerError, "authorize")
 
 	dynamicClientID := "missing-role-dynamic"
-	must.NoErr(t, service.store.SaveClient(ctx, Client{OAuthClient: OAuthClient{
+	must.NoErr(t, service.store.SaveClient(ctx, Client{
 		ID:              dynamicClientID,
 		RedirectURIs:    []string{"https://client.example.com/callback"},
 		GrantTypes:      []string{"authorization_code", "refresh_token"},
@@ -421,8 +421,7 @@ func TestAuthorizeRoleLookupFailureFailsClosed(t *testing.T) {
 		Scopes:          ClientAllowedScopes,
 		ApplicationType: "web",
 		ClientName:      "Dynamic Client",
-		Public:          true,
-	}}))
+		Public:          true}))
 	dynamicSession := seedLoginSession(
 		t,
 		service,
@@ -527,17 +526,15 @@ func testAccessToken(t *testing.T, service *Service, subject string, scopes []st
 	t.Helper()
 	now := time.Now().UTC()
 	tokenClaims := claims{
-		Email:  subject,
-		Scope:  strings.Join(scopes, " "),
-		Locale: localeClaim{Timezone: service.Timezone()},
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    service.cfg.IssuerURL,
-			Subject:   subject,
-			Audience:  jwt.ClaimStrings{service.cfg.IssuerURL},
-			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(now),
-			ID:        "test-access-token",
-		},
+		Email:     subject,
+		Scope:     strings.Join(scopes, " "),
+		Locale:    localeClaim{Timezone: service.Timezone()},
+		Issuer:    service.cfg.IssuerURL,
+		Subject:   subject,
+		Audience:  jwt.ClaimStrings{service.cfg.IssuerURL},
+		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ID:        "test-access-token",
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodES256, tokenClaims).SignedString(service.signingKey.Private)
 	must.NoErr(t, err)
@@ -1095,7 +1092,7 @@ func TestAuthConfigSetupCompleteCallback(t *testing.T) {
 }
 
 func TestClientFositeMethods(t *testing.T) {
-	c := Client{OAuthClient: OAuthClient{
+	c := Client{
 		ID:              "test",
 		GrantTypes:      []string{"authorization_code"},
 		ResponseTypes:   []string{"code"},
@@ -1103,8 +1100,7 @@ func TestClientFositeMethods(t *testing.T) {
 		ApplicationType: "web",
 		ClientName:      "Test",
 		Public:          true,
-		Preseeded:       true,
-	}}
+		Preseeded:       true}
 	if c.GetID() != "test" {
 		t.Fatalf("GetID() = %q", c.GetID())
 	}

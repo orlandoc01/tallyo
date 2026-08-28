@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+
+	u "tallyo/internal/utils"
 )
 
 const sqliteOptimizeInterval = 4 * time.Hour
 
 func RunSQLiteOptimize(ctx context.Context, db *DB, log *slog.Logger) {
-	runPeriodic(ctx, sqliteOptimizeInterval, func(ctx context.Context) {
+	u.RunPeriodic(ctx, sqliteOptimizeInterval, func(ctx context.Context) {
 		triggerSQLiteOptimize(ctx, db, log)
 	})
 }

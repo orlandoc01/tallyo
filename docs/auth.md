@@ -174,28 +174,23 @@ Use this order when adding or replacing a sign-in method:
 1. Keep the current working admin method enabled.
 2. Add the required user record and configure the new provider.
 3. If this is the first OAuth provider, configure the issuer and exact frontend
-   callback, then restart through the Authorization save flow.
+   callback in the Authorization card and save.
 4. Test a fresh private browser session, including token refresh or passkey
    registration as applicable.
 5. Add a second recovery credential.
 6. Disable the old method.
 
-Changes to Google, email, passkey, and trusted-proxy sections apply live when
-the OAuth service was already active at startup. Enabling the first OAuth
-provider on a master-password-only instance still requires a restart so the
-OAuth routes and provider are initialized.
-
-Saving the Authorization section, including master password, issuer, frontend
-redirects, token durations, development CORS, or disable-all-auth, schedules
-the Tallyo process to exit after the response. A Docker restart policy,
-systemd, or another supervisor must start it again. The setup wizard performs
-the same restart and waits for `/auth/config` to return. Without a supervisor,
-start the bare binary manually after it exits.
+Every section applies live. Saving the Authorization section, including master
+password, issuer, frontend redirects, token durations, development CORS, or
+disable-all-auth, rebuilds the OAuth provider in place; enabling the first OAuth
+provider on a master-password-only instance mounts the OAuth routes the same
+way. Nothing exits or restarts. Access tokens issued under a previous issuer
+stop validating, so users sign in again after an issuer change.
 
 Tallyo rejects a completed configuration with no authentication method. It
 also rejects a transition to passkey-only authentication unless an admin
 passkey already exists. Environment values for `MASTER_PASSWORD` and
-`DISABLE_ALL_AUTH` continue to override database settings after a restart.
+`DISABLE_ALL_AUTH` always override the database settings.
 
 ## `DISABLE_ALL_AUTH`
 

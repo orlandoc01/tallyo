@@ -1,16 +1,7 @@
 -- Used by GraphQL rule list/node resolvers and internally by transactions/db.Store.CreateRule/UpdateRule to return rules after mutations.
 -- name: ListRules :many
 SELECT
-  r.id AS rule_id,
-  r.merchant_pattern,
-  r.original_pattern,
-  r.merchant_name,
-  r.amount_min_cents,
-  r.amount_max_cents,
-  r.should_hide,
-  r.should_be_recurring,
-  r.priority,
-  r.created_at AS rule_created_at,
+  sqlc.embed(r),
   cr.cat_id,
   cr.cat_name,
   cr.cat_emoji,
@@ -79,12 +70,7 @@ VALUES (@rule_id, @tag_id);
 -- name: TagsByRuleIDs :many
 SELECT
   rt.rule_id,
-  t.id,
-  t.name,
-  t.color,
-  t.created_at,
-  t.updated_at,
-  t.transaction_count
+  sqlc.embed(t)
 FROM tags t
 JOIN rule_tags rt ON rt.tag_id = t.id
 WHERE rt.rule_id IN (sqlc.slice('rule_ids'))

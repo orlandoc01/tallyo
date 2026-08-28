@@ -250,20 +250,32 @@ html.dark .setup-light textarea {
 html.dark {
   --brand-50: var(--brand-50-dk);
   --brand-100: var(--brand-100-dk);
+  --dark-bg: #171513;
+  --dark-surface: #1f1c1a;
+  --dark-hover: #2a2725;
+  --dark-border: #292524;
   --text-primary-dark: 196 191 185;
   --text-secondary-dark: 168 162 158;
   color-scheme: dark;
-  background: #0f0f14;
+  background: var(--dark-bg);
   /* Softer base text — keeps body copy from glaring near-white against the dark bg */
   color: rgb(var(--text-secondary-dark));
 }
 
 /* Backgrounds */
-html.dark .bg-white        { background-color: #1c1b1a; }
-html.dark .bg-white\/90    { background-color: rgb(28 27 26 / 0.9); }
-html.dark .bg-paper        { background-color: #0f0f14; }
-html.dark .bg-neutral-50   { background-color: #242321; }
-html.dark .bg-neutral-100  { background-color: #2a2928; }
+html.dark .bg-white        { background-color: var(--dark-surface); }
+html.dark .bg-white\/90    { background-color: rgb(31 28 26 / 0.9); }
+html.dark .bg-paper        { background-color: var(--dark-bg); }
+html.dark .bg-neutral-50   { background-color: var(--dark-hover); }
+html.dark .bg-neutral-100  { background-color: var(--dark-hover); }
+html.dark .dark\:bg-neutral-950 { background-color: var(--dark-bg); }
+html.dark .dark\:bg-neutral-950\/30 { background-color: rgb(23 21 19 / 0.3); }
+html.dark .dark\:bg-neutral-950\/40 { background-color: rgb(23 21 19 / 0.4); }
+html.dark .dark\:bg-neutral-950\/50 { background-color: rgb(23 21 19 / 0.5); }
+html.dark .dark\:bg-neutral-900 { background-color: var(--dark-surface); }
+html.dark .dark\:bg-neutral-900\/50 { background-color: rgb(31 28 26 / 0.5); }
+html.dark .dark\:bg-neutral-900\/70 { background-color: rgb(31 28 26 / 0.7); }
+html.dark .dark\:bg-neutral-800 { background-color: var(--dark-hover); }
 /* Active nav item, selected theme button, role badges — theme-aware via CSS variables.
    html.dark swaps brand-50/100 so opacity variants like bg-brand-50/70 stay muted too. */
 html.dark .bg-brand-50     { background-color: rgb(var(--brand-50-dk)); }
@@ -338,13 +350,17 @@ html.dark .dark\:text-orange-800,
 html.dark .dark\:text-orange-900 { color: #fdba74; }
 
 /* Borders */
-html.dark .border-neutral-200  { border-color: #292524; }
-html.dark .border-neutral-100  { border-color: #1c1b1a; }
+html.dark .border-neutral-100,
+html.dark .border-neutral-200,
+html.dark .border-neutral-300,
+html.dark .dark\:border-neutral-600,
+html.dark .dark\:border-neutral-700,
+html.dark .dark\:border-neutral-800 { border-color: var(--dark-border); }
+html.dark .dark\:ring-neutral-800 { --tw-ring-color: var(--dark-border); }
 
 /* Dividers — match the border overrides so divide-y lines look the same as borders in dark mode */
-html.dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: #292524; }
-html.dark .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1c1b1a; }
-html.dark .border-neutral-300  { border-color: #44403c; }
+html.dark .divide-neutral-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--dark-border); }
 html.dark .border-emerald-200  { border-color: #064e3b; }
 /* Soft-red danger borders — muted so the outline/separator doesn't glare white */
 html.dark .border-red-200      { border-color: #5e2a2a; }
@@ -353,23 +369,28 @@ html.dark .border-amber-200    { border-color: #5c4314; }
 html.dark .border-orange-200   { border-color: #5f3215; }
 
 /* Hover states */
-html.dark .hover\:bg-neutral-50:hover  { background-color: #242321; }
-html.dark .hover\:bg-neutral-100:hover { background-color: #2a2928; }
+html.dark .hover\:bg-neutral-50:hover,
+html.dark .hover\:bg-neutral-100:hover,
+html.dark .dark\:hover\:bg-neutral-700:hover,
+html.dark .dark\:hover\:bg-neutral-800:hover,
+html.dark .dark\:hover\:bg-neutral-800\/50:hover,
+html.dark .dark\:hover\:bg-neutral-800\/70:hover,
+html.dark .dark\:hover\:bg-neutral-900:hover { background-color: var(--dark-hover); }
 html.dark .hover\:bg-red-50:hover      { background-color: #3b0505; }
 
 /* Form controls */
 html.dark input,
 html.dark select,
 html.dark textarea {
-  background-color: #1c1b1a;
+  background-color: var(--dark-surface);
   color: rgb(var(--text-primary-dark));
 }
 
 html.dark input:disabled,
 html.dark select:disabled,
 html.dark textarea:disabled {
-  background-color: #242321;
-  border-color: #292524;
+  background-color: var(--dark-hover);
+  border-color: var(--dark-border);
   color: #8d8780;
   opacity: 1;
 }
@@ -380,13 +401,13 @@ html.dark .shadow-card {
 }
 
 /* Recharts: dim grid lines and lighten axis labels to match the surrounding text */
-html.dark .recharts-cartesian-grid line { stroke: #292524; }
+html.dark .recharts-cartesian-grid line { stroke: var(--dark-border); }
 html.dark .recharts-cartesian-axis-tick-value { fill: rgb(var(--text-secondary-dark)); }
 
 /* Dark mode: Recharts default tooltip */
 html.dark .recharts-default-tooltip {
-  background-color: #1c1b1a !important;
-  border-color: #292524 !important;
+  background-color: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
 }
 html.dark .recharts-tooltip-label,
 html.dark .recharts-tooltip-item {
@@ -437,4 +458,4 @@ html.dark .cashflow-chart .recharts-reference-line line {
 }
 
 /* Spending comparison custom dot: white fill → surface color */
-html.dark [fill="white"] { fill: #1c1b1a; }
+html.dark [fill="white"] { fill: var(--dark-surface); }

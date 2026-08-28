@@ -24,21 +24,19 @@ import (
 )
 
 type Config struct {
-	Logger                *slog.Logger
-	Auth                  *auth.Service
-	Resolver              *graph.Resolver
-	Transactions          transactions.ImportExportStore
-	OAuthIssuerURL        string
-	DevCORSAllowedOrigins []string
-	ClientIPResolver      middleware.ClientIPResolver
-	RuntimeConfig         *runtimeconfig.Manager
+	Logger           *slog.Logger
+	Auth             *auth.Service
+	Resolver         *graph.Resolver
+	Transactions     transactions.ImportExportStore
+	ClientIPResolver middleware.ClientIPResolver
+	RuntimeConfig    *runtimeconfig.Manager
 }
 
 func New(cfg Config) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestLogger(cfg.Logger))
 	csp := "default-src 'self'; script-src 'self' https://cdn.plaid.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.plaid.com https://icons.duckduckgo.com; connect-src 'self' https://*.plaid.com; frame-src https://*.plaid.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
-	router.Use(middleware.SecurityHeaders(strings.HasPrefix(cfg.OAuthIssuerURL, "https://"), csp))
+	router.Use(middleware.SecurityHeaders(func() bool { return strings.HasPrefix(cfg.Auth.IssuerURL(), "https://") }, csp))
 	router.Use(cfg.Auth.DevCORS)
 
 	router.Get("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
@@ -60,11 +58,8 @@ func limitAuthBody(handler http.HandlerFunc) http.HandlerFunc {
 
 func registerAuthRoutes(router chi.Router, authSrv *auth.Service, resolver middleware.ClientIPResolver) {
 	authSrv.Routes(router)
-	if !authSrv.OAuthEnabled() {
-		return
-	}
 	router.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimitWithClientIP(5, 15*time.Second, resolver))
+		r.Use(authSrv.RequireOAuth, middleware.RateLimitWithClientIP(5, 15*time.Second, resolver))
 		r.Post("/auth/email/send", limitAuthBody(authSrv.EmailSend))
 		r.Post("/auth/email/verify", limitAuthBody(authSrv.EmailVerify))
 		r.Get("/auth/email/magic", authSrv.EmailMagicLink)
@@ -72,13 +67,13 @@ func registerAuthRoutes(router chi.Router, authSrv *auth.Service, resolver middl
 		r.Post("/auth/webauthn/login/finish", limitAuthBody(authSrv.WebAuthnLoginFinish))
 	})
 	router.Group(func(r chi.Router) {
-		r.Use(middleware.RateLimitWithClientIP(10, 10*time.Second, resolver))
+		r.Use(authSrv.RequireOAuth, middleware.RateLimitWithClientIP(10, 10*time.Second, resolver))
 		r.Post("/token", limitAuthBody(authSrv.Token))
 	})
 }
 
 func registerMCPRoute(router chi.Router, cfg Config) {
-	mcpHandler := mcpserver.New(mcpserver.Config{AllowedOrigins: cfg.DevCORSAllowedOrigins, Logger: cfg.Logger}, cfg.Resolver)
+	mcpHandler := mcpserver.New(mcpserver.Config{Logger: cfg.Logger}, cfg.Resolver)
 	handler := clearWriteDeadline(dynamicMCPMiddleware(cfg, mcpHandler))
 	router.Handle("/mcp", http.MaxBytesHandler(handler, 1<<20))
 }

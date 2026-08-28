@@ -228,7 +228,7 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
                 {balanceOnly && !controlsDisabled ? (
                   <input
                     aria-label="Snapshot balance"
-                    className="w-32 rounded-lg border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className="w-32 rounded-xl border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
                     disabled={lines.length === 0 && !usdAsset}
                     onChange={(e) => changeLines(linesWithBalance(lines, usdAsset, e.target.value, liabilityBalance))}
                     step="any"

@@ -8,10 +8,10 @@ import { chartMarkOpacity, chartOpacityForFocus, spendingChartColor } from '../.
 import { formatCurrency, formatCurrencyCompact } from '../../utils/currency'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { Card } from '../common/FormControls'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { type GroupBy, aggregateByGroup, topNWithEverythingElse } from '../../utils/spending'
 import { reportChartAxes } from './chartAxes'
 import { GranularitySelector } from './DateRangeSelector'
-import { ChartViewTogglePill } from './ChartViewTogglePill'
 
 export type TrendsChartView = 'stacked' | 'line'
 
@@ -95,22 +95,22 @@ export function SpendingTrends({
         <div className="flex flex-nowrap items-center gap-2 lg:w-auto lg:gap-3">
           {onGranularityChange ? (
             <GranularitySelector
-              buttonClassName="rounded-xl px-2 py-2 text-xs font-semibold"
-              className="flex rounded-2xl bg-neutral-100 p-1"
               granularity={granularity}
               labelVariant="long"
               onChange={onGranularityChange}
+              size="sm"
             />
           ) : null}
-          <ChartViewTogglePill
+          <SegmentedControl
+            ariaLabel="Trend chart view"
             options={[{ value: 'stacked', label: 'Stacked' }, { value: 'line', label: 'Line' }]}
-            size="responsive"
+            size="sm"
             value={view}
             onChange={setView}
           />
           {focusedCategoryId ? (
             <button
-              className="rounded-2xl border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:text-brand-900"
+              className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:text-brand-900"
               onClick={() => onCategoryFocusChange?.(null)}
               type="button"
             >
@@ -199,7 +199,7 @@ function ChartLegend({
     <div className="mt-4 flex flex-wrap gap-3 px-2">
       {chartItems.map((item) => (
         <button
-          className={`flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 text-sm transition-colors ${onLegendClick ? 'cursor-pointer hover:bg-neutral-100' : 'cursor-default'}`}
+          className={`flex items-center gap-1.5 rounded-xl px-1.5 py-0.5 text-sm transition-colors ${onLegendClick ? 'cursor-pointer hover:bg-neutral-100' : 'cursor-default'}`}
           key={item.id}
           onClick={onLegendClick ? () => onLegendClick(item.id) : undefined}
           type="button"

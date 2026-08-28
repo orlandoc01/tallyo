@@ -94,7 +94,7 @@ Domain packages follow a consistent shape: `stores.go` declares the store interf
 
 ## Database
 
-Single SQLite file, opened with `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=30000`. Migrations run on startup and are idempotent (`CREATE TABLE IF NOT EXISTS`, additive column changes). First boot seeds the category tree, the uncategorized sentinel (category `0`), and Plaid category mappings. The authoritative schema snapshot lives at `internal/database/testdata/schema.sql`.
+Single SQLite file, opened with `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=30000`. Migrations run on startup and are idempotent (`CREATE TABLE IF NOT EXISTS`, additive column changes). First boot seeds the category tree, the uncategorized sentinel (category `0`), and Plaid category mappings. The authoritative schema snapshot lives at `internal/database/testdata/schema.sql`.
 
 Table groups at a glance:
 
@@ -173,7 +173,7 @@ and open the snapshot with your SQLite browser of choice. Avoid opening the live
 
 ## Configuration
 
-Env vars cover only what's needed before the database opens (see the [root README](../README.md#environment-variables)). Everything else is runtime configuration in the `configurations` table, edited through the setup wizard, **Settings → Configuration** / **Settings → AI Integration**, or the `updateConfiguration` mutation:
+Env vars cover only what's needed before the database opens (see the [root README](../README.md#environment-variables)). Everything else is runtime configuration in the `configurations` table, edited through the setup wizard, **Settings → Configuration** / **Settings → AI Integration**, or the `updateConfiguration` mutation. Every section applies live — no restart for any of them:
 
 | Section | Settings |
 |---------|----------|
@@ -181,7 +181,7 @@ Env vars cover only what's needed before the database opens (see the [root READM
 | `googleAuthn` / `emailCodeAuthn` / `passKeyAuthn` | Sign-in providers (Google OAuth, SMTP for OTP/magic links, WebAuthn relying party) |
 | `llmCategorization` | Ollama transaction categorization: enabled, URL, and model |
 | `mcp` | MCP server enable + allowed dynamic-client redirect hosts |
-| `security` | Trusted proxy CIDRs (live, no restart) |
+| `security` | Trusted proxy CIDRs |
 | `general` | Disable transaction tracking (hide transaction UI and skip background transaction + recurring sync polling), disable wealth tracking (hide wealth UI and skip background wealth adapter + portfolio polling) |
 | `locale` | Timezone |
 

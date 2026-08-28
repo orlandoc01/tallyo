@@ -120,7 +120,7 @@ func upsertAsset(ctx context.Context, q *dbgen.Queries, asset wealth.AssetUpsert
 			return nil, fmt.Errorf("insert asset adapter source: %w", err)
 		}
 	}
-	return assetFromRow(assetModelFromUpsertRow(upserted))
+	return assetFromRow(upserted)
 }
 
 func mergeAssetAdditional(
@@ -231,7 +231,7 @@ func (s *Store) UpdateAsset(ctx context.Context, input model.UpdateAssetInput) (
 	}
 
 	identifierChanged := input.Identifier != nil && *input.Identifier != existing.Identifier
-	forcedPriceValue, forcedPriceSet, forcedPriceClear, err := updateAssetForcedPrice(input)
+	forcedPrice, err := updateAssetForcedPrice(input)
 	if err != nil {
 		return nil, err
 	}
@@ -241,9 +241,9 @@ func (s *Store) UpdateAsset(ctx context.Context, input model.UpdateAssetInput) (
 			Name:                   input.Name,
 			Identifier:             input.Identifier,
 			Classifier:             nullableEnumString(input.Classifier),
-			ForcedPriceSet:         forcedPriceSet,
-			ForcedPriceValue:       forcedPriceValue,
-			ForcedPriceClear:       forcedPriceClear,
+			ForcedPriceSet:         forcedPrice.Set,
+			ForcedPriceValue:       forcedPrice.Value,
+			ForcedPriceClear:       forcedPrice.Clear,
 			TrackingTicker:         input.TrackingTicker,
 			TrackingMultiplier:     input.TrackingMultiplier,
 			ClearMarketPrice:       identifierChanged,
@@ -296,17 +296,23 @@ func effectivePortfolioTicker(identifier string, trackingTicker *string) string 
 	return lo.Ternary(ticker != "", ticker, strings.TrimSpace(strings.ToUpper(identifier)))
 }
 
-func updateAssetForcedPrice(input model.UpdateAssetInput) (*float64, bool, bool, error) {
+type forcedPriceUpdate struct {
+	Value *float64
+	Set   bool
+	Clear bool
+}
+
+func updateAssetForcedPrice(input model.UpdateAssetInput) (forcedPriceUpdate, error) {
 	if input.ForcePrice == nil {
-		return input.ForcedUsdPrice, input.ForcedUsdPrice != nil, false, nil
+		return forcedPriceUpdate{Value: input.ForcedUsdPrice, Set: input.ForcedUsdPrice != nil}, nil
 	}
 	if !*input.ForcePrice {
-		return nil, false, true, nil
+		return forcedPriceUpdate{Clear: true}, nil
 	}
 	if input.ForcedUsdPrice == nil {
-		return nil, false, false, errors.New("forcedUsdPrice is required when forcePrice is true")
+		return forcedPriceUpdate{}, errors.New("forcedUsdPrice is required when forcePrice is true")
 	}
-	return input.ForcedUsdPrice, true, false, nil
+	return forcedPriceUpdate{Value: input.ForcedUsdPrice, Set: true}, nil
 }
 
 func nullableEnumString[T ~string](value *T) *string {

@@ -4,12 +4,12 @@ import { useMemo, useState } from 'react'
 import { Tooltip } from 'recharts'
 import { DonutChart } from '../common/DonutChart'
 import { Card } from '../common/FormControls'
+import { SegmentedControl } from '../common/SegmentedControl'
 import type { CategorySpending, SpendingPeriod } from '../../types/domain'
 import { spendingChartColor } from '../../utils/chartStyles'
 import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
 import { type GroupBy, aggregateByGroup, topCategoriesWithEverythingElse, topNWithEverythingElse } from '../../utils/spending'
 import { CategoryBar } from './CategoryBar'
-import { ChartViewTogglePill } from './ChartViewTogglePill'
 
 export type ChartView = 'bar' | 'pie'
 
@@ -126,10 +126,11 @@ export function SpendingBreakdown({
     <Card as="section" overflow="visible">
       <div className="hidden flex-nowrap items-center justify-between gap-3 border-b border-neutral-100 p-5 lg:flex lg:flex-wrap">
         <p className="text-sm text-neutral-500">{period.periodStart} to {period.periodEnd}</p>
-        <ChartViewTogglePill
+        <SegmentedControl
+          ariaLabel="Spending chart view"
           options={[
-            { value: 'pie', label: 'Pie', icon: <PieIcon className="h-4 w-4" /> },
-            { value: 'bar', label: 'Bars', icon: <BarChart3 className="h-4 w-4" /> },
+            { value: 'pie', label: <><PieIcon className="h-4 w-4" />Pie</> },
+            { value: 'bar', label: <><BarChart3 className="h-4 w-4" />Bars</> },
           ]}
           value={view}
           onChange={setView}
@@ -142,7 +143,7 @@ export function SpendingBreakdown({
             <CategoryBar
               dimmed={hasFocus && focusedCategoryId !== item.id}
               focused={focusedCategoryId === item.id}
-              item={{ category: { id: item.id, name: item.name, emoji: item.emoji, groupName: '', groupEmoji: '', kind: 'EXPENSE' as const, sortOrder: 0, plaidPFC2Codes: [] }, total: item.total, transactionCount: item.transactionCount, percentOfTotal: item.percentOfTotal }}
+              item={{ category: { id: item.id, name: item.name, emoji: item.emoji }, total: item.total }}
               key={item.id}
               maxAbsTotal={maxAbsTotal}
               onClick={onCategoryFocusChange ? () => toggleCategoryFocus(item.id, item.categoryIds) : undefined}
@@ -182,7 +183,7 @@ export function SpendingBreakdown({
               <button
                 aria-pressed={focusedCategoryId === item.categoryId}
                 className={clsx(
-                  'flex items-start gap-3 rounded-2xl p-2 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-400',
+                  'flex items-start gap-3 rounded-xl p-2 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-400',
                   focusedCategoryId === item.categoryId ? 'bg-brand-50' : 'hover:bg-neutral-50',
                   hasFocus && focusedCategoryId !== item.categoryId && 'opacity-55 grayscale',
                 )}
@@ -264,7 +265,7 @@ function ExpandButton({
 
   return (
     <button
-      className="flex w-full items-center justify-center gap-1 rounded-2xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
+      className="flex w-full items-center justify-center gap-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
       onClick={onToggleExpanded}
       type="button"
     >

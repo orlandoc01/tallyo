@@ -141,7 +141,7 @@ function CashFlowTooltip({
   if (!active || !payload?.length) return null
   const d = payload[0].payload!
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-3 text-sm shadow-lg">
+    <div className="rounded-xl border border-neutral-200 bg-white p-3 text-sm shadow-lg">
       <p className="mb-2 font-semibold">{d.periodLabel}</p>
       <p className="mb-1 text-emerald-700">Income : {formatCurrency(d.income)}</p>
       <p className="mb-1 text-red-600">Expenses : {formatCurrency(d.expenses)}</p>

@@ -138,7 +138,7 @@ export function AssetSecurityFields({
           <ToggleSwitch checked={draft.forcePrice} disabled={!canEdit} label="Override pricing with fixed price" onChange={(forcePrice) => updateDraft({ forcePrice })} />
         </div>
         {draft.forcePrice ? (
-          <TextField className="mt-3 max-w-40" controlClassName="rounded-lg" disabled={!canEdit} label="USD price per unit" min="0" onChange={(forcedUsdPrice) => updateDraft({ forcedUsdPrice })} step="0.01" type="number" value={draft.forcedUsdPrice} />
+          <TextField className="mt-3 max-w-40" controlClassName="rounded-xl" disabled={!canEdit} label="USD price per unit" min="0" onChange={(forcedUsdPrice) => updateDraft({ forcedUsdPrice })} step="0.01" type="number" value={draft.forcedUsdPrice} />
         ) : null}
       </div>
     </>

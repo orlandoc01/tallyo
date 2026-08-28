@@ -7,7 +7,7 @@ export function AnalysisSliceList({ slices, amountsHidden = false, selectedLabel
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   if (slices.length === 0) {
-    return <div className="rounded-3xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">No portfolio slices to show yet.</div>
+    return <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">No portfolio slices to show yet.</div>
   }
 
   return (

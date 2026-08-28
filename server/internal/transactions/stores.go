@@ -8,7 +8,6 @@ import (
 	"tallyo/internal/graph/model"
 )
 
-// Store is the combined interface for all transaction-domain operations.
 type Store interface {
 	CategoryStore
 	ImportExportStore
@@ -31,8 +30,6 @@ type TagStore interface {
 	TagsByRuleIDs(ctx context.Context, ruleIDs []int64) (map[int64][]*model.Tag, error)
 }
 
-// ── CategoryStore (categories, groups, rules) ────────────────────────────────
-
 type CategoryStore interface {
 	Categories(ctx context.Context) ([]*model.Category, error)
 	CategoriesForLLM(ctx context.Context) ([]categorizer.CategoryRef, error)
@@ -54,8 +51,6 @@ type CategoryStore interface {
 	DeleteRule(ctx context.Context, id int64) (bool, error)
 }
 
-// ── ImportExportStore ────────────────────────────────────────────────────────
-
 type ImportExportStore interface {
 	ImportTransactions(ctx context.Context, rows []ImportRow) (ImportResult, error)
 	// ExportTransactionPage returns one page ordered by date desc then id desc,
@@ -64,8 +59,6 @@ type ImportExportStore interface {
 	// whole export.
 	ExportTransactionPage(ctx context.Context, filter *model.TransactionsFilter, cursor *Cursor, limit int) ([]ExportTransaction, *Cursor, error)
 }
-
-// ── LLMStore ─────────────────────────────────────────────────────────────────
 
 type LLMStore interface {
 	UncategorizedForLLM(ctx context.Context, limit int) ([]categorizer.TransactionInput, error)
@@ -85,8 +78,6 @@ type LLMStagingStore interface {
 	StageUncategorizedForLLM(ctx context.Context) (int64, error)
 }
 
-// ── RecurringStore ───────────────────────────────────────────────────────────
-
 type RecurringStore interface {
 	UpsertRecurringCharge(ctx context.Context, charge RecurringChargeDraft) (int64, error)
 	ReplaceChargeTxns(ctx context.Context, chargeID int64, txnIDs []string) error
@@ -95,16 +86,16 @@ type RecurringStore interface {
 	RecurringChargeByID(ctx context.Context, id int64) (*model.RecurringCharge, error)
 }
 
-// ── ReportStore ──────────────────────────────────────────────────────────────
-
 type ReportStore interface {
 	CashFlow(ctx context.Context, filter model.SpendingFilter) ([]*model.CashFlowPeriod, error)
 	SpendingByCategory(ctx context.Context, filter model.SpendingFilter) (*model.SpendingByCategoryReport, error)
-	// SpendingRows returns aggregated spending data. Used by BudgetReport.
-	SpendingRows(ctx context.Context, filter model.SpendingFilter, byCategory, excludeIncome bool) ([]SpendingRow, error)
+	SpendingRows(ctx context.Context, filter model.SpendingFilter, mode SpendingMode) ([]SpendingRow, error)
 }
 
-// ── TransactionStore ─────────────────────────────────────────────────────────
+type SpendingMode struct {
+	ByCategory    bool
+	ExcludeIncome bool
+}
 
 type TransactionStore interface {
 	Transaction(ctx context.Context, id int64) (*model.Transaction, error)
@@ -116,9 +107,6 @@ type TransactionStore interface {
 	DeleteTransaction(ctx context.Context, id int64) (bool, error)
 	BulkDeleteTransactions(ctx context.Context, input model.BulkDeleteTransactionsInput) (int32, error)
 }
-
-// ── PersistStore ─────────────────────────────────────────────────────────────
-// The shared-table write subset consumed by the sync persister.
 
 type PersistStore interface {
 	DeleteSyncedTransaction(ctx context.Context, source, externalID string) (bool, error)

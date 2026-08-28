@@ -63,7 +63,7 @@ func (s *Service) EmailSend(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "save otp", http.StatusInternalServerError)
 		return
 	}
-	magicLink := s.cfg.IssuerURL + "/auth/email/magic?token=" + url.QueryEscape(magicToken) +
+	magicLink := s.IssuerURL() + "/auth/email/magic?token=" + url.QueryEscape(magicToken) +
 		"&session_id=" + url.QueryEscape(req.LoginSessionID) +
 		"&email=" + url.QueryEscape(req.Email)
 	emailSubject := "Tallyo Email Login"
@@ -110,7 +110,7 @@ func (s *Service) EmailVerify(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	redirectURL := s.cfg.IssuerURL + "/authorize?session_id=" + session.ID
+	redirectURL := s.IssuerURL() + "/authorize?session_id=" + session.ID
 	writeJSON(w, map[string]any{"redirect_url": redirectURL})
 }
 
@@ -152,7 +152,7 @@ func (s *Service) EmailMagicLink(w http.ResponseWriter, r *http.Request) {
 	if session.Purpose == "passkey" {
 		s.setMagicCookie(w, "st_post_login", url.QueryEscape("/settings/passkeys?onboarding=passkey"), "/")
 	}
-	http.Redirect(w, r, s.cfg.IssuerURL+"/authorize?session_id="+url.QueryEscape(session.ID), http.StatusFound)
+	http.Redirect(w, r, s.IssuerURL()+"/authorize?session_id="+url.QueryEscape(session.ID), http.StatusFound)
 }
 
 func (s *Service) setMagicCookie(w http.ResponseWriter, name, value, path string) {
@@ -162,7 +162,7 @@ func (s *Service) setMagicCookie(w http.ResponseWriter, name, value, path string
 		Path:     path,
 		MaxAge:   300,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   strings.HasPrefix(s.cfg.IssuerURL, "https://"),
+		Secure:   strings.HasPrefix(s.IssuerURL(), "https://"),
 		HttpOnly: false,
 	})
 }

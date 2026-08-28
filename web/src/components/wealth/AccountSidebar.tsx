@@ -6,6 +6,7 @@ import { accountBalanceUSD, accountNetContributionUSD } from '../../utils/accoun
 import type { Account, ClassifierBreakdown, LiabilityBreakdown } from '../../types/graphql'
 import { formatAccountType } from '../../utils/accountSubtypes'
 import { accountMatchesAccountGroup, ASSET_ACCOUNT_GROUPS, type AccountGroupId } from '../../utils/accountGroups'
+import { formatRelativeTime } from '../../utils/dates'
 
 interface AccountGroup {
   id: string
@@ -94,10 +95,10 @@ export function AccountSidebar({
   const [open, setOpen] = useState<Record<string, boolean>>({})
 
   return (
-    <aside className={className ?? 'hidden w-80 shrink-0 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none lg:block'} data-account-sidebar>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">{heading}</p>
+    <aside className={className ?? 'hidden w-80 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none lg:block'} data-account-sidebar>
+      <p className="text-sm font-semibold text-neutral-500">{heading}</p>
       {showSummary ? <p className="mt-2 text-3xl font-bold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, formatCurrency(netWorth))}</p> : null}
-      <div className="mt-6 space-y-3">
+      <div className="mt-4 space-y-2">
         {groups.map((group) => {
           const expanded = open[group.id] ?? false
           const canExpand = group.accounts.length > 0
@@ -127,6 +128,7 @@ export function AccountSidebar({
             >
               {group.accounts.map((account) => {
                 const accountKind = account.subtype || formatAccountType(account.type)
+                const institution = account.connection?.name || (account.manual ? 'Manual' : accountKind)
                 const amount = group.isLiability
                   ? formatSignedCurrency(-(accountBalanceUSD(account) ?? 0))
                   : formatCurrency(accountNetContributionUSD(account) ?? accountBalanceUSD(account) ?? 0)
@@ -140,11 +142,14 @@ export function AccountSidebar({
                     selected={selectedAccount}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{account.name}</p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">{account.owner.name} - {accountKind}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{account.name}</p>
+                        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{institution}</p>
                       </div>
-                      <p className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, amount)}</p>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, amount)}</p>
+                        {account.lastSyncedAt ? <p className="text-[11px] text-neutral-500">{formatRelativeTime(account.lastSyncedAt)}</p> : null}
+                      </div>
                     </div>
                   </OneLevelGroupRow>
                 )

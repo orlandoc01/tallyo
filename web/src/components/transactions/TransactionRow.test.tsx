@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { accounts, categories, transactions } from '../../mocks/fixtures'
-import { TransactionRow } from './TransactionRow'
+import { MobileTransactionRow, TransactionRow } from './TransactionRow'
 
 const mockAuth = vi.hoisted(() => ({ hideOwners: false }))
 
@@ -30,6 +30,22 @@ describe('TransactionRow', () => {
 
     expect(screen.getByText('+$52.12')).toBeInTheDocument()
     expect(screen.getByText('Hidden')).toBeInTheDocument()
+  })
+
+  it('italicizes pending amounts but leaves posted amounts upright', () => {
+    const pendingTransaction = { ...transactions[0], pending: true }
+    const { rerender } = render(<table><tbody><TransactionRow transaction={pendingTransaction} /></tbody></table>)
+
+    expect(screen.getByText('$62.30')).toHaveClass('italic')
+
+    rerender(<table><tbody><TransactionRow transaction={transactions[0]} /></tbody></table>)
+    expect(screen.getByText('$62.30')).not.toHaveClass('italic')
+  })
+
+  it('italicizes pending amounts in mobile rows', () => {
+    render(<MobileTransactionRow transaction={{ ...transactions[0], pending: true }} />)
+
+    expect(screen.getByText('$62.30')).toHaveClass('italic')
   })
 
   it('hides the owner icon when requested', () => {

@@ -308,9 +308,10 @@ func TestSyncTokenDoesNotConfirmWhenPersistFails(t *testing.T) {
 
 func newTestAdapter(store *simpleFinStore, client clients.SimpleFinClient) *Adapter {
 	return &Adapter{
-		BaseAdapter: wealth.BaseAdapter{Reads: store, Log: testutil.Logger},
-		store:       store,
-		client:      client,
+		Reads:  store,
+		Log:    testutil.Logger,
+		store:  store,
+		client: client,
 	}
 }
 

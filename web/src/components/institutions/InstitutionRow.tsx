@@ -2,7 +2,7 @@ import { useState } from 'react'
 import clsx from 'clsx'
 import { AlertTriangle, Landmark } from 'lucide-react'
 import type { Account, Connection, PlaidItem, SimpleFinConnection } from '../../types/graphql'
-import { formatDisplayDate } from '../../utils/dates'
+import { formatDisplayDate, formatRelativeTime } from '../../utils/dates'
 import { ActionMenuItem } from './ActionMenuItem'
 import { accountNeedsReview } from './connectionReview'
 import { ManualAccountBadge } from './ManualAccountBadge'
@@ -69,7 +69,7 @@ export function InstitutionRow({
       <div className="text-sm md:min-w-72">
         <p className="font-semibold text-neutral-950">{providerName}</p>
         <p className="text-neutral-500">
-          {credentialLabel} {!isActive ? 'not syncing' : lastSyncedAt ? `synced ${relativeTime(lastSyncedAt)}` : 'not synced yet'}
+          {credentialLabel} {!isActive ? 'not syncing' : lastSyncedAt ? `synced ${formatRelativeTime(lastSyncedAt)}` : 'not synced yet'}
         </p>
         {isActive && plaidItem ? <p className="mt-1 text-xs text-neutral-500">Next transaction sync: {formatScheduleTime(plaidItem.nextSyncAt)}</p> : null}
         {isActive && plaidItem ? <p className="text-xs text-neutral-500">Next recurring sync: {formatScheduleTime(plaidItem.nextRecurringSyncAt)}</p> : null}
@@ -198,22 +198,6 @@ function healthMessage(item: PlaidItem) {
 
 function formatDateTime(value: string) {
   return formatDisplayDate(value.slice(0, 10))
-}
-
-function relativeTime(value: string) {
-  const timestamp = new Date(value).getTime()
-  const seconds = Math.max(1, Math.round((Date.now() - timestamp) / 1000))
-
-  if (seconds < 60) return 'just now'
-
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
 }
 
 function formatScheduleTime(value?: string | null) {

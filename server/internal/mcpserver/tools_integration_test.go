@@ -113,6 +113,13 @@ func TestCuratedToolsReadAndMutateTransactions(t *testing.T) {
 	tx1 := test.MustTransactionBySourceExternalID(t, store.Transactions, transactions.TransactionSourcePlaid, "tx-1", "TransactionByExternalID() error = %v")
 	tx1ID := tx1.ID
 	missingTxID := model.New(model.GlobalIDTransaction, 999999)
+	smoke := func(name string, call func() (any, string, error)) {
+		t.Helper()
+		value, _, err := call()
+		if err != nil || value == nil {
+			t.Fatalf("%s() = %#v, %v", name, value, err)
+		}
+	}
 	value, _, err := srv.listTransactions(ctx, model.TransactionsInput{First: new(int32(10))})
 	must.NoErr(t, err)
 	conn := value.(*leanTransactionConnection)
@@ -126,6 +133,15 @@ func TestCuratedToolsReadAndMutateTransactions(t *testing.T) {
 	if len(items) != 1 || items[0].Credential == nil || len(items[0].Accounts) != 1 {
 		t.Fatalf("listPlaidItems() items = %#v", items)
 	}
+	spending := model.SpendingFilter{DatetimeRange: &model.DateTimeRange{From: new(test.DateTime("2026-05-01T00:00:00Z")), To: new(test.DateTime("2026-06-01T00:00:00Z"))}}
+	smoke("getTransaction", func() (any, string, error) { return srv.getTransaction(ctx, getTransactionInput{ID: tx1ID}) })
+	smoke("spendingByCategory", func() (any, string, error) { return srv.spendingByCategory(ctx, spending) })
+	smoke("cashFlow", func() (any, string, error) { return srv.cashFlow(ctx, spending) })
+	smoke("transactionsSummary", func() (any, string, error) { return srv.transactionsSummary(ctx, model.TransactionsFilter{}) })
+	smoke("listCategories", func() (any, string, error) { return srv.listCategories(ctx, noInput{}) })
+	smoke("listCategoryGroups", func() (any, string, error) { return srv.listCategoryGroups(ctx, noInput{}) })
+	smoke("listRecurringCharges", func() (any, string, error) { return srv.listRecurringCharges(ctx, noInput{}) })
+	smoke("listOwners", func() (any, string, error) { return srv.listOwners(ctx, noInput{}) })
 	credsResult, _, err := srv.listPlaidCredentials(ctx, noInput{})
 	must.NoErr(t, err)
 	creds := credsResult.(*leanList[leanPlaidCredential]).Items

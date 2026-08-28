@@ -19,9 +19,9 @@ describe('DateRangeSelector', () => {
     expect(dateInputs[0]).toHaveValue('2026-05-01')
     expect(dateInputs[1]).toHaveValue('2026-05-31')
     expect(screen.getByLabelText('Date range preset')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Monthly' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Quarterly' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Yearly' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Monthly' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Quarterly' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Yearly' })).toBeInTheDocument()
   })
 
   it('calls onChange when granularity is changed', async () => {
@@ -37,7 +37,7 @@ describe('DateRangeSelector', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Quarterly' }))
+    await user.click(screen.getByRole('radio', { name: 'Quarterly' }))
     expect(onChange).toHaveBeenCalledWith({ dateFrom: '2026-05-01', dateTo: '2026-05-31', granularity: 'QUARTERLY' })
   })
 
@@ -85,7 +85,7 @@ describe('DateRangeSelector', () => {
       />,
     )
 
-    const yearlyButton = screen.getByRole('button', { name: 'Yearly' })
+    const yearlyButton = screen.getByRole('radio', { name: 'Yearly' })
     expect(yearlyButton).toHaveClass('bg-white', 'shadow-sm')
   })
 

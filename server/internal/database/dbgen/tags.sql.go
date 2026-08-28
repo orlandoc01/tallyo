@@ -48,7 +48,7 @@ func (q *Queries) AddTransactionTagsByTransactionIDs(ctx context.Context, arg Ad
 }
 
 const createTag = `-- name: CreateTag :one
-INSERT INTO tags (name, color) VALUES (?1, ?2) RETURNING id, name, color, transaction_count
+INSERT INTO tags (name, color) VALUES (?1, ?2) RETURNING color, created_at, id, name, transaction_count, updated_at
 `
 
 type CreateTagParams struct {
@@ -56,22 +56,17 @@ type CreateTagParams struct {
 	Color string
 }
 
-type CreateTagRow struct {
-	ID               int64
-	Name             string
-	Color            string
-	TransactionCount int64
-}
-
 // Used by GraphQL mutation createTag via transactions/db.Store.CreateTag.
-func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (CreateTagRow, error) {
+func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error) {
 	row := q.db.QueryRowContext(ctx, createTag, arg.Name, arg.Color)
-	var i CreateTagRow
+	var i Tag
 	err := row.Scan(
+		&i.Color,
+		&i.CreatedAt,
 		&i.ID,
 		&i.Name,
-		&i.Color,
 		&i.TransactionCount,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -118,11 +113,11 @@ func (q *Queries) DeleteTransactionTagsByTransactionIDs(ctx context.Context, arg
 }
 
 const listTags = `-- name: ListTags :many
-SELECT id, name, color, transaction_count
-FROM tags
+SELECT t.color, t.created_at, t.id, t.name, t.transaction_count, t.updated_at
+FROM tags t
 WHERE TRUE
-  AND id = ?1 -- :if $1
-ORDER BY name, id
+  AND t.id = ?1 -- :if $1
+ORDER BY t.name, t.id
 `
 
 var _listTagsDynQ = dynCompile(listTags)
@@ -131,15 +126,8 @@ type ListTagsParams struct {
 	ID *int64
 }
 
-type ListTagsRow struct {
-	ID               int64
-	Name             string
-	Color            string
-	TransactionCount int64
-}
-
 // Used by GraphQL tag list and node lookup paths with an optional ID filter.
-func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsRow, error) {
+func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error) {
 
 	dynQuery, dynArgs := _listTagsDynQ.Build([]any{arg.ID})
 	rows, err := q.db.QueryContext(ctx, dynQuery, dynArgs...)
@@ -147,14 +135,16 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsR
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListTagsRow{}
+	items := []Tag{}
 	for rows.Next() {
-		var i ListTagsRow
+		var i Tag
 		if err := rows.Scan(
+			&i.Color,
+			&i.CreatedAt,
 			&i.ID,
 			&i.Name,
-			&i.Color,
 			&i.TransactionCount,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -170,7 +160,7 @@ func (q *Queries) ListTags(ctx context.Context, arg ListTagsParams) ([]ListTagsR
 }
 
 const tagsByTransactionIDs = `-- name: TagsByTransactionIDs :many
-SELECT tt.transaction_id, t.id, t.name, t.color, t.transaction_count
+SELECT tt.transaction_id, t.color, t.created_at, t.id, t.name, t.transaction_count, t.updated_at
 FROM transaction_tags tt
 JOIN tags t ON t.id = tt.tag_id
 WHERE tt.transaction_id IN (/*SLICE:transaction_ids*/?)
@@ -182,11 +172,8 @@ type TagsByTransactionIDsParams struct {
 }
 
 type TagsByTransactionIDsRow struct {
-	TransactionID    int64
-	ID               int64
-	Name             string
-	Color            string
-	TransactionCount int64
+	TransactionID int64
+	Tag           Tag
 }
 
 // Used by the Transaction.tags dataloader (internal/graph/loaders.go) to batch-load tags for a list of transactions.
@@ -211,10 +198,12 @@ func (q *Queries) TagsByTransactionIDs(ctx context.Context, arg TagsByTransactio
 		var i TagsByTransactionIDsRow
 		if err := rows.Scan(
 			&i.TransactionID,
-			&i.ID,
-			&i.Name,
-			&i.Color,
-			&i.TransactionCount,
+			&i.Tag.Color,
+			&i.Tag.CreatedAt,
+			&i.Tag.ID,
+			&i.Tag.Name,
+			&i.Tag.TransactionCount,
+			&i.Tag.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -235,7 +224,7 @@ SET name = ?1,
     color = ?2,
     updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
 WHERE id = ?3
-RETURNING id, name, color, transaction_count
+RETURNING color, created_at, id, name, transaction_count, updated_at
 `
 
 type UpdateTagParams struct {
@@ -244,22 +233,17 @@ type UpdateTagParams struct {
 	ID    int64
 }
 
-type UpdateTagRow struct {
-	ID               int64
-	Name             string
-	Color            string
-	TransactionCount int64
-}
-
 // Used by GraphQL mutation updateTag via transactions/db.Store.UpdateTag.
-func (q *Queries) UpdateTag(ctx context.Context, arg UpdateTagParams) (UpdateTagRow, error) {
+func (q *Queries) UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error) {
 	row := q.db.QueryRowContext(ctx, updateTag, arg.Name, arg.Color, arg.ID)
-	var i UpdateTagRow
+	var i Tag
 	err := row.Scan(
+		&i.Color,
+		&i.CreatedAt,
 		&i.ID,
 		&i.Name,
-		&i.Color,
 		&i.TransactionCount,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

@@ -66,7 +66,7 @@ export function RegisterAccountStep() {
       {configResult.error ? <FormError className="mt-5 font-semibold">{configResult.error.message}</FormError> : null}
 
       {setup.passkeyEnabled && registeredEmail ? (
-        <section className="mt-8 max-w-xl rounded-3xl border border-brand-100 bg-white p-5 shadow-sm">
+        <section className="mt-8 max-w-xl rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
           <p className="text-sm font-bold text-neutral-950">Register an admin passkey</p>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
             {passkeyOnly ? 'Passkeys are the only sign-in method. Register one now or you will be locked out after setup.' : 'Add a passkey now, or skip and add one later from Settings.'}

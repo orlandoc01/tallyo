@@ -56,7 +56,7 @@ export function SecurityChoiceStep() {
 
 function ChoiceCard({ icon, title, tag, warning, description, selected, onClick }: { icon: ReactNode; title: string; tag?: string; warning?: string; description: string; selected: boolean; onClick: () => void }) {
   return (
-    <button className={`relative rounded-[1.75rem] border p-6 text-left transition ${selected ? 'border-brand-600 bg-brand-50 shadow-xl shadow-brand-600/10' : 'border-brand-100 bg-white hover:border-brand-300'}`} onClick={onClick} type="button">
+    <button className={`relative rounded-2xl border p-6 text-left transition ${selected ? 'border-brand-600 bg-brand-50 shadow-xl shadow-brand-600/10' : 'border-brand-100 bg-white hover:border-brand-300'}`} onClick={onClick} type="button">
       {selected ? <span className="absolute right-5 top-5 grid h-7 w-7 place-items-center rounded-full bg-brand-600 text-white"><Check className="h-4 w-4" /></span> : null}
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-600">{icon}</div>
       <div className="mt-5 flex items-center gap-2">

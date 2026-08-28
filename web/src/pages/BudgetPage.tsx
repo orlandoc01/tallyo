@@ -11,7 +11,9 @@ import { actualsByCategory, useBudgetSetup } from '../components/budgets/useBudg
 import { ErrorState } from '../components/common/ErrorState'
 import { FormError } from '../components/common/FormControls'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import { PageToolbar, PageToolbarActions, PageToolbarSegmentedControl } from '../components/common/PageToolbar'
+import { PageHeader } from '../components/common/PageHeader'
+import { PageToolbarButton } from '../components/common/PageToolbar'
+import { SegmentedControl } from '../components/common/SegmentedControl'
 import { useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { useBudgetMutations, useBudgetReport, useBudgetReportHistory } from '../hooks/useBudgets'
 import { useCategoryGroups } from '../hooks/useEntityQueries'
@@ -145,22 +147,23 @@ export function BudgetPage() {
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      {hasBudgetHistory || showCopyLastMonth ? <PageToolbar className="hidden lg:flex">
-        <PageToolbarActions>
+      <PageHeader
+        actions={hasBudgetHistory || showCopyLastMonth ? (
+          <>
           {hasBudgetHistory ? <BudgetViewToggle onChange={handleChangeView} view={view} /> : null}
           {showCopyLastMonth ? (
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white px-4 text-sm font-semibold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            <PageToolbarButton
               disabled={copyBudgetsState.fetching}
               onClick={handleCopyLastMonth}
-              type="button"
             >
               <Copy aria-hidden className="h-4 w-4" />
               Copy last month
-            </button>
+            </PageToolbarButton>
           ) : null}
-        </PageToolbarActions>
-      </PageToolbar> : null}
+          </>
+        ) : undefined}
+        title="Budgets"
+      />
 
       {budgetMode !== 'first-budget' && budgetMode !== 'setup' ? (
         <BudgetPeriodNav
@@ -228,8 +231,6 @@ export function BudgetPage() {
 
 function BudgetViewToggle({ compact = false, onChange, view }: { compact?: boolean; onChange: (view: BudgetView) => void; view: BudgetView }) {
   return (
-    <div className={compact ? '[&_button]:!px-2 [&_button]:!py-1' : undefined}>
-      <PageToolbarSegmentedControl ariaLabel="Budget view" options={budgetViewOptions} value={view} onChange={onChange} />
-    </div>
+    <SegmentedControl ariaLabel="Budget view" options={budgetViewOptions} size={compact ? 'sm' : 'md'} value={view} onChange={onChange} />
   )
 }

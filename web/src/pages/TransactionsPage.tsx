@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { EmptyState } from '../components/common/EmptyState'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
 import { MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
+import { PageHeader } from '../components/common/PageHeader'
 import { SearchInput } from '../components/common/FormControls'
 import { BulkActionBar, BulkSelectAllCheckbox, BulkTransactionModals } from '../components/transactions/BulkTransactionsUI'
 import { CreateTransactionModal } from '../components/transactions/CreateTransactionModal'
@@ -122,23 +123,28 @@ export function TransactionsPage() {
 
   return (
     <div className="space-y-4">
-      <TransactionsToolbar
-        activeFilterCount={activeTransactionFilterCount(draftFilter, trimmedSearch)}
-        canWrite={canWriteTransactions}
-        draftFilter={draftFilter}
-        filter={filter}
-        isBulkMode={isBulkMode}
-        selectedCount={selectedIds.size}
-        sort={sort}
-        summary={summary.summary}
-        onCancelBulkMode={bulk.cancelBulkMode}
-        onClearFilters={handleClearFilters}
-        onCreate={() => setShowCreate(true)}
-        onEnterBulkMode={enterBulkMode}
-        onFilterChange={handleFilterDraftChange}
-        onImportSuccess={refetchTransactions}
-        onRuleCreated={refetchTransactions}
-        onSortChange={setSort}
+      <PageHeader
+        actions={(
+          <TransactionsToolbar
+            activeFilterCount={activeTransactionFilterCount(draftFilter, trimmedSearch)}
+            canWrite={canWriteTransactions}
+            draftFilter={draftFilter}
+            filter={filter}
+            isBulkMode={isBulkMode}
+            selectedCount={selectedIds.size}
+            sort={sort}
+            summary={summary.summary}
+            onCancelBulkMode={bulk.cancelBulkMode}
+            onClearFilters={handleClearFilters}
+            onCreate={() => setShowCreate(true)}
+            onEnterBulkMode={enterBulkMode}
+            onFilterChange={handleFilterDraftChange}
+            onImportSuccess={refetchTransactions}
+            onRuleCreated={refetchTransactions}
+            onSortChange={setSort}
+          />
+        )}
+        title="Transactions"
       />
 
       <div aria-busy={transactions.fetching} aria-live="polite">
@@ -167,6 +173,7 @@ export function TransactionsPage() {
             reexecuteQuery={transactions.reexecuteQuery}
             selectedIds={selectedIds}
             selectedTransactionId={selectedTransactionId}
+            showTitle={false}
             sort={sort}
             toggleSelected={toggleSelected}
             transactions={transactions.transactions}

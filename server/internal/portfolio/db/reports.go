@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"tallyo/internal/clients/yfinance"
 	"tallyo/internal/database/dbgen"
 	"tallyo/internal/database/dbutil"
 	"tallyo/internal/portfolio"
@@ -55,29 +54,27 @@ func (s *Store) ReportsByAssetIDs(ctx context.Context, assetIDs []int64) (map[in
 
 func reportFromRow(row dbgen.AssetAnalysisReport) portfolio.AssetReport {
 	return portfolio.AssetReport{
-		AssetID: row.AssetID,
-		FundReport: yfinance.FundReport{
-			Category:                    row.Category,
-			Group:                       row.GroupName,
-			CashPosition:                row.CashPosition,
-			StockPosition:               row.StockPosition,
-			BondPosition:                row.BondPosition,
-			PreferredPosition:           row.PreferredPosition,
-			ConvertiblePosition:         row.ConvertiblePosition,
-			OtherPosition:               row.OtherPosition,
-			SectorRealEstate:            row.SectorRealEstate,
-			SectorConsumerCyclical:      row.SectorConsumerCyclical,
-			SectorBasicMaterials:        row.SectorBasicMaterials,
-			SectorConsumerDefensive:     row.SectorConsumerDefensive,
-			SectorTechnology:            row.SectorTechnology,
-			SectorCommunicationServices: row.SectorCommunicationServices,
-			SectorFinancialServices:     row.SectorFinancialServices,
-			SectorUtilities:             row.SectorUtilities,
-			SectorIndustrials:           row.SectorIndustrials,
-			SectorEnergy:                row.SectorEnergy,
-			SectorHealthcare:            row.SectorHealthcare,
-		},
-		EquitySector: row.EquitySector,
-		FetchedAt:    row.FetchedAt,
+		AssetID:                     row.AssetID,
+		Category:                    row.Category,
+		Group:                       row.GroupName,
+		CashPosition:                row.CashPosition,
+		StockPosition:               row.StockPosition,
+		BondPosition:                row.BondPosition,
+		PreferredPosition:           row.PreferredPosition,
+		ConvertiblePosition:         row.ConvertiblePosition,
+		OtherPosition:               row.OtherPosition,
+		SectorRealEstate:            row.SectorRealEstate,
+		SectorConsumerCyclical:      row.SectorConsumerCyclical,
+		SectorBasicMaterials:        row.SectorBasicMaterials,
+		SectorConsumerDefensive:     row.SectorConsumerDefensive,
+		SectorTechnology:            row.SectorTechnology,
+		SectorCommunicationServices: row.SectorCommunicationServices,
+		SectorFinancialServices:     row.SectorFinancialServices,
+		SectorUtilities:             row.SectorUtilities,
+		SectorIndustrials:           row.SectorIndustrials,
+		SectorEnergy:                row.SectorEnergy,
+		SectorHealthcare:            row.SectorHealthcare,
+		EquitySector:                row.EquitySector,
+		FetchedAt:                   row.FetchedAt,
 	}
 }

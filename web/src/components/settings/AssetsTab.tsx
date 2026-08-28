@@ -56,7 +56,7 @@ export function AssetsTab() {
     <AssetFiltersDropdown
       assetTypeFilter={assetTypeFilter}
       buttonAriaLabel="Open asset filters"
-      buttonClassName={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5')}
+      buttonClassName={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
       buttonContent={<SlidersHorizontal className="h-5 w-5" />}
       includeHistorical={includeHistorical}
       onAssetTypeChange={setAssetTypeFilter}

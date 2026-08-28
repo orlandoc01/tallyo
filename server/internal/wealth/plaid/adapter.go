@@ -45,11 +45,12 @@ func New(
 ) *Adapter {
 	store := wealthdb.New(db)
 	return &Adapter{
-		BaseAdapter: wealth.BaseAdapter{Reads: store, Log: log},
-		plaid:       store,
-		clients:     clients,
-		prices:      prices,
-		reads:       store,
+		Reads:   store,
+		Log:     log,
+		plaid:   store,
+		clients: clients,
+		prices:  prices,
+		reads:   store,
 	}
 }
 

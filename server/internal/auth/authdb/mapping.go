@@ -51,8 +51,8 @@ func loginSessionFromSQL(row dbgen.LoginSessionsRow) authtypes.LoginSession {
 		WebAuthnSession:     row.WebauthnSession,
 		Purpose:             row.Purpose,
 		ExpiresAt:           row.ExpiresAt,
+		EmailOTPExpiresAt:   lo.FromPtr(row.EmailOtpExpiresAt),
 	}
-	session.EmailOTPExpiresAt = lo.FromPtr(row.EmailOtpExpiresAt)
 	return session
 }
 

@@ -37,7 +37,7 @@ function getInitialCollapsedState(filter: TransactionsFilter): Record<SectionKey
 export function TransactionFilters({
   accounts,
   categoryGroups,
-  className = 'rounded-3xl border border-neutral-200 bg-white p-5 shadow-card',
+  className = 'rounded-2xl border border-neutral-200 bg-white p-5 shadow-card',
   filter,
   onChange,
   onClear,

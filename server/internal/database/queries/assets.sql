@@ -56,10 +56,7 @@ ON CONFLICT(asset_type, identifier) DO UPDATE SET
     ELSE assets.last_price_at
   END,
   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
-RETURNING id, asset_type, identifier, name, classifier,
-  additional, last_price, last_price_at, forced_usd_price,
-  tracking_ticker, tracking_multiplier,
-  price_connectivity, investment_connectivity;
+RETURNING *;
 
 -- Used by wealth/db.Store.UpsertAsset and manual updateAsset handling to persist merged type-specific metadata.
 -- name: UpdateAssetAdditional :exec

@@ -4,7 +4,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       <div className="font-semibold">Something went wrong</div>
       <p className="mt-1">{message}</p>
       {onRetry ? (
-        <button className="mt-3 rounded-lg bg-red-700 px-3 py-2 font-semibold text-white" onClick={onRetry} type="button">
+        <button className="mt-3 rounded-xl bg-red-700 px-3 py-2 font-semibold text-white" onClick={onRetry} type="button">
           Retry
         </button>
       ) : null}

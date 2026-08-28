@@ -19,7 +19,7 @@ func (s *Store) AccountBalanceSnapshotsPage(
 		AfterDate: afterDate,
 		RowLimit:  limit,
 	})
-	return dbutil.MapRows(rows, err, snapshotRowFromSQLRow[dbgen.AccountBalanceSnapshotsPageRow])
+	return dbutil.MapRows(rows, err, snapshotRowFromSQLRow)
 }
 
 func (s *Store) AccountBalanceSnapshotDayCount(ctx context.Context, accountID int64) (int, error) {

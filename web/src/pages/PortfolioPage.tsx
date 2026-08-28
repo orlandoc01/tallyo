@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useMobileHeader, useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { MobileFilterButton, MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../components/common/MobileFilterFooter'
-import { PageToolbar, PageToolbarActions } from '../components/common/PageToolbar'
+import { PageHeader } from '../components/common/PageHeader'
 import { AmountVisibilityButton } from '../components/common/AmountVisibilityButton'
 import { AnalysisFilterContent, AnalysisFilters } from '../components/portfolio/AnalysisFilters'
 import { AnalysisPieChart } from '../components/portfolio/AnalysisPieChart'
@@ -125,30 +125,34 @@ export function PortfolioPage() {
 
   return (
     <div className="space-y-6 lg:min-h-screen">
-      <PageToolbar>
+      <PageHeader
+        actions={(
+          <>
+            <AnalysisViewToggle value={view} onChange={setView} />
+            <AmountVisibilityButton amountsHidden={amountsHidden} onToggle={toggleAmountsHidden} variant="toolbar" />
+            <AnalysisFilters
+              accounts={accounts}
+              accountGroupIds={accountGroupIds}
+              accountIds={accountIds}
+              checkboxVariant="highlight"
+              enableAccountConnectionToggle
+              includeUnclassified={includeUnclassified}
+              ownerIds={ownerIds}
+              owners={owners}
+              onAccountChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountIds, ids)}
+              onAccountGroupChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountGroupIds, ids)}
+              onClear={clearFilters}
+              onIncludeUnclassifiedChange={setIncludeUnclassified}
+              onOwnerChange={(ids) => setListFilter(PORTFOLIO_PARAMS.ownerIds, ids)}
+            />
+          </>
+        )}
+        title="Portfolio"
+      >
         <div className="w-full lg:hidden">
           <AnalysisViewToggle value={view} onChange={setView} />
         </div>
-        <PageToolbarActions>
-          <AnalysisViewToggle value={view} onChange={setView} />
-          <AmountVisibilityButton amountsHidden={amountsHidden} onToggle={toggleAmountsHidden} variant="toolbar" />
-          <AnalysisFilters
-            accounts={accounts}
-            accountGroupIds={accountGroupIds}
-            accountIds={accountIds}
-            checkboxVariant="highlight"
-            enableAccountConnectionToggle
-            includeUnclassified={includeUnclassified}
-            ownerIds={ownerIds}
-            owners={owners}
-            onAccountChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountIds, ids)}
-            onAccountGroupChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountGroupIds, ids)}
-            onClear={clearFilters}
-            onIncludeUnclassifiedChange={setIncludeUnclassified}
-            onOwnerChange={(ids) => setListFilter(PORTFOLIO_PARAMS.ownerIds, ids)}
-          />
-        </PageToolbarActions>
-      </PageToolbar>
+      </PageHeader>
 
       <QueryGate
         data={report}

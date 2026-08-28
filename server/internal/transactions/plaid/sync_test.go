@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"tallyo/internal/transactions"
 	"tallyo/internal/utils"
 	testutil "tallyo/internal/utils/test"
 
@@ -138,7 +137,7 @@ func TestTransactionHelpers(t *testing.T) {
 }
 
 func TestAppendGeneralErrorReportsFailure(t *testing.T) {
-	report := (&Adapter{BaseAdapter: transactions.BaseAdapter{Log: testutil.Logger}}).generalErrorReport(errFake)
+	report := (&Adapter{Log: testutil.Logger}).generalErrorReport(errFake)
 
 	if len(report.Items) != 1 || report.Items[0].Err == nil {
 		t.Fatalf("generalErrorReport result = %#v", report)

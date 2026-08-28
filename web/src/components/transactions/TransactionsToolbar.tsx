@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
 import { FilterDropdownShell } from '../common/FilterDropdownShell'
-import { PageToolbar, PageToolbarActions, PageToolbarButton } from '../common/PageToolbar'
+import { PageToolbarButton } from '../common/PageToolbar'
 import { useAccounts, useCategoryGroups, useOwners, useTags } from '../../hooks/useEntityQueries'
 import type { TransactionSort, TransactionsFilter, TransactionsSummary } from '../../types/graphql'
 import { ImportExportMenu } from './ImportExportMenu'
@@ -51,8 +51,7 @@ export function TransactionsToolbar({
   const { tags } = useTags()
 
   return (
-    <PageToolbar className="hidden lg:flex">
-      <PageToolbarActions>
+    <>
         <ImportExportMenu
           canImport={canWrite}
           filter={filter}
@@ -105,7 +104,6 @@ export function TransactionsToolbar({
             Create
           </PageToolbarButton>
         ) : null}
-      </PageToolbarActions>
-    </PageToolbar>
+    </>
   )
 }

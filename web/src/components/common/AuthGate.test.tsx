@@ -29,6 +29,12 @@ describe('AuthGate', () => {
     expect(screen.queryByText(/sign in with google or email/i)).not.toBeInTheDocument()
   })
 
+  it('does not focus a sign-in button automatically', () => {
+    render(<AuthGate onLogin={vi.fn()} onLoginWithEmail={vi.fn()} onLoginWithMasterPassword={vi.fn()} masterPasswordEnabled={false} emailAuthEnabled={true} googleAuthEnabled={true} />)
+
+    expect(screen.getByRole('button', { name: /sign in with google/i })).not.toHaveFocus()
+  })
+
   it('starts the OAuth login flow', async () => {
     const onLogin = vi.fn()
     const onLoginWithEmail = vi.fn()

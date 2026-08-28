@@ -103,11 +103,11 @@ func (s *Store) RecurringChargeByID(ctx context.Context, id int64) (*model.Recur
 	return charges[0], nil
 }
 
-func (s *Store) recurringChargesFromRows(ctx context.Context, rows []dbgen.ListRecurringChargesRow) ([]*model.RecurringCharge, error) {
+func (s *Store) recurringChargesFromRows(ctx context.Context, rows []dbgen.RecurringCharge) ([]*model.RecurringCharge, error) {
 	if len(rows) == 0 {
 		return []*model.RecurringCharge{}, nil
 	}
-	chargeID := func(row dbgen.ListRecurringChargesRow) int64 { return row.ID }
+	chargeID := func(row dbgen.RecurringCharge) int64 { return row.ID }
 	chargeIDs := u.Map(rows, chargeID)
 
 	txnIDsByCharge, err := s.recurringChargeTransactionIDs(ctx, chargeIDs)
@@ -123,7 +123,7 @@ func (s *Store) recurringChargesFromRows(ctx context.Context, rows []dbgen.ListR
 		return nil, err
 	}
 
-	toCharge := func(row dbgen.ListRecurringChargesRow) *model.RecurringCharge {
+	toCharge := func(row dbgen.RecurringCharge) *model.RecurringCharge {
 		return recurringChargeFromRow(
 			row,
 			recurringChargeTransactions(txnIDsByCharge[row.ID], txnsByID),
@@ -156,23 +156,9 @@ func (s *Store) recurringTransactionsByID(ctx context.Context, txnIDsByCharge ma
 func (s *Store) recurringChargeCategories(ctx context.Context, chargeIDs []int64) (map[int64]*model.Category, error) {
 	rows, err := s.q.MajorityCategoriesForRecurringCharges(ctx, dbgen.MajorityCategoriesForRecurringChargesParams{ChargeIds: chargeIDs})
 	toCategoryByChargeID := func(row dbgen.MajorityCategoriesForRecurringChargesRow) (int64, *model.Category) {
-		return row.ChargeID, categoryFromRecurringChargeRow(row)
+		return row.ChargeID, CategoryFromRow(row.CategoryRow)
 	}
 	return dbutil.AssociateRows(rows, err, toCategoryByChargeID)
-}
-
-func categoryFromRecurringChargeRow(row dbgen.MajorityCategoriesForRecurringChargesRow) *model.Category {
-	return categoryFromRow(dbgen.CategoryRow{
-		CatID:          row.CatID,
-		CatName:        row.CatName,
-		CatEmoji:       row.CatEmoji,
-		GroupName:      row.GroupName,
-		GroupEmoji:     row.GroupEmoji,
-		GroupKind:      row.GroupKind,
-		SortOrder:      row.SortOrder,
-		GroupID:        row.GroupID,
-		PlaidPfc2Codes: row.PlaidPfc2Codes,
-	})
 }
 
 func recurringChargeTransactions(txnIDs []int64, txnsByID map[int64]*model.Transaction) []*model.Transaction {
@@ -183,7 +169,7 @@ func recurringChargeTransactions(txnIDs []int64, txnsByID map[int64]*model.Trans
 	return lo.FilterMap(txnIDs, toTxn)
 }
 
-func recurringChargeFromRow(row dbgen.ListRecurringChargesRow, txns []*model.Transaction, category *model.Category) *model.RecurringCharge {
+func recurringChargeFromRow(row dbgen.RecurringCharge, txns []*model.Transaction, category *model.Category) *model.RecurringCharge {
 	interval := PlaidFrequencyToInterval(row.Frequency)
 	lastDate := model.Date(row.LastDate)
 	merchant := row.Description

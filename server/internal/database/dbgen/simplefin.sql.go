@@ -377,8 +377,7 @@ func (q *Queries) SimpleFinConnections(ctx context.Context, arg SimpleFinConnect
 }
 
 const simpleFinTokenSecretByConnID = `-- name: SimpleFinTokenSecretByConnID :one
-SELECT sat.id, sat.access_url, sat.owner_id, sat.sync_cron,
-       sat.last_synced_at, sat.next_sync_at, sat.next_balance_sync_at
+SELECT sat.access_url, sat.created_at, sat.id, sat.label, sat.last_synced_at, sat.next_balance_sync_at, sat.next_sync_at, sat.owner_id, sat.sync_cron, sat.updated_at
 FROM simplefin_access_tokens sat
 JOIN simplefin_connections sc ON sc.access_token_id = sat.id
 WHERE sc.id = ?1
@@ -388,34 +387,27 @@ type SimpleFinTokenSecretByConnIDParams struct {
 	ConnID int64
 }
 
-type SimpleFinTokenSecretByConnIDRow struct {
-	ID                int64
-	AccessUrl         string
-	OwnerID           int64
-	SyncCron          string
-	LastSyncedAt      *time.Time
-	NextSyncAt        *time.Time
-	NextBalanceSyncAt *time.Time
-}
-
 // Used by internal/transactions/db's SimpleFIN sync to fetch the access URL and schedule for a token, looked up by connection ID.
-func (q *Queries) SimpleFinTokenSecretByConnID(ctx context.Context, arg SimpleFinTokenSecretByConnIDParams) (SimpleFinTokenSecretByConnIDRow, error) {
+func (q *Queries) SimpleFinTokenSecretByConnID(ctx context.Context, arg SimpleFinTokenSecretByConnIDParams) (SimplefinAccessToken, error) {
 	row := q.db.QueryRowContext(ctx, simpleFinTokenSecretByConnID, arg.ConnID)
-	var i SimpleFinTokenSecretByConnIDRow
+	var i SimplefinAccessToken
 	err := row.Scan(
-		&i.ID,
 		&i.AccessUrl,
+		&i.CreatedAt,
+		&i.ID,
+		&i.Label,
+		&i.LastSyncedAt,
+		&i.NextBalanceSyncAt,
+		&i.NextSyncAt,
 		&i.OwnerID,
 		&i.SyncCron,
-		&i.LastSyncedAt,
-		&i.NextSyncAt,
-		&i.NextBalanceSyncAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const simpleFinTokenSecrets = `-- name: SimpleFinTokenSecrets :many
-SELECT id, access_url, owner_id, sync_cron, last_synced_at, next_sync_at, next_balance_sync_at
+SELECT sat.access_url, sat.created_at, sat.id, sat.label, sat.last_synced_at, sat.next_balance_sync_at, sat.next_sync_at, sat.owner_id, sat.sync_cron, sat.updated_at
 FROM simplefin_access_tokens sat
 WHERE COALESCE(
     CASE CAST(?1 AS TEXT) WHEN 'sync' THEN next_sync_at ELSE next_balance_sync_at END,
@@ -449,16 +441,6 @@ type SimpleFinTokenSecretsParams struct {
 	Now  *time.Time
 }
 
-type SimpleFinTokenSecretsRow struct {
-	ID                int64
-	AccessUrl         string
-	OwnerID           int64
-	SyncCron          string
-	LastSyncedAt      *time.Time
-	NextSyncAt        *time.Time
-	NextBalanceSyncAt *time.Time
-}
-
 // Used by SimpleFIN sync loops to select due token secrets. Balance work also
 // excludes tokens whose linked accounts exist and are all closed: the shared
 // snapshot sink rejects closed-account writes, so fetching from the provider
@@ -466,23 +448,26 @@ type SimpleFinTokenSecretsRow struct {
 // the first transaction sync creates them) stays due. Transaction sync keeps
 // syncing a token's open accounts regardless of a sibling closed one, so
 // this filter applies only to the balance kind.
-func (q *Queries) SimpleFinTokenSecrets(ctx context.Context, arg SimpleFinTokenSecretsParams) ([]SimpleFinTokenSecretsRow, error) {
+func (q *Queries) SimpleFinTokenSecrets(ctx context.Context, arg SimpleFinTokenSecretsParams) ([]SimplefinAccessToken, error) {
 	rows, err := q.db.QueryContext(ctx, simpleFinTokenSecrets, arg.Kind, arg.Now)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SimpleFinTokenSecretsRow{}
+	items := []SimplefinAccessToken{}
 	for rows.Next() {
-		var i SimpleFinTokenSecretsRow
+		var i SimplefinAccessToken
 		if err := rows.Scan(
-			&i.ID,
 			&i.AccessUrl,
+			&i.CreatedAt,
+			&i.ID,
+			&i.Label,
+			&i.LastSyncedAt,
+			&i.NextBalanceSyncAt,
+			&i.NextSyncAt,
 			&i.OwnerID,
 			&i.SyncCron,
-			&i.LastSyncedAt,
-			&i.NextSyncAt,
-			&i.NextBalanceSyncAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

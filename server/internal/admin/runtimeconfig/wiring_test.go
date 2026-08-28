@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/samber/lo"
+
 	"tallyo/internal/transactions"
 	"tallyo/internal/transactions/categorizer"
 	"tallyo/internal/utils/nooplog"
@@ -23,6 +25,11 @@ type fakeRuntimeAuthService struct {
 	rpID            string
 	rpOrigins       []string
 	timezone        string
+	auth            Sections
+}
+
+func (s *fakeRuntimeAuthService) PrepareAuthConfig(_ context.Context, resolved Sections) (func(), error) {
+	return func() { s.auth = resolved }, nil
 }
 
 func (s *fakeRuntimeAuthService) UpdateEmailConfig(enabled bool, host, _ string, _ string, _ string, password string) {
@@ -163,6 +170,9 @@ func TestRegisterRuntimeConfigurationCallbacks(t *testing.T) {
 	}
 	if authService.timezone != "America/Los_Angeles" {
 		t.Fatalf("timezone = %q", authService.timezone)
+	}
+	if !authService.auth.OAuthEnabled() || lo.FromPtr(authService.auth.Auth.Fields.MasterPassword) != "secret" || authService.auth.DisableAllAuth() {
+		t.Fatalf("auth runtime = %+v", authService.auth)
 	}
 	if len(clientIPs.trustedProxyCIDRs) != 2 || clientIPs.trustedProxyCIDRs[0] != "10.0.0.0/24" {
 		t.Fatalf("trusted proxy cidrs = %#v", clientIPs.trustedProxyCIDRs)

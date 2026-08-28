@@ -60,7 +60,7 @@ export function RulesPage() {
         <RuleFiltersDropdown
           accounts={accounts}
           buttonAriaLabel="Open rule filters"
-          buttonClassName={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5')}
+          buttonClassName={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
           buttonContent={<SlidersHorizontal className="h-5 w-5" />}
           filters={filters}
           onChange={updateFilters}
@@ -69,7 +69,7 @@ export function RulesPage() {
         {canWriteRules ? (
           <button
             aria-label="Create rule"
-            className={mobileHeaderActionClass('inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-2xl', showCreateModal)}
+            className={mobileHeaderActionClass('inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-xl', showCreateModal)}
             onClick={() => setShowCreateModal(true)}
             type="button"
           >

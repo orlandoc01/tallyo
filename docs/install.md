@@ -123,7 +123,7 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-`Restart=on-failure` is important: saving authorization settings makes Tallyo exit with status 1 so that the supervisor starts it with a fully rebuilt authorization service.
+`Restart=on-failure` brings the service back after an unexpected exit. Configuration changes, including authorization settings, apply live and never require a restart.
 
 After installing the unit, reload systemd, enable the service, and start it using the normal service-management commands for the host.
 

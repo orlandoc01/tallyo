@@ -32,12 +32,12 @@ export function ConnectionModal({
         <p className="mt-1 text-sm text-neutral-500">Choose how this provider connection should be linked.</p>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-neutral-100 p-1" role="tablist" aria-label="Bank data providers">
+      <div className="mt-5 grid grid-cols-2 gap-2 rounded-full bg-neutral-100 p-1" role="tablist" aria-label="Bank data providers">
         {TABS.map((tab) => (
           <button
             aria-selected={activeTab === tab.value}
             className={clsx(
-              'rounded-xl px-3 py-2 text-left text-sm font-semibold transition',
+              'rounded-full px-3 py-2 text-left text-sm font-semibold transition',
               activeTab === tab.value ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-800',
             )}
             key={tab.value}

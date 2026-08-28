@@ -12,23 +12,18 @@ import (
 const createOwner = `-- name: CreateOwner :one
 INSERT INTO owners (name)
 VALUES (?1)
-RETURNING id, name
+RETURNING created_at, id, name
 `
 
 type CreateOwnerParams struct {
 	Name string
 }
 
-type CreateOwnerRow struct {
-	ID   int64
-	Name string
-}
-
 // Used by GraphQL mutation createOwner via accounts/db.Store.CreateOwner.
-func (q *Queries) CreateOwner(ctx context.Context, arg CreateOwnerParams) (CreateOwnerRow, error) {
+func (q *Queries) CreateOwner(ctx context.Context, arg CreateOwnerParams) (Owner, error) {
 	row := q.db.QueryRowContext(ctx, createOwner, arg.Name)
-	var i CreateOwnerRow
-	err := row.Scan(&i.ID, &i.Name)
+	var i Owner
+	err := row.Scan(&i.CreatedAt, &i.ID, &i.Name)
 	return i, err
 }
 
@@ -51,11 +46,11 @@ func (q *Queries) DeleteOwner(ctx context.Context, arg DeleteOwnerParams) (int64
 }
 
 const owners = `-- name: Owners :many
-SELECT id, name
-FROM owners
+SELECT o.created_at, o.id, o.name
+FROM owners o
 WHERE TRUE
-  AND id = ?1 -- :if $1
-ORDER BY name
+  AND o.id = ?1 -- :if $1
+ORDER BY o.name
 `
 
 var _ownersDynQ = dynCompile(owners)
@@ -64,13 +59,8 @@ type OwnersParams struct {
 	ID *int64
 }
 
-type OwnersRow struct {
-	ID   int64
-	Name string
-}
-
 // Used by GraphQL query owners and owner lookups in account/wealth linking flows.
-func (q *Queries) Owners(ctx context.Context, arg OwnersParams) ([]OwnersRow, error) {
+func (q *Queries) Owners(ctx context.Context, arg OwnersParams) ([]Owner, error) {
 
 	dynQuery, dynArgs := _ownersDynQ.Build([]any{arg.ID})
 	rows, err := q.db.QueryContext(ctx, dynQuery, dynArgs...)
@@ -78,10 +68,10 @@ func (q *Queries) Owners(ctx context.Context, arg OwnersParams) ([]OwnersRow, er
 		return nil, err
 	}
 	defer rows.Close()
-	items := []OwnersRow{}
+	items := []Owner{}
 	for rows.Next() {
-		var i OwnersRow
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		var i Owner
+		if err := rows.Scan(&i.CreatedAt, &i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

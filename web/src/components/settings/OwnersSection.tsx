@@ -74,7 +74,7 @@ export function OwnersSection({ canWriteOwners }: { canWriteOwners: boolean }) {
                 {canWriteOwners ? (
                   <button
                     aria-label={`Delete ${owner.name}`}
-                    className="rounded-lg p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-xl p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                     onClick={() => void handleDelete(owner)}
                     type="button"
                   >

@@ -57,7 +57,7 @@ func TestFositeAccessTokenSessionRountrip(t *testing.T) {
 	ctx := context.Background()
 
 	req := fosite.NewRequest()
-	req.Client = Client{OAuthClient: OAuthClient{ID: FrontendClientID}}
+	req.Client = Client{ID: FrontendClientID}
 	req.GrantedScope = []string{"read"}
 	req.ID = "access-request-1"
 	session := &oauth2.JWTSession{Subject: "test@example.com"}

@@ -555,11 +555,11 @@ func newTestAdapter(
 		prices = testutil.LastKnownPriceProvider{}
 	}
 	return &Adapter{
-		BaseAdapter: wealth.BaseAdapter{Reads: reads, Log: log},
-		plaid:       plaidStore,
-		clients:     clients,
-		prices:      prices,
-		reads:       reads,
+		Reads: reads, Log: log,
+		plaid:   plaidStore,
+		clients: clients,
+		prices:  prices,
+		reads:   reads,
 	}
 }
 

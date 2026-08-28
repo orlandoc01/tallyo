@@ -11,12 +11,12 @@ import (
 
 func (s *Store) Owners(ctx context.Context) ([]*model.Owner, error) {
 	rows, err := s.q.Owners(ctx, dbgen.OwnersParams{})
-	return dbutil.MapRows(rows, err, ownerFromSQLRow[dbgen.OwnersRow])
+	return dbutil.MapRows(rows, err, OwnerFromRow)
 }
 
 func (s *Store) OwnerByID(ctx context.Context, id int64) (*model.Owner, error) {
 	rows, err := s.q.Owners(ctx, dbgen.OwnersParams{ID: &id})
-	return dbutil.MapFirstRow(rows, err, ownerFromSQLRow[dbgen.OwnersRow])
+	return dbutil.MapFirstRow(rows, err, OwnerFromRow)
 }
 
 func (s *Store) CreateOwner(ctx context.Context, input model.CreateOwnerInput) (*model.Owner, error) {
@@ -24,7 +24,7 @@ func (s *Store) CreateOwner(ctx context.Context, input model.CreateOwnerInput) (
 	if err != nil {
 		return nil, fmt.Errorf("insert owner: %w", err)
 	}
-	return ownerFromSQLRow(row), nil
+	return OwnerFromRow(row), nil
 }
 
 func (s *Store) DeleteOwner(ctx context.Context, id int64) (bool, error) {
@@ -35,11 +35,6 @@ func (s *Store) DeleteOwner(ctx context.Context, id int64) (bool, error) {
 	return n > 0, nil
 }
 
-type ownerSQLRow interface {
-	dbgen.OwnersRow | dbgen.CreateOwnerRow
-}
-
-func ownerFromSQLRow[Row ownerSQLRow](sqlRow Row) *model.Owner {
-	row := dbgen.OwnersRow(sqlRow)
+func OwnerFromRow(row dbgen.Owner) *model.Owner {
 	return &model.Owner{ID: model.New(model.GlobalIDOwner, row.ID), Name: row.Name}
 }

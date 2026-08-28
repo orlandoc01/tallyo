@@ -91,7 +91,7 @@ func TestRealEstateSyncConnectionInto(t *testing.T) {
 
 func newFakeRealEstateAdapterStore() *fakeStore {
 	return &fakeStore{
-		ScheduleFake: testutil.ScheduleFake{ID: syncerids.RealEstate},
+		ID:           syncerids.RealEstate,
 		latestByAcct: map[int64]*wealth.SnapshotRow{},
 		latestErrs:   map[int64]error{},
 	}

@@ -200,7 +200,7 @@ export function UncategorizedQueue() {
         {/* Desktop expanded card list */}
         <div className="hidden space-y-4 lg:block">
           {transactions.map((transaction) => (
-            <div className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-card" key={transaction.id}>
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-card" key={transaction.id}>
               <table className="mb-4 w-full">
                 <tbody>
                   <TransactionRow

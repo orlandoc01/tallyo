@@ -39,7 +39,7 @@ export function GeneralSettingsTab() {
                 type="button"
                 onClick={() => setColorTheme(opt.value)}
                 className={clsx(
-                  'flex flex-col items-center gap-2 rounded-2xl border py-3 text-center transition',
+                  'flex flex-col items-center gap-2 rounded-xl border py-3 text-center transition',
                   selected ? 'border-neutral-300 bg-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
                 )}
                 title={opt.label}
@@ -65,7 +65,7 @@ export function GeneralSettingsTab() {
             return (
               <button
                 className={clsx(
-                  'flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 text-center transition',
+                  'flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition',
                   selected ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500 text-brand-700' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
                 )}
                 key={opt.value}

@@ -1,5 +1,6 @@
 import { useQuery } from 'urql'
 import { Card } from '../components/common/FormControls'
+import { PageHeader } from '../components/common/PageHeader'
 import { QueryGate } from '../components/common/QueryGate'
 import { RECURRING_CHARGES_QUERY } from '../graphql/queries'
 import type { RecurrenceInterval, RecurringCharge } from '../types/graphql'
@@ -27,7 +28,9 @@ export function RecurringPage() {
   })).filter((section) => section.items.length > 0)
 
   return (
-    <QueryGate
+    <div className="space-y-6">
+      <PageHeader title="Recurring" />
+      <QueryGate
       data={data}
       empty={groups.length === 0}
       emptyTitle="No recurring charges detected"
@@ -39,7 +42,7 @@ export function RecurringPage() {
       <div className="space-y-6">
         {byInterval.map((section) => (
           <div key={section.label}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">{section.label}</h2>
+            <h2 className="mb-3 text-sm font-semibold text-neutral-500">{section.label}</h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {section.items.map((group) => (
                 <Card as="article" key={group.id} padded>
@@ -68,6 +71,7 @@ export function RecurringPage() {
           </div>
         ))}
       </div>
-    </QueryGate>
+      </QueryGate>
+    </div>
   )
 }

@@ -145,20 +145,18 @@ func (a *Adapter) reconcileBalances(
 			return fmt.Errorf("lookup account %s: %w", account.GetAccountId(), sql.ErrNoRows)
 		}
 		draft := wealth.SnapshotDraft{
-			AccountBalanceSnapshot: wealth.AccountBalanceSnapshot{
-				AccountID:  resolved.ID,
-				Source:     a.Source().Str(),
-				Date:       sink.Today(),
-				SyncedAt:   syncedAt,
-				BalanceUSD: money.FromDollars(*balance),
-				Holdings: []wealth.AssetDailyHolding{{
-					AssetID:           usd.ID.Int64(),
-					Quantity:          balance,
-					Price:             &usdPrice,
-					ValueUSD:          *balance,
-					CountsTowardValue: true,
-				}},
-			},
+			AccountID:  resolved.ID,
+			Source:     a.Source().Str(),
+			Date:       sink.Today(),
+			SyncedAt:   syncedAt,
+			BalanceUSD: money.FromDollars(*balance),
+			Holdings: []wealth.AssetDailyHolding{{
+				AssetID:           usd.ID.Int64(),
+				Quantity:          balance,
+				Price:             &usdPrice,
+				ValueUSD:          *balance,
+				CountsTowardValue: true,
+			}},
 			Decision: wealth.DecisionClean,
 		}
 		events <- wealth.PersistEvent{Snapshot: &draft}

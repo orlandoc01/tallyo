@@ -30,10 +30,10 @@ export function TransactionSummaryDropdown({ summary }: { summary: TransactionsS
   )
 }
 
-export function TransactionSummaryCard({ className = 'rounded-3xl border border-neutral-200 bg-white p-5 shadow-card', showTitle = true, summary }: { className?: string; showTitle?: boolean; summary: TransactionsSummary }) {
+export function TransactionSummaryCard({ className = 'rounded-2xl border border-neutral-200 bg-white p-5 shadow-card', showTitle = true, summary }: { className?: string; showTitle?: boolean; summary: TransactionsSummary }) {
   return (
     <aside aria-label="Transaction summary" className={className}>
-      {showTitle ? <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-neutral-500">Summary</h2> : null}
+      {showTitle ? <h2 className="mb-4 text-sm font-semibold text-neutral-500">Summary</h2> : null}
       <dl className="space-y-3">
         <SummaryRow label="Transactions" value={String(summary.totalCount)} />
         <SummaryRow label="Total" value={formatCurrency(summary.totalAmount)} />

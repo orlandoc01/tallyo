@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatDisplayDate,
   formatCompactDisplayDate,
+  formatRelativeTime,
   formatTransactionDatetime,
   getCurrentPeriod,
   getLastThreePeriodDateRange,
@@ -54,6 +55,13 @@ describe('date utilities', () => {
 
   it('formats compact dates for date range pills', () => {
     expect(formatCompactDisplayDate('2026-05-14')).toBe('05-14-26')
+  })
+
+  it('formats relative sync recency', () => {
+    const now = new Date('2026-05-14T12:03:00Z').getTime()
+
+    expect(formatRelativeTime('2026-05-14T12:00:00Z', now)).toBe('3m ago')
+    expect(formatRelativeTime('2026-05-13T12:03:00Z', now)).toBe('1d ago')
   })
 
   it('formats UTC datetimes using the browser local date', () => {

@@ -69,7 +69,7 @@ export function AccessPage() {
         </Card>
         {inviteLinkError ? <FormError className="font-semibold">{inviteLinkError}</FormError> : null}
         {inviteLink ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-bold">One-time invite link</p>
             <p className="mt-1">Expires {formatDateTime(inviteLink.expiresAt)}. The invitee stays signed in on that browser to finish passkey setup; generate a new link if they switch devices later.</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">

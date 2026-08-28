@@ -52,7 +52,7 @@ export function SnapshotAssetPicker({
             <button
               aria-expanded={open}
               aria-label="Select holding asset"
-              className="w-full rounded-lg border border-neutral-200 px-2 py-1.5 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full rounded-xl border border-neutral-200 px-2 py-1.5 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
               onClick={() => setOpen((current) => !current)}
               type="button"
             >
@@ -87,7 +87,7 @@ export function SnapshotAssetPicker({
             <span className="sr-only">Quantity</span>
             <input
               aria-label="Quantity for new holding"
-              className="w-full rounded-lg border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums disabled:bg-neutral-50 disabled:text-neutral-500"
+              className="w-full rounded-xl border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums disabled:bg-neutral-50 disabled:text-neutral-500"
               disabled
               readOnly
               type="number"

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/99designs/gqlgen/client"
 
@@ -151,8 +152,10 @@ func TestWealthGraphQLExecutionPreservesUnknownQuantity(t *testing.T) {
 		Identifier: "base:moo-aero",
 		Classifier: model.AssetClassifierStablecoin,
 	})
+	// Relative to now so the snapshot stays inside the one-month range queried below.
+	snapshotDate := time.Now().UTC().AddDate(0, 0, -7)
 	must.NoErr(t, store.WealthDB.ReplaceAccountBalanceSnapshot(context.Background(), wealth.AccountBalanceSnapshot{
-		AccountID: account.ID.Int64(), Source: "debank", Date: "2026-07-23", SyncedAt: "2026-07-23T21:02:33Z",
+		AccountID: account.ID.Int64(), Source: "debank", Date: snapshotDate.Format(time.DateOnly), SyncedAt: snapshotDate.Format(time.RFC3339),
 		BalanceUSD: money.FromDollars(76_714.93),
 		Holdings:   []wealth.AssetDailyHolding{{AssetID: asset.ID.Int64(), ValueUSD: 76_714.93, CountsTowardValue: true}},
 	}))

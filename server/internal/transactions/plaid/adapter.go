@@ -63,10 +63,10 @@ func New(
 	accountStore := accountsdb.New(db)
 	transactionStore := transactionsdb.New(db)
 	return &Adapter{
-		BaseAdapter: transactions.BaseAdapter{Reads: accountStore, Log: log},
-		plaid:       transactionStore,
-		clients:     clients,
-		now:         now,
+		Reads: accountStore, Log: log,
+		plaid:   transactionStore,
+		clients: clients,
+		now:     now,
 	}
 }
 

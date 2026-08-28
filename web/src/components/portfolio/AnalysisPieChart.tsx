@@ -8,10 +8,10 @@ import { analysisSliceColor } from './analysisSliceColor'
 export function AnalysisPieChart({ slices, totalValueUSD, amountsHidden = false, selectedLabel, onSliceClick }: { slices: AnalysisSlice[]; totalValueUSD: number; amountsHidden?: boolean; selectedLabel?: string | null; onSliceClick?: (label: string | null) => void }) {
   const selectedSlice = selectedLabel ? slices.find((slice) => slice.label === selectedLabel) : null
   return (
-    <section className="min-w-0 overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Allocation</h2>
+          <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">Allocation</h2>
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
             Total analyzed <span className="font-bold text-neutral-950 dark:text-neutral-50">{displayAmount(amountsHidden, formatCurrency(totalValueUSD))}</span>
           </p>

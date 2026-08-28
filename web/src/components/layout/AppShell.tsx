@@ -86,7 +86,7 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
         {mobile.headerLeading ?? (
           <button
             aria-label="Open menu"
-            className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5')}
+            className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
             onClick={() => setMenuOpen(true)}
             type="button"
           >
@@ -101,7 +101,7 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
                   <button
                     aria-label={transactionSelection.isBulkMode ? 'Exit bulk select' : 'Bulk actions'}
                     aria-pressed={transactionSelection.isBulkMode}
-                    className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5', transactionSelection.isBulkMode)}
+                    className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', transactionSelection.isBulkMode)}
                     onClick={() => (transactionSelection.isBulkMode ? transactionSelection.exitBulkMode() : transactionSelection.enterBulkMode())}
                     type="button"
                   >
@@ -211,7 +211,7 @@ function AppShellInner({ collapsed, onCollapsedChange }: { collapsed: boolean; o
   return (
     <>
       <a
-        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
         href="#main-content"
       >
         Skip to main content

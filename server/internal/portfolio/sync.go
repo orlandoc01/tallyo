@@ -105,5 +105,5 @@ func reportFromFund(assetID int64, fund yfinance.FundReport, fetchedAt time.Time
 
 func reportFromEquity(assetID int64, equity yfinance.EquityReport, fetchedAt time.Time) AssetReport {
 	sector := strings.TrimSpace(equity.Sector)
-	return AssetReport{AssetID: assetID, FundReport: yfinance.FundReport{Category: "Individual Equity", Group: "Individual Equity", StockPosition: 1}, EquitySector: &sector, FetchedAt: fetchedAt}
+	return AssetReport{AssetID: assetID, Category: "Individual Equity", Group: "Individual Equity", StockPosition: 1, EquitySector: &sector, FetchedAt: fetchedAt}
 }

@@ -258,7 +258,7 @@ func TestResolvePriceWithZeroFromLiveProviderFallsBack(t *testing.T) {
 
 func newFakeManualStore() *fakeManualStore {
 	return &fakeManualStore{
-		ScheduleFake: testutil.ScheduleFake{ID: syncerids.Manual},
+		ID:           syncerids.Manual,
 		rows:         map[int64]*wealth.SnapshotRow{},
 		holdings:     map[int64][]wealth.SnapshotHolding{},
 		latestErrs:   map[int64]error{},

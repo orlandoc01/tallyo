@@ -21,7 +21,7 @@ export function AmountVisibilityButton({ amountsHidden, onToggle, variant }: {
   return (
     <button
       aria-label={ariaLabel}
-      className={mobileHeaderActionClass('touch-manipulation rounded-2xl p-2.5')}
+      className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
       onClick={onToggle}
       type="button"
     >

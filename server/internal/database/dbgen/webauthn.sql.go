@@ -157,48 +157,33 @@ func (q *Queries) UpdateWebAuthnCredential(ctx context.Context, arg UpdateWebAut
 }
 
 const webAuthnCredentialsByUserID = `-- name: WebAuthnCredentialsByUserID :many
-SELECT
-  id,
-  user_id,
-  name,
-  credential,
-  created_at,
-  last_used_at
-FROM webauthn_credentials
-WHERE user_id = ?1
-ORDER BY created_at DESC
+SELECT wc.created_at, wc.credential, wc.id, wc.last_used_at, wc.name, wc.user_id
+FROM webauthn_credentials wc
+WHERE wc.user_id = ?1
+ORDER BY wc.created_at DESC
 `
 
 type WebAuthnCredentialsByUserIDParams struct {
 	UserID int64
 }
 
-type WebAuthnCredentialsByUserIDRow struct {
-	ID         string
-	UserID     int64
-	Name       string
-	Credential string
-	CreatedAt  time.Time
-	LastUsedAt *time.Time
-}
-
 // Used by internal/auth's WebAuthn login-begin handler and credentials-list handler to load a user's saved passkeys.
-func (q *Queries) WebAuthnCredentialsByUserID(ctx context.Context, arg WebAuthnCredentialsByUserIDParams) ([]WebAuthnCredentialsByUserIDRow, error) {
+func (q *Queries) WebAuthnCredentialsByUserID(ctx context.Context, arg WebAuthnCredentialsByUserIDParams) ([]WebauthnCredential, error) {
 	rows, err := q.db.QueryContext(ctx, webAuthnCredentialsByUserID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []WebAuthnCredentialsByUserIDRow{}
+	items := []WebauthnCredential{}
 	for rows.Next() {
-		var i WebAuthnCredentialsByUserIDRow
+		var i WebauthnCredential
 		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Name,
-			&i.Credential,
 			&i.CreatedAt,
+			&i.Credential,
+			&i.ID,
 			&i.LastUsedAt,
+			&i.Name,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -214,31 +199,24 @@ func (q *Queries) WebAuthnCredentialsByUserID(ctx context.Context, arg WebAuthnC
 }
 
 const webAuthnRegistration = `-- name: WebAuthnRegistration :one
-SELECT user_id, name, session, expires_at
-FROM webauthn_registrations
-WHERE user_id = ?1
+SELECT wr.expires_at, wr.name, wr.session, wr.user_id
+FROM webauthn_registrations wr
+WHERE wr.user_id = ?1
 `
 
 type WebAuthnRegistrationParams struct {
 	UserID int64
 }
 
-type WebAuthnRegistrationRow struct {
-	UserID    int64
-	Name      string
-	Session   string
-	ExpiresAt time.Time
-}
-
 // Used by internal/auth's WebAuthn registration-finish handler to retrieve the pending ceremony session for attestation verification.
-func (q *Queries) WebAuthnRegistration(ctx context.Context, arg WebAuthnRegistrationParams) (WebAuthnRegistrationRow, error) {
+func (q *Queries) WebAuthnRegistration(ctx context.Context, arg WebAuthnRegistrationParams) (WebauthnRegistration, error) {
 	row := q.db.QueryRowContext(ctx, webAuthnRegistration, arg.UserID)
-	var i WebAuthnRegistrationRow
+	var i WebauthnRegistration
 	err := row.Scan(
-		&i.UserID,
+		&i.ExpiresAt,
 		&i.Name,
 		&i.Session,
-		&i.ExpiresAt,
+		&i.UserID,
 	)
 	return i, err
 }

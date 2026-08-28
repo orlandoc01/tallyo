@@ -21,7 +21,7 @@ export function CredentialPicker({
 
         return (
           <button
-            className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+            className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
               isSelected ? 'border-brand-500 bg-brand-50' : 'border-neutral-200 hover:border-brand-200 hover:bg-neutral-50'
             }`}
             key={credential.id}

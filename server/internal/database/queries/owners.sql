@@ -1,16 +1,16 @@
 -- Used by GraphQL query owners and owner lookups in account/wealth linking flows.
 -- name: Owners :many
-SELECT id, name
-FROM owners
+SELECT o.*
+FROM owners o
 WHERE TRUE
-  AND id = @id -- :if @id
-ORDER BY name;
+  AND o.id = @id -- :if @id
+ORDER BY o.name;
 
 -- Used by GraphQL mutation createOwner via accounts/db.Store.CreateOwner.
 -- name: CreateOwner :one
 INSERT INTO owners (name)
 VALUES (@name)
-RETURNING id, name;
+RETURNING *;
 
 -- Used by GraphQL mutation deleteOwner via accounts/db.Store.DeleteOwner.
 -- name: DeleteOwner :execrows

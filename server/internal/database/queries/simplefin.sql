@@ -26,7 +26,7 @@ ORDER BY sat.id;
 -- syncing a token's open accounts regardless of a sibling closed one, so
 -- this filter applies only to the balance kind.
 -- name: SimpleFinTokenSecrets :many
-SELECT id, access_url, owner_id, sync_cron, last_synced_at, next_sync_at, next_balance_sync_at
+SELECT sat.*
 FROM simplefin_access_tokens sat
 WHERE COALESCE(
     CASE CAST(@kind AS TEXT) WHEN 'sync' THEN next_sync_at ELSE next_balance_sync_at END,
@@ -151,8 +151,7 @@ WHERE id = @id;
 
 -- Used by internal/transactions/db's SimpleFIN sync to fetch the access URL and schedule for a token, looked up by connection ID.
 -- name: SimpleFinTokenSecretByConnID :one
-SELECT sat.id, sat.access_url, sat.owner_id, sat.sync_cron,
-       sat.last_synced_at, sat.next_sync_at, sat.next_balance_sync_at
+SELECT sat.*
 FROM simplefin_access_tokens sat
 JOIN simplefin_connections sc ON sc.access_token_id = sat.id
 WHERE sc.id = @conn_id;

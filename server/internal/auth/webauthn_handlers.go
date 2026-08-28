@@ -197,7 +197,7 @@ func (s *Service) WebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	loginSession, err := s.store.LoginSessionByID(r.Context(), req.LoginSessionID)
-	if err != nil || loginSession.ExpiresAt.Before(time.Now().UTC()) || loginSession.WebAuthnSession == "" {
+	if err != nil || loginSession.ExpiresAt.Before(time.Now().UTC()) || loginSession.Authenticated || loginSession.WebAuthnSession == "" {
 		http.Error(w, "login session not found or expired", http.StatusBadRequest)
 		return
 	}
@@ -220,6 +220,9 @@ func (s *Service) WebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
 	if HTTPFail(w, err, http.StatusBadRequest, "finish webauthn login") {
 		return
 	}
+	if credential.Authenticator.CloneWarning {
+		s.cfg.Log.Warn("webauthn credential clone warning", "credential_id", webAuthnCredentialID(credential.ID))
+	}
 	credentialJSON, err := webAuthnCredentialJSON(*credential)
 	if HTTPFail(w, err, http.StatusInternalServerError, "update webauthn credential") {
 		return
@@ -237,7 +240,7 @@ func (s *Service) WebAuthnLoginFinish(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "complete webauthn login", http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"redirect_url": s.cfg.IssuerURL + "/authorize?session_id=" + req.LoginSessionID})
+	writeJSON(w, map[string]string{"redirect_url": s.IssuerURL() + "/authorize?session_id=" + req.LoginSessionID})
 }
 
 func (s *Service) requestWebAuthnUser(w http.ResponseWriter, r *http.Request, emailFallback string) (webAuthnUser, bool) {

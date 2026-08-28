@@ -12,32 +12,22 @@ import (
 	"github.com/ory/fosite/compose"
 	"github.com/ory/fosite/token/jwt"
 	"github.com/samber/lo"
+
+	"tallyo/internal/apierror"
+	u "tallyo/internal/utils"
 )
 
 func New(ctx context.Context, cfg Config, db authPersistence) (*Service, error) {
-	cfg.IssuerURL = strings.TrimRight(cfg.IssuerURL, "/")
 	if cfg.DCRSettings == nil {
 		cfg.DCRSettings = func() DCRSettings { return DCRSettings{} }
 	}
 	if cfg.SetupComplete == nil {
 		cfg.SetupComplete = func() bool { return true }
 	}
-	if cfg.OAuthEnabled && cfg.IssuerURL == "" {
-		return nil, fmt.Errorf("oauth issuer url is required")
+	if err := normalizeAuthConfig(&cfg); err != nil {
+		return nil, err
 	}
-	if cfg.AccessTokenLifetime == 0 {
-		cfg.AccessTokenLifetime = 15 * time.Minute
-	}
-	if cfg.RefreshTokenLifetime == 0 {
-		cfg.RefreshTokenLifetime = 168 * time.Hour
-	}
-	if cfg.DisableAllAuth {
-		cfg.Log.Warn(
-			"all authentication is disabled; do not expose this server outside localhost or a trusted network",
-			"issuer",
-			cfg.IssuerURL,
-		)
-	}
+	warnIfAuthDisabled(cfg)
 	var webAuthn *webauthnlib.WebAuthn
 	if cfg.OAuthEnabled && cfg.PassKeyAuthnEnabled {
 		var err error
@@ -51,44 +41,10 @@ func New(ctx context.Context, cfg Config, db authPersistence) (*Service, error) 
 	if err != nil {
 		return nil, err
 	}
-	var fositeStore *FositeStore
-	var provider fosite.OAuth2Provider
-	if cfg.OAuthEnabled {
-		if err := store.UpsertFrontendClient(ctx, cfg.FrontendRedirectURIs); err != nil {
-			return nil, err
-		}
-		fositeStore = NewFositeStore(store, cfg.IssuerURL)
-		keyGetter := func(_ context.Context) (any, error) { return key.Private, nil }
-		fositeConfig := &fosite.Config{
-			AccessTokenIssuer:           cfg.IssuerURL,
-			AccessTokenLifespan:         cfg.AccessTokenLifetime,
-			RefreshTokenLifespan:        cfg.RefreshTokenLifetime,
-			AuthorizeCodeLifespan:       10 * time.Minute,
-			TokenEntropy:                32,
-			ScopeStrategy:               fosite.HierarchicScopeStrategy,
-			AudienceMatchingStrategy:    fosite.DefaultAudienceMatchingStrategy,
-			SendDebugMessagesToClients:  false,
-			RefreshTokenScopes:          ClientAllowedScopes,
-			EnforcePKCE:                 true,
-			EnforcePKCEForPublicClients: true,
-			JWTScopeClaimKey:            jwt.JWTScopeFieldString,
-		}
-		plainStrategy := &plainTokenStrategy{}
-		jwtStrategy := compose.NewOAuth2JWTStrategy(keyGetter, plainStrategy, fositeConfig)
-		strategy := &compose.CommonStrategy{
-			CoreStrategy: jwtStrategy,
-			Signer:       &jwt.DefaultSigner{GetPrivateKey: keyGetter},
-		}
-		provider = compose.Compose(
-			fositeConfig,
-			fositeStore,
-			strategy,
-			compose.OAuth2AuthorizeExplicitFactory,
-			compose.OAuth2PKCEFactory,
-			compose.OAuth2RefreshTokenGrantFactory,
-			compose.OAuth2TokenIntrospectionFactory,
-		)
+	if err := store.UpsertFrontendClient(ctx, cfg.FrontendRedirectURIs); err != nil {
+		return nil, err
 	}
+	fositeStore := NewFositeStore(store, cfg.IssuerURL)
 
 	var googleCfg googleOAuthConfig
 	if cfg.OAuthEnabled && cfg.GoogleAuthnEnabled {
@@ -97,7 +53,7 @@ func New(ctx context.Context, cfg Config, db authPersistence) (*Service, error) 
 	service := &Service{
 		store:        store,
 		fositeStore:  fositeStore,
-		provider:     provider,
+		provider:     newOAuthProvider(cfg, fositeStore, key),
 		cfg:          cfg,
 		devOrigins:   normalizeOriginSet(cfg.DevCORSAllowedOrigins),
 		timezones:    NewTimezoneCache(timezoneFromConfig(cfg)),
@@ -110,22 +66,74 @@ func New(ctx context.Context, cfg Config, db authPersistence) (*Service, error) 
 	return service, nil
 }
 
-func (s *Service) RunCleanup(ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := s.store.CleanupExpired(ctx); err != nil {
-				s.cfg.Log.Error("auth cleanup failed", "error", err)
-			}
-		}
+func normalizeAuthConfig(cfg *Config) error {
+	cfg.IssuerURL = strings.TrimRight(cfg.IssuerURL, "/")
+	if cfg.OAuthEnabled && cfg.IssuerURL == "" {
+		return fmt.Errorf("oauth issuer url is required")
+	}
+	if cfg.AccessTokenLifetime == 0 {
+		cfg.AccessTokenLifetime = 15 * time.Minute
+	}
+	if cfg.RefreshTokenLifetime == 0 {
+		cfg.RefreshTokenLifetime = 168 * time.Hour
+	}
+	return nil
+}
+
+func warnIfAuthDisabled(cfg Config) {
+	if cfg.DisableAllAuth {
+		cfg.Log.Warn(
+			"all authentication is disabled; do not expose this server outside localhost or a trusted network",
+			"issuer",
+			cfg.IssuerURL,
+		)
 	}
 }
 
+func newOAuthProvider(cfg Config, store *FositeStore, key *SigningKey) fosite.OAuth2Provider {
+	keyGetter := func(_ context.Context) (any, error) { return key.Private, nil }
+	fositeConfig := &fosite.Config{
+		AccessTokenIssuer:           cfg.IssuerURL,
+		AccessTokenLifespan:         cfg.AccessTokenLifetime,
+		RefreshTokenLifespan:        cfg.RefreshTokenLifetime,
+		AuthorizeCodeLifespan:       10 * time.Minute,
+		TokenEntropy:                32,
+		ScopeStrategy:               fosite.HierarchicScopeStrategy,
+		AudienceMatchingStrategy:    fosite.DefaultAudienceMatchingStrategy,
+		SendDebugMessagesToClients:  false,
+		RefreshTokenScopes:          ClientAllowedScopes,
+		EnforcePKCE:                 true,
+		EnforcePKCEForPublicClients: true,
+		JWTScopeClaimKey:            jwt.JWTScopeFieldString,
+	}
+	jwtStrategy := compose.NewOAuth2JWTStrategy(keyGetter, &plainTokenStrategy{}, fositeConfig)
+	strategy := &compose.CommonStrategy{
+		CoreStrategy: jwtStrategy,
+		Signer:       &jwt.DefaultSigner{GetPrivateKey: keyGetter},
+	}
+	return compose.Compose(
+		fositeConfig,
+		store,
+		strategy,
+		compose.OAuth2AuthorizeExplicitFactory,
+		compose.OAuth2PKCEFactory,
+		compose.OAuth2RefreshTokenGrantFactory,
+		compose.OAuth2TokenIntrospectionFactory,
+	)
+}
+
+func (s *Service) RunCleanup(ctx context.Context) {
+	u.RunPeriodic(ctx, 10*time.Minute, func(ctx context.Context) {
+		if err := s.store.CleanupExpired(ctx); err != nil {
+			s.cfg.Log.Error("auth cleanup failed", "error", err)
+		}
+	})
+}
+
 func (s *Service) SendInvitation(ctx context.Context, email string, role string, invitedBy string) error {
+	if !s.OAuthEnabled() {
+		return nil
+	}
 	magicLink, _, err := s.buildInviteSession(ctx, email, role, 24*time.Hour, "")
 	if err != nil {
 		return err
@@ -146,6 +154,9 @@ func (s *Service) SendInvitation(ctx context.Context, email string, role string,
 }
 
 func (s *Service) CreateInviteLink(ctx context.Context, email string, role string) (string, time.Time, error) {
+	if !s.OAuthEnabled() {
+		return "", time.Time{}, apierror.Publicf("invitations are not configured")
+	}
 	return s.buildInviteSession(ctx, email, role, 15*time.Minute, "passkey")
 }
 
@@ -168,7 +179,8 @@ func (s *Service) buildInviteSession(ctx context.Context, email string, role str
 
 	expiresAt := time.Now().UTC().Add(ttl)
 
-	redirectURI := lo.FirstOrEmpty(s.cfg.FrontendRedirectURIs)
+	cfg := s.config()
+	redirectURI := lo.FirstOrEmpty(cfg.FrontendRedirectURIs)
 
 	session := LoginSession{
 		ID:                  sessionID,
@@ -201,7 +213,7 @@ func (s *Service) buildInviteSession(ctx context.Context, email string, role str
 	if purpose == "passkey" {
 		values.Set("onboarding", "passkey")
 	}
-	return s.cfg.IssuerURL + "/auth/email/magic?" + values.Encode(), expiresAt, nil
+	return cfg.IssuerURL + "/auth/email/magic?" + values.Encode(), expiresAt, nil
 }
 
 func normalizeOriginSet(values []string) map[string]struct{} {

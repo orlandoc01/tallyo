@@ -51,6 +51,37 @@ func TestServiceNetWorthAndAccountFields(t *testing.T) {
 	}
 }
 
+func TestServiceMergeAsset(t *testing.T) {
+	ctx := context.Background()
+	store := openWealthTestStore(t)
+	target := mustUpsertAsset(t, store, AssetUpsert{AssetType: model.AssetTypeSecurity, Identifier: "TARGET", Classifier: model.AssetClassifierPublic})
+	duplicate := mustUpsertAsset(t, store, AssetUpsert{
+		AssetType:  model.AssetTypeSecurity,
+		Identifier: "DUPLICATE",
+		Classifier: model.AssetClassifierPublic,
+		AdapterSource: &AdapterSource{
+			Adapter:  syncerids.Plaid,
+			SourceID: "plaid-asset",
+		},
+	})
+
+	merged, err := testService(store).MergeAsset(ctx, model.MergeAssetInput{AssetID: target.ID, SourceAdapter: model.AssetSourceAdapterPlaid, SourceID: "plaid-asset"})
+	must.NoErr(t, err)
+	if merged.ID != target.ID {
+		t.Fatalf("merged asset = %s, want %s", merged.ID, target.ID)
+	}
+	resolved, err := store.AssetByAdapterSource(ctx, AdapterSource{Adapter: syncerids.Plaid, SourceID: "plaid-asset"})
+	must.NoErr(t, err)
+	if resolved == nil || resolved.ID != target.ID {
+		t.Fatalf("source resolves to %#v, want %s", resolved, target.ID)
+	}
+	removed, err := store.AssetByID(ctx, duplicate.ID.Int64())
+	must.NoErr(t, err)
+	if removed != nil {
+		t.Fatalf("duplicate asset = %#v, want nil", removed)
+	}
+}
+
 func TestHistoricalNetWorthPointLimit(t *testing.T) {
 	ctx := context.Background()
 	store := openWealthTestStore(t)

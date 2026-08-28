@@ -233,24 +233,15 @@ func (q *Queries) DeleteCategoryPlaidMappings(ctx context.Context, arg DeleteCat
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT
-  cat_id,
-  cat_name,
-  cat_emoji,
-  group_name,
-  group_emoji,
-  group_kind,
-  sort_order,
-  group_id,
-  plaid_pfc2_codes
-FROM category_rows
+SELECT cr.cat_id, cr.cat_name, cr.cat_emoji, cr.group_name, cr.group_emoji, cr.group_kind, cr.sort_order, cr.group_id, cr.group_sort_order, cr.plaid_pfc2_codes
+FROM category_rows cr
 WHERE TRUE
-  AND group_kind = 'EXPENSE' -- :if $3
-  AND cat_id IN (/*SLICE:category_ids*/?1) -- :if $1
-  AND group_id = ?2 -- :if $2
+  AND cr.group_kind = 'EXPENSE' -- :if $3
+  AND cr.cat_id IN (/*SLICE:category_ids*/?1) -- :if $1
+  AND cr.group_id = ?2 -- :if $2
 ORDER BY
-  group_sort_order, -- :if $4
-  sort_order
+  cr.group_sort_order, -- :if $4
+  cr.sort_order
 `
 
 var _listCategoriesDynQ = dynCompile(listCategories)
@@ -262,20 +253,8 @@ type ListCategoriesParams struct {
 	GroupOrder  bool
 }
 
-type ListCategoriesRow struct {
-	CatID          int64
-	CatName        string
-	CatEmoji       string
-	GroupName      string
-	GroupEmoji     string
-	GroupKind      string
-	SortOrder      int64
-	GroupID        int64
-	PlaidPfc2Codes string
-}
-
 // Used by category list, lookup, spending report, and category-group display paths with optional filters and ordering.
-func (q *Queries) ListCategories(ctx context.Context, arg ListCategoriesParams) ([]ListCategoriesRow, error) {
+func (q *Queries) ListCategories(ctx context.Context, arg ListCategoriesParams) ([]CategoryRow, error) {
 
 	dynQuery, dynArgs := _listCategoriesDynQ.Build([]any{arg.CategoryIds, arg.GroupID, arg.ExpenseOnly, arg.GroupOrder})
 	rows, err := q.db.QueryContext(ctx, dynQuery, dynArgs...)
@@ -283,9 +262,9 @@ func (q *Queries) ListCategories(ctx context.Context, arg ListCategoriesParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListCategoriesRow{}
+	items := []CategoryRow{}
 	for rows.Next() {
-		var i ListCategoriesRow
+		var i CategoryRow
 		if err := rows.Scan(
 			&i.CatID,
 			&i.CatName,
@@ -295,6 +274,7 @@ func (q *Queries) ListCategories(ctx context.Context, arg ListCategoriesParams) 
 			&i.GroupKind,
 			&i.SortOrder,
 			&i.GroupID,
+			&i.GroupSortOrder,
 			&i.PlaidPfc2Codes,
 		); err != nil {
 			return nil, err

@@ -10,12 +10,12 @@ export function BudgetProgressBar({ actual, budgeted, category, children }: { ac
   const fillColor = category.kind === 'INCOME' ? CASH_FLOW_INCOME_BAR_FILL : CASH_FLOW_EXPENSE_BAR_FILL
 
   return (
-    <div aria-label={`Budget progress for ${category.name}`} className="relative h-9 w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800">
+    <div aria-label={`Budget progress for ${category.name}`} className="relative h-9 w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-800">
       <div
         aria-valuemax={100}
         aria-valuemin={0}
         aria-valuenow={ariaPercent}
-        className={`absolute left-0 top-0 h-full rounded-lg transition-all ${chartFocusOpacityClassName}`}
+        className={`absolute left-0 top-0 h-full rounded-xl transition-all ${chartFocusOpacityClassName}`}
         role="progressbar"
         style={{ ...chartFocusOpacityVariables, backgroundColor: fillColor, width: `${percent}%` }}
       />

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -42,18 +41,11 @@ import (
 	"github.com/samber/lo"
 )
 
-// errRestartRequested is returned by runServer when a runtime configuration
-// change (e.g. authorization settings) requires a process restart. main exits
-// nonzero on any error, which is exactly the signal the container supervisor
-// needs to restart the process.
-var errRestartRequested = errors.New("restart requested")
-
 func runServer(ctx context.Context, logger *slog.Logger, cfg config.Config, dbOptions database.OpenOptions) error {
-	// Cancelling here (via SIGINT/SIGTERM, since it derives from ctx, or via
-	// ScheduleRestart below) lets the HTTP server and background loops finish
-	// their graceful shutdown before the database is closed.
-	ctx, cancelForRestart := context.WithCancelCause(ctx)
-	defer cancelForRestart(nil)
+	// Cancelling here lets the HTTP server and background loops finish their
+	// graceful shutdown before the database is closed.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	db, err := database.OpenDB(ctx, dbOptions)
 	if err != nil {
@@ -66,7 +58,7 @@ func runServer(ctx context.Context, logger *slog.Logger, cfg config.Config, dbOp
 	}()
 	var background sync.WaitGroup
 	defer func() {
-		cancelForRestart(nil)
+		cancel()
 		background.Wait()
 	}()
 	accountsStore := accountsdb.New(db)
@@ -220,9 +212,7 @@ func runServer(ctx context.Context, logger *slog.Logger, cfg config.Config, dbOp
 		Timezone:      authSrv.Timezone,
 	}
 	budgetsSvc := &budgets.Service{Store: budgetsStore, Spending: transactionsStore, Categories: transactionsStore}
-	if authSrv.OAuthEnabled() {
-		adminSvc.Inviter = authSrv
-	}
+	adminSvc.Inviter = authSrv
 
 	resolver := &graph.Resolver{
 		AccountsStore:     accountsStore,
@@ -238,18 +228,15 @@ func runServer(ctx context.Context, logger *slog.Logger, cfg config.Config, dbOp
 		RealEstate:        realEstateSvc,
 		ManualSnapshot:    manualSnapshotSvc,
 		Config:            cfg,
-		ScheduleRestart:   func() { cancelForRestart(errRestartRequested) },
 	}
 
 	router := httphandler.New(httphandler.Config{
-		Logger:                logger,
-		Auth:                  authSrv,
-		Resolver:              resolver,
-		Transactions:          transactionsStore,
-		OAuthIssuerURL:        rtCfg.Auth.Fields.OAuthIssuerURL,
-		DevCORSAllowedOrigins: rtCfg.Auth.Fields.DevCORSAllowedOrigins,
-		ClientIPResolver:      clientIPResolver,
-		RuntimeConfig:         runtimeCfg,
+		Logger:           logger,
+		Auth:             authSrv,
+		Resolver:         resolver,
+		Transactions:     transactionsStore,
+		ClientIPResolver: clientIPResolver,
+		RuntimeConfig:    runtimeCfg,
 	})
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -278,11 +265,5 @@ func runServer(ctx context.Context, logger *slog.Logger, cfg config.Config, dbOp
 	// Waits for graceful shutdown to finish draining connections before
 	// returning: the deferred db.Close() above must not run while requests
 	// are still live.
-	if err := u.ServeUntilDone(ctx, server, 10*time.Second); err != nil {
-		return err
-	}
-	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
-		return cause
-	}
-	return nil
+	return u.ServeUntilDone(ctx, server, 10*time.Second)
 }

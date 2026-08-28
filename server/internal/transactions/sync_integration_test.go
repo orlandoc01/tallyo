@@ -127,16 +127,16 @@ func TestSyncDueItemsWritesSyncLog(t *testing.T) {
 		t.Fatalf("SyncDueItems() = %#v", result)
 	}
 
-	added, modified, removed, err := fixture.store.PlaidSyncLogEntry(ctx, fixture.itemID)
+	entry, err := fixture.store.PlaidSyncLogEntry(ctx, fixture.itemID)
 	must.NoErr(t, err)
-	if !strings.Contains(added, `"tx"`) {
-		t.Errorf("added log missing transaction id, got: %s", added)
+	if !strings.Contains(entry.Added, `"tx"`) {
+		t.Errorf("added log missing transaction id, got: %s", entry.Added)
 	}
-	if modified != "[]" {
-		t.Errorf("modified = %s, want []", modified)
+	if entry.Modified != "[]" {
+		t.Errorf("modified = %s, want []", entry.Modified)
 	}
-	if removed != "[]" {
-		t.Errorf("removed = %s, want []", removed)
+	if entry.Removed != "[]" {
+		t.Errorf("removed = %s, want []", entry.Removed)
 	}
 }
 

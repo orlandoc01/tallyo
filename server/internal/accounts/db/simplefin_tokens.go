@@ -65,13 +65,7 @@ func simpleFinAccessTokenFromSQLRow(row dbgen.SimpleFinAccessTokensRow) *model.S
 	}
 }
 
-type SimpleFinSecretSQLRow interface {
-	dbgen.SimpleFinTokenSecretsRow |
-		dbgen.SimpleFinTokenSecretByConnIDRow
-}
-
-func SimpleFinSecretFromSQLRow[Row SimpleFinSecretSQLRow](sqlRow Row) accounts.SimpleFinAccessTokenSecret {
-	row := dbgen.SimpleFinTokenSecretsRow(sqlRow)
+func simpleFinSecretFromRow(row dbgen.SimplefinAccessToken) accounts.SimpleFinAccessTokenSecret {
 	return accounts.SimpleFinAccessTokenSecret{
 		ID:                row.ID,
 		AccessURL:         row.AccessUrl,
@@ -85,8 +79,8 @@ func SimpleFinSecretFromSQLRow[Row SimpleFinSecretSQLRow](sqlRow Row) accounts.S
 
 func SimpleFinTokenSecretByConnID(ctx context.Context, q *dbgen.Queries, connID int64) (*accounts.SimpleFinAccessTokenSecret, error) {
 	row, err := q.SimpleFinTokenSecretByConnID(ctx, dbgen.SimpleFinTokenSecretByConnIDParams{ConnID: connID})
-	toSecret := func(row dbgen.SimpleFinTokenSecretByConnIDRow) *accounts.SimpleFinAccessTokenSecret {
-		secret := SimpleFinSecretFromSQLRow(row)
+	toSecret := func(row dbgen.SimplefinAccessToken) *accounts.SimpleFinAccessTokenSecret {
+		secret := simpleFinSecretFromRow(row)
 		return &secret
 	}
 	return dbutil.MapRow(row, err, toSecret)
@@ -104,7 +98,7 @@ func SimpleFinTokenSecretsDue(
 ) ([]accounts.SimpleFinAccessTokenSecret, error) {
 	nowUTC := now.UTC()
 	rows, err := q.SimpleFinTokenSecrets(ctx, dbgen.SimpleFinTokenSecretsParams{Kind: string(kind), Now: &nowUTC})
-	return dbutil.MapRows(rows, err, SimpleFinSecretFromSQLRow[dbgen.SimpleFinTokenSecretsRow])
+	return dbutil.MapRows(rows, err, simpleFinSecretFromRow)
 }
 
 func (s *Store) SimpleFinTokensDueForSync(ctx context.Context, now time.Time) ([]accounts.SimpleFinAccessTokenSecret, error) {
