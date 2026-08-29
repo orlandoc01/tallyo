@@ -16,7 +16,7 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v tallyo-data:/data \
-  'ghcr.io/orlandoc01/tallyo:0.2.0'
+  'ghcr.io/orlandoc01/tallyo:latest'
 ```
 
 Open `http://127.0.0.1:8080` and complete the setup wizard before making the service reachable from another machine. Add startup settings with `--env-file <environment-file>` or individual `-e` options; see [Configuration](configuration.md).
@@ -168,7 +168,7 @@ Consequently, a clean source checkout cannot be built directly with plain `docke
 1. Read the release notes and identify the exact new version.
 2. Create a SQLite backup with Tallyo's backup command. Do not copy the live database file directly.
 3. Stop the existing process or container.
-4. Replace the binary or change the pinned image tag, then start Tallyo.
+4. Replace the binary or pull the new image (`docker compose pull` or `docker pull`), then start Tallyo.
 5. Confirm that `/healthz` returns `204`, sign in, and check connection sync health.
 6. Keep the pre-upgrade backup until the new version has been verified.
 
