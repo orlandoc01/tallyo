@@ -13,6 +13,7 @@ interface SearchableGroupedFilterCheckboxListProps {
   className?: string
   optionsClassName?: string
   groupSelection?: 'toggle' | 'heading'
+  summary?: string
 }
 
 export function SearchableGroupedFilterCheckboxList({
@@ -26,6 +27,7 @@ export function SearchableGroupedFilterCheckboxList({
   className = 'space-y-4',
   optionsClassName = 'space-y-3',
   groupSelection = 'toggle',
+  summary,
 }: SearchableGroupedFilterCheckboxListProps) {
   const [search, setSearch] = useState('')
   const groupsWithAllOptionIds = groups.map((group) => ({
@@ -48,6 +50,7 @@ export function SearchableGroupedFilterCheckboxList({
   return (
     <div className={className}>
       <TextField hideLabel label={searchLabel} onChange={setSearch} placeholder={searchPlaceholder} type="search" value={search} />
+      {summary ? <div className="text-xs text-neutral-500">{summary}</div> : null}
       <div className={optionsClassName}>
         <FilterCheckboxList
           options={[{ id: 'select-all', label: 'Select all', ariaLabel: selectAllAriaLabel }]}

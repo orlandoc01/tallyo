@@ -45,6 +45,14 @@ npm run dev:stub
 
 Stub mode serves fixture data through MSW browser handlers (`src/mocks/`) and seeds an all-scopes token so every authenticated route is reachable.
 
+### Demo build
+
+```bash
+npm run build:demo
+```
+
+Builds the same stub-mode app as a static site for GitHub Pages (`.github/workflows/pages.yml` deploys it to [orlandoc01.github.io/tallyo](https://orlandoc01.github.io/tallyo/) on every published release). Differences from `npm run build`: `--mode demo` (a richer, generated demo dataset in `src/mocks/` and a persistent demo banner), Vite `base` from `BASE_PATH` (default `/tallyo/`), still installable via its own manifest but without the workbox service worker (MSW's `mockServiceWorker.js` owns the scope instead, so there is no offline precache), and `dist/404.html` + `dist/.nojekyll` for SPA deep links. Preview it locally with `BASE_PATH=/tallyo/ npx vite preview` and open `http://localhost:4173/tallyo/`.
+
 ### Environment variables
 
 Vite env vars are baked in at build time; only `VITE_`-prefixed vars reach the client.
@@ -54,6 +62,7 @@ Vite env vars are baked in at build time; only `VITE_`-prefixed vars reach the c
 | `VITE_API_URL` | `/query` | GraphQL endpoint. The default is correct for the embedded production build and the dev proxy; set it only when pointing at a remote API |
 | `VITE_DEV_API_TARGET` | `http://localhost:8082` | Dev-server proxy target |
 | `VITE_APP_VERSION` | *(unset)* | Optional semver shown on the login screen and Settings page; set by the release workflow |
+| `BASE_PATH` | `/` | Vite `base` for hosting under a sub-path; `build:demo` defaults it to `/tallyo/` |
 
 ## GraphQL Types Are Generated
 

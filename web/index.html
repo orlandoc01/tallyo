@@ -22,7 +22,7 @@
         var ct = themes.indexOf(stored) !== -1 ? stored : 'teal'
         document.documentElement.classList.add('color-' + ct)
         var touchIcon = document.querySelector('link[rel="apple-touch-icon"]')
-        if (touchIcon) touchIcon.href = '/apple-touch-icon-' + ct + '.png'
+        if (touchIcon) touchIcon.href = '%BASE_URL%apple-touch-icon-' + ct + '.png'
       })()
     </script>
     <script type="module" src="/src/main.tsx"></script>

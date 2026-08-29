@@ -21,13 +21,17 @@ import {
   transactions,
   transactionsSummary,
   analysisReportForInput,
+  budgetReportForMonth,
   computeAssetLatestSnapshot,
+  demoHistoricalNetWorthReport,
+  demoNetWorthReport,
   persistAccountSnapshot,
 } from './fixtures'
 import { cashFlowPeriodsForFilter, spendingReportForFilter, type ReportFilter } from './reportFixtures'
 import type { Account, AccountSnapshot, AccountSnapshotInput, AccountSnapshotsInput, AddUserInput, AnalysisInput, Asset, AssetsInput, BudgetReportInput, BulkDeleteTransactionsInput, BulkUpdateTransactionsInput, CashFlowPeriod, ChangeAccountSnapshotInput, CopyBudgetsInput, CreateAssetInput, CreateCategoryGroupInput, CreateCategoryInput, CreateManualAccountInput, CreateOwnerInput, CreatePlaidCredentialInput, CreateRuleInput, CreateSimpleFinAccessTokenInput, CreateTransactionInput, Holding, LinkEVMWalletInput, MergeAssetInput, ReorderCategoriesInput, RulesInput, SetBudgetInput, SpendingByCategoryReport, TransactionsFilter, TransactionsInput, UpdateAccountInput, UpdateCategoryGroupInput, UpdateCategoryInput, UpdateConnectionInput, UpdatePlaidCredentialInput, UpdateRuleInput, UpdateTransactionInput, UpdateUserInput, User } from '../types/graphql'
 
-const api = graphql.link('/query')
+const base = import.meta.env.BASE_URL
+const api = graphql.link(`${base}query`)
 
 // Rule payload shared by the CreateRule and UpdateRule mutation handlers.
 function ruleFromInput(input: CreateRuleInput | UpdateRuleInput, rule: { id: string; priority: number; createdAt: string }) {
@@ -205,7 +209,7 @@ function transactionPage(items: ReturnType<typeof transactionsForInput>, input?:
 
 function setupCompleteForStubApi() {
   if (!disableAuthForStubApi) return true
-  return !window.location.pathname.startsWith('/setup')
+  return !window.location.pathname.startsWith(`${base}setup`)
 }
 
 export const configuration = {
@@ -296,8 +300,8 @@ function withBudgetTypenames(report: typeof budgetReport) {
 }
 
 export const handlers = [
-  http.get('/auth/config', () => HttpResponse.json({ master_password_status: 'ENABLED', email_auth_enabled: true, google_auth_enabled: true, webauthn_enabled: true, disable_all_auth: disableAuthForStubApi, setup_complete: setupCompleteForStubApi(), scopes: [] })),
-  http.get('/auth/webauthn/credentials', () => HttpResponse.json([])),
+  http.get(`${base}auth/config`, () => HttpResponse.json({ master_password_status: 'ENABLED', email_auth_enabled: true, google_auth_enabled: true, webauthn_enabled: true, disable_all_auth: disableAuthForStubApi, setup_complete: setupCompleteForStubApi(), scopes: [] })),
+  http.get(`${base}auth/webauthn/credentials`, () => HttpResponse.json([])),
   api.query('Categories', () => HttpResponse.json({ data: { categories: { __typename: 'CategoryList', items: categories } } })),
   api.query('CategoryGroups', () => HttpResponse.json({ data: { categoryGroups: { __typename: 'CategoryGroupList', items: categoryGroups } } })),
   api.query('PlaidPFC2Codes', () => HttpResponse.json({ data: { plaidPFC2Codes: ['FOOD_AND_DRINK_GROCERIES', 'FOOD_AND_DRINK_RESTAURANT', 'FOOD_AND_DRINK_COFFEE'] } })),
@@ -744,6 +748,7 @@ export const handlers = [
     return HttpResponse.json({ data: { createManualAccount: { __typename: 'CreateManualAccountPayload', account: newAccount } } })
   }),
   api.query('NetWorth', ({ variables }) => {
+    if (demoNetWorthReport) return HttpResponse.json({ data: { netWorth: demoNetWorthReport } })
     const includeHoldings = Boolean((variables as { includeHoldings?: boolean }).includeHoldings)
     const cashAccount: Account = { ...accounts[0], latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-cash', balanceUSD: 4500, netContributionUSD: 300 }, lastSyncedAt: '2026-05-21T10:00:00Z' }
     const taxAdvantagedInvestmentAccount: Account = { ...accounts[1], id: 'acct-invest-tax-advantaged', name: 'Roth 401k', type: 'INVESTMENT', subtype: 'roth 401k', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-tax-advantaged', accountId: 'acct-invest-tax-advantaged', balanceUSD: 12200, netContributionUSD: 950 }, closed: false, lastSyncedAt: '2026-05-21T10:00:00Z' }
@@ -806,6 +811,7 @@ export const handlers = [
     })
   }),
   api.query('HistoricalNetWorth', () => {
+    if (demoHistoricalNetWorthReport) return HttpResponse.json({ data: { historicalNetWorth: demoHistoricalNetWorthReport } })
     return HttpResponse.json({
       data: {
         historicalNetWorth: {
@@ -864,7 +870,7 @@ export const handlers = [
   }),
   api.query('BudgetReport', ({ variables }) => {
     const input = variables.input as BudgetReportInput
-    return HttpResponse.json({ data: { budgetReport: withBudgetTypenames({ ...budgetReport, month: input?.month ?? budgetReport.month }) } })
+    return HttpResponse.json({ data: { budgetReport: withBudgetTypenames(budgetReportForMonth(input?.month ?? budgetReport.month)) } })
   }),
   api.query('BudgetReportHistory', () => HttpResponse.json({
     data: {
@@ -901,8 +907,8 @@ export const handlers = [
       data: { copyBudgets: { __typename: 'CopyBudgetsPayload', copiedCount: input.fromMonth === input.toMonth ? 0 : 2 } },
     })
   }),
-  http.get('/transactions/export', () => new HttpResponse('account_id,date,amount,merchant_name\nacct-1,2026-05-14,62.30,Target\n', {
+  http.get(`${base}transactions/export`, () => new HttpResponse('account_id,date,amount,merchant_name\nacct-1,2026-05-14,62.30,Target\n', {
     headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="transactions.csv"' },
   })),
-  http.post('/transactions/import', () => HttpResponse.json({ processed: 2, skipped: 0, errors: [] })),
+  http.post(`${base}transactions/import`, () => HttpResponse.json({ processed: 2, skipped: 0, errors: [] })),
 ]

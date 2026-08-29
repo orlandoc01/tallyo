@@ -91,7 +91,7 @@ export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: (
               }
               void resolve('USE_PROVIDER')
             }}
-            variant={confirmUseProvider ? 'danger' : 'secondary'}
+            variant={confirmUseProvider ? 'danger-solid' : 'secondary'}
           >
             {resolving === 'USE_PROVIDER' ? 'Restoring...' : confirmUseProvider ? 'Confirm Use Provider' : 'Use Provider'}
           </Button>

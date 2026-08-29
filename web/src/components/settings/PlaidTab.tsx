@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery } from 'urql'
@@ -177,8 +177,7 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
 
         <div className="flex items-center justify-between gap-3">
           {mode === 'edit' ? (
-            <Button className="gap-2 text-red-600 hover:bg-red-50 hover:text-red-700" disabled={saving} onClick={handleDelete} type="button" variant="ghost">
-              <Trash2 className="h-4 w-4" />
+            <Button disabled={saving} onClick={handleDelete} type="button" variant={confirmDelete ? 'danger-solid' : 'danger'}>
               {confirmDelete ? 'Confirm delete' : 'Delete'}
             </Button>
           ) : <span />}

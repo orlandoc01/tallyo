@@ -1,5 +1,6 @@
 import type { Account, Category, Tag } from '../../types/graphql'
 import { TextField } from '../common/FormControls'
+import { ScrollFadeBox } from '../common/ScrollFadeBox'
 import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { AccountCheckboxList } from './AccountCheckboxList'
 import { CategorySelect } from './CategorySelect'
@@ -26,7 +27,7 @@ export function RuleFormFields({
 
   return (
     <>
-      <section className="rounded-2xl border border-neutral-100 p-4">
+      <section className="rounded-xl border border-neutral-100 p-4">
         <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-500">Filters</h3>
         <div className="mt-4 space-y-4">
           <label className="block text-sm font-semibold text-neutral-950">
@@ -92,9 +93,9 @@ export function RuleFormFields({
 
           <div>
             <div className="text-sm font-semibold text-neutral-950">Accounts</div>
-            <div className="mt-2 max-h-32 overflow-auto rounded-xl border border-neutral-100 p-2">
-              <AccountCheckboxList accounts={accounts} onChange={(ids) => fields.setAccountIds(ids ?? [])} selectedAccountIds={fields.accountIds} />
-            </div>
+            <ScrollFadeBox className="mt-2 max-h-56 rounded-xl border border-neutral-100 p-2">
+              <AccountCheckboxList accounts={accounts} onChange={(ids) => fields.setAccountIds(ids ?? [])} selectedAccountIds={fields.accountIds} showCount />
+            </ScrollFadeBox>
           </div>
         </div>
       </section>

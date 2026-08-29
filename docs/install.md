@@ -16,7 +16,7 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v tallyo-data:/data \
-  'ghcr.io/orlandoc01/tallyo:<full-version>'
+  'ghcr.io/orlandoc01/tallyo:0.2.0'
 ```
 
 Open `http://127.0.0.1:8080` and complete the setup wizard before making the service reachable from another machine. Add startup settings with `--env-file <environment-file>` or individual `-e` options; see [Configuration](configuration.md).

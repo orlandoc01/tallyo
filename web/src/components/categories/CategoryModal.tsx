@@ -97,7 +97,7 @@ export function CategoryModal({
                     This will permanently delete this category. Any auto-categorization rules for this category will also be deleted.
                   </p>
                   <div className="flex gap-2">
-                    <Button disabled={deleting} onClick={handleDelete} size="sm" type="button" variant="danger">
+                    <Button disabled={deleting} onClick={handleDelete} size="sm" type="button" variant="danger-solid">
                       {deleting ? 'Deleting…' : 'Confirm delete'}
                     </Button>
                     <Button onClick={() => setConfirmDelete(false)} size="sm" type="button" variant="secondary">

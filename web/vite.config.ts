@@ -1,13 +1,44 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import { VitePWA, type ManifestOptions } from 'vite-plugin-pwa'
 
-export default defineConfig({
+const base = process.env.BASE_PATH ?? '/'
+
+const manifest: Partial<ManifestOptions> = {
+  name: 'Tallyo',
+  short_name: 'Spending',
+  description: 'Personal finance tracker',
+  theme_color: '#f2faf9',
+  background_color: '#f2faf9',
+  display: 'standalone',
+  scope: base,
+  start_url: base,
+  icons: [
+    { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+    { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
+    { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  ],
+}
+
+// ponytail: demo mode (GitHub Pages) runs MSW's service worker instead of workbox — they'd fight over the same scope —
+// so it gets the install manifest only, without the offline precache.
+function demoManifest(): Plugin {
+  return {
+    name: 'demo-manifest',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: JSON.stringify({ ...manifest, name: 'Tallyo Demo', short_name: 'Tallyo Demo' }) })
+    },
+    transformIndexHtml: () => [{ tag: 'link', attrs: { rel: 'manifest', href: `${base}manifest.webmanifest` }, injectTo: 'head' }],
+  }
+}
+
+export default defineConfig(({ mode }) => ({
+  base,
   cacheDir: 'node_modules/.vite',
   plugins: [
     react(),
-    VitePWA({
+    mode === 'demo' ? demoManifest() : VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
         'favicon.ico',
@@ -18,21 +49,7 @@ export default defineConfig({
         'apple-touch-icon-azure.png',
         'apple-touch-icon-maroon.png',
       ],
-      manifest: {
-        name: 'Tallyo',
-        short_name: 'Spending',
-        description: 'Personal finance tracker',
-        theme_color: '#f2faf9',
-        background_color: '#f2faf9',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
+      manifest,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: 'index.html',
@@ -100,4 +117,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

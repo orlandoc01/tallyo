@@ -9,12 +9,14 @@ export function AccountCheckboxList({
   selectedAccountIds,
   onChange,
   enableGroupToggle = false,
+  showCount = false,
 }: {
   accounts: Account[]
   selectedAccountIds?: string[]
   onChange: (accountIds: string[] | undefined) => void
   variant?: 'default' | 'highlight'
   enableGroupToggle?: boolean
+  showCount?: boolean
 }) {
   const { hideOwners } = useAuth()
   const selectedIds = selectedAccountIds ?? []
@@ -55,6 +57,7 @@ export function AccountCheckboxList({
       searchPlaceholder="Search accounts"
       selectAllAriaLabel="Select all accounts"
       selectedIds={selectedIds}
+      summary={showCount ? `${visibleAccounts.length} ${visibleAccounts.length === 1 ? 'account' : 'accounts'}` : undefined}
       onChange={handleChange}
     />
   )

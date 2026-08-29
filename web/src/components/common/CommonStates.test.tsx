@@ -88,13 +88,17 @@ describe('common UI states', () => {
         <Button>Primary</Button>
         <Button size="sm" variant="secondary">Secondary</Button>
         <Button variant="danger">Danger</Button>
+        <Button variant="danger-solid">Confirm</Button>
         <Button variant="ghost">Ghost</Button>
       </>,
     )
 
     expect(screen.getByRole('button', { name: 'Primary' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Secondary' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Danger' })).toBeInTheDocument()
+    const danger = screen.getByRole('button', { name: 'Danger' })
+    expect(danger).toHaveClass('text-red-600', 'border-red-300')
+    expect(danger).not.toHaveClass('bg-red-600')
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('bg-red-600', 'text-white')
     expect(screen.getByRole('button', { name: 'Ghost' })).toBeInTheDocument()
   })
 

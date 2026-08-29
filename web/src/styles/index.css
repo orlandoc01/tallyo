@@ -252,6 +252,7 @@ html.dark {
   --brand-100: var(--brand-100-dk);
   --dark-bg: #171513;
   --dark-surface: #1f1c1a;
+  --dark-raised: #262320;
   --dark-hover: #2a2725;
   --dark-border: #292524;
   --text-primary-dark: 196 191 185;
@@ -266,8 +267,9 @@ html.dark {
 html.dark .bg-white        { background-color: var(--dark-surface); }
 html.dark .bg-white\/90    { background-color: rgb(31 28 26 / 0.9); }
 html.dark .bg-paper        { background-color: var(--dark-bg); }
-html.dark .bg-neutral-50   { background-color: var(--dark-hover); }
-html.dark .bg-neutral-100  { background-color: var(--dark-hover); }
+/* Static subcard fills step one notch above the surface; hover fills (below) stay a notch lighter still. */
+html.dark .bg-neutral-50   { background-color: var(--dark-raised); }
+html.dark .bg-neutral-100  { background-color: var(--dark-raised); }
 html.dark .dark\:bg-neutral-950 { background-color: var(--dark-bg); }
 html.dark .dark\:bg-neutral-950\/30 { background-color: rgb(23 21 19 / 0.3); }
 html.dark .dark\:bg-neutral-950\/40 { background-color: rgb(23 21 19 / 0.4); }
@@ -377,6 +379,10 @@ html.dark .dark\:hover\:bg-neutral-800\/50:hover,
 html.dark .dark\:hover\:bg-neutral-800\/70:hover,
 html.dark .dark\:hover\:bg-neutral-900:hover { background-color: var(--dark-hover); }
 html.dark .hover\:bg-red-50:hover      { background-color: #3b0505; }
+
+/* Scroll-box bottom fade (ScrollFadeBox) — matches the surface it sits on */
+.scroll-fade { background: linear-gradient(to top, #ffffff, transparent); }
+html.dark .scroll-fade { background: linear-gradient(to top, var(--dark-surface), transparent); }
 
 /* Form controls */
 html.dark input,

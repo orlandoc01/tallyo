@@ -2,8 +2,9 @@ import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery } from 'urql'
 import { Plus, SlidersHorizontal } from 'lucide-react'
-import { Card, SectionLabel } from '../components/common/FormControls'
+import { Card } from '../components/common/FormControls'
 import { mobileHeaderActionClass } from '../components/common/mobileHeaderActionClass'
+import { PageHeader } from '../components/common/PageHeader'
 import { QueryGate } from '../components/common/QueryGate'
 import { useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { CreateRuleModal } from '../components/transactions/CreateRuleModal'
@@ -96,22 +97,24 @@ export function RulesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="hidden items-center justify-between gap-3 lg:flex">
-        <SectionLabel>Rules</SectionLabel>
-        <div className="flex items-center gap-2">
-          <RuleFiltersDropdown accounts={accounts} filters={filters} onChange={updateFilters} onClear={clearFilters} />
-          {canWriteRules ? (
-            <button
-              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white shadow-sm"
-              onClick={() => setShowCreateModal(true)}
-              type="button"
-            >
-              <Plus className="h-4 w-4" />
-              Add
-            </button>
-          ) : null}
-        </div>
-      </div>
+      <PageHeader
+        actions={(
+          <>
+            <RuleFiltersDropdown accounts={accounts} filters={filters} onChange={updateFilters} onClear={clearFilters} />
+            {canWriteRules ? (
+              <button
+                className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white shadow-sm"
+                onClick={() => setShowCreateModal(true)}
+                type="button"
+              >
+                <Plus className="h-4 w-4" />
+                Add
+              </button>
+            ) : null}
+          </>
+        )}
+        title="Rules"
+      />
       <QueryGate
         data={data}
         empty={rules.length === 0}
@@ -154,11 +157,6 @@ export function RulesPage() {
                   <RuleDetail label="Created" value={formatDate(rule.createdAt)} />
                 </div>
               </div>
-              {canWriteRules ? (
-                <div className="self-start rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-semibold text-neutral-500">
-                  Click to edit
-                </div>
-              ) : null}
             </div>
           ))}
         </Card>

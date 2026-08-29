@@ -6,6 +6,7 @@ import type { GeneralConfiguration } from '../types/graphql'
 import { AuthContext, type AuthContextValue, type MasterPasswordStatus } from './authContextValue'
 import { beginEmailOAuthLogin } from './emailAuth'
 import { beginOAuthLogin } from './oauth'
+import { getApiBaseUrl } from '../utils/apiUrl'
 import { beginPasskeyOAuthLogin } from './webauthn'
 import { isPastIdleTimeout, markActivity, useIdleTimeout } from '../hooks/useIdleTimeout'
 import { DialogButtonRow } from '../components/common/Button'
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refreshAuthConfig = useCallback(async () => {
-    const res = await fetch(`${window.location.origin}/auth/config`)
+    const res = await fetch(`${getApiBaseUrl()}/auth/config`)
     const data = await res.json() as AuthConfigResponse
     applyAuthConfig(data)
   }, [applyAuthConfig])

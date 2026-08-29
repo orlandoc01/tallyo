@@ -1,5 +1,10 @@
 import type { Account, AccountSnapshot, AnalysisHolding, AnalysisInput, AnalysisReport, AnalysisView, Asset, AssetSnapshot, BalanceSnapshotReview, BudgetReport, BudgetReportHistory, CashFlowPeriod, Category, CategoryGroup, Configuration, Holding, Rule, Connection, Owner, PlaidCredential, PlaidItem, RecurringCharge, RecurringStreamStatus, SimpleFinAccessToken, SimpleFinConnection, Tag, Transaction, TransactionsSummary } from '../types/graphql'
 import type { SpendingPeriod } from '../types/domain'
+import { buildDemoData } from './demo/data'
+
+const demoData = import.meta.env.MODE === 'demo' ? buildDemoData() : null
+export const demoNetWorthReport = demoData?.netWorthReport ?? null
+export const demoHistoricalNetWorthReport = demoData?.historicalNetWorthReport ?? null
 
 export const uncategorizedCategory: Category = { __typename: 'Category', id: '0', name: 'uncategorized', emoji: '❓', groupName: 'Other', groupEmoji: '?', kind: 'EXPENSE', sortOrder: 2147483647, plaidPFC2Codes: [] }
 
@@ -562,6 +567,7 @@ const analysisHoldings: AnalysisHoldingFixture[] = [
 ]
 
 export function analysisReportForInput(input?: AnalysisInput): AnalysisReport {
+  if (demoData) return demoData.analysisReportForInput(input)
   const view = input?.view ?? 'COMPOSITION'
   const filteredHoldings = analysisHoldings.filter((holding) => {
     if (input?.ownerIds?.length && !input.ownerIds.includes(holding.account.owner.id)) return false
@@ -846,4 +852,40 @@ export const budgetReportHistory: BudgetReportHistory = {
       sections: budgetReport.sections,
     },
   ],
+}
+
+export function budgetReportForMonth(month: string) {
+  return demoData?.budgetReportHistory.items.find((report) => report.month === month) ?? { ...budgetReport, month }
+}
+
+if (demoData) {
+  categories.splice(0, categories.length, ...demoData.categories)
+  categoryGroups.splice(0, categoryGroups.length, ...demoData.categoryGroups)
+  tags.splice(0, tags.length, ...demoData.tags)
+  owners.splice(0, owners.length, ...demoData.owners)
+  plaidCredentials.splice(0, plaidCredentials.length, ...demoData.plaidCredentials)
+  assets.splice(0, assets.length, ...demoData.assets)
+  accountSnapshots.splice(0, accountSnapshots.length, ...demoData.accountSnapshots)
+  plaidItems.splice(0, plaidItems.length, ...demoData.plaidItems)
+  simpleFinAccessTokens.splice(0, simpleFinAccessTokens.length, ...demoData.simpleFinAccessTokens)
+  connections.splice(0, connections.length, ...demoData.connections)
+  accounts.splice(0, accounts.length, ...demoData.accounts)
+  balanceReviews.splice(0, balanceReviews.length)
+  transactions.splice(0, transactions.length, ...demoData.allTransactions)
+  allTransactions.splice(0, allTransactions.length, ...demoData.allTransactions)
+  recurringCharges.splice(0, recurringCharges.length, ...demoData.recurringCharges)
+  rules.splice(0, rules.length, {
+    __typename: 'Rule', id: 'demo-rule-1', merchantPattern: 'Trader Joe\'s', originalPattern: 'TRADER JOE', merchantName: null, category: demoData.categories.find((category) => category.id === '1')!, tags: [], shouldHide: null, shouldBeRecurring: null, accounts: [demoData.accounts.find((account) => account.id === 'demo-visa')!], amountMin: null, amountMax: null, priority: 10, createdAt: demoData.allTransactions[0].datetime,
+  })
+  Object.assign(budgetReport, demoData.budgetReport)
+  budgetReportHistory.items.splice(0, budgetReportHistory.items.length, ...demoData.budgetReportHistory.items)
+  Object.assign(transactionsSummary, {
+    totalCount: demoData.allTransactions.length,
+    totalAmount: demoData.allTransactions.reduce((sum, transaction) => sum + transaction.amount, 0),
+    averageAmount: demoData.allTransactions.reduce((sum, transaction) => sum + transaction.amount, 0) / demoData.allTransactions.length,
+    largestAmount: Math.max(...demoData.allTransactions.map((transaction) => transaction.amount)),
+    firstDate: demoData.allTransactions.at(-1)?.datetime.slice(0, 10) ?? null,
+    lastDate: demoData.allTransactions[0]?.datetime.slice(0, 10) ?? null,
+  })
+  refreshAssetLatestSnapshots()
 }

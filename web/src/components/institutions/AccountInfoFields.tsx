@@ -147,7 +147,7 @@ export function AccountInfoActions({
       ) : null}
       <div className="ml-auto flex items-center gap-3">
         {canWriteAccounts && account.manual ? (
-          <Button disabled={isSaving || isDeleting} onClick={onRemoveManualAccount} type="button" variant="danger">
+          <Button disabled={isSaving || isDeleting} onClick={onRemoveManualAccount} type="button" variant={confirmingDelete ? 'danger-solid' : 'danger'}>
             {isDeleting ? 'Removing…' : confirmingDelete ? 'Confirm remove' : 'Remove'}
           </Button>
         ) : null}

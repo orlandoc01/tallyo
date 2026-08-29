@@ -19,6 +19,7 @@ import { mobileHeaderActionClass } from '../common/mobileHeaderActionClass'
 import { TransactionSelectionProvider } from '../transactions/TransactionSelectionProvider'
 import { useTransactionSelection } from '../transactions/useTransactionSelection'
 import { NavIcon } from './NavIcon'
+import { DemoBanner } from './DemoBanner'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'app-sidebar-collapsed'
 
@@ -223,6 +224,7 @@ function AppShellInner({ collapsed, onCollapsedChange }: { collapsed: boolean; o
           <MobileHeader hasReviewItems={hasReviewItems} />
 
           <main className="mx-auto max-w-[1600px] p-4 pb-28 pt-16 lg:p-6 lg:pb-6 lg:pt-6" id="main-content">
+            <DemoBanner />
             <Outlet />
           </main>
         </div>

@@ -75,7 +75,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 export function App() {
   return (
     <AppErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
@@ -100,21 +100,21 @@ function AppRoutes() {
     let cancelled = false
     listPasskeys()
       .then((items) => {
-        if (!cancelled && items.length === 0) window.location.assign('/settings/access?onboarding=passkey')
+        if (!cancelled && items.length === 0) window.location.assign(`${import.meta.env.BASE_URL}settings/access?onboarding=passkey`)
       })
       .catch(() => undefined)
     return () => { cancelled = true }
   }, [isAuthenticated, isLoading, location.pathname, passkeyOnly, setupComplete])
 
-  if (window.location.pathname === '/auth/callback') {
+  if (location.pathname === '/auth/callback') {
     return <AuthCallback />
   }
 
-  if (window.location.pathname === '/auth/email-challenge') {
+  if (location.pathname === '/auth/email-challenge') {
     return <EmailChallengePage />
   }
 
-  if (window.location.pathname === '/auth/login') {
+  if (location.pathname === '/auth/login') {
     return <LoginPage />
   }
 
@@ -252,7 +252,7 @@ function AuthCallback() {
 
   useEffect(() => {
     completeOAuthCallback(window.location.search)
-      .then(() => window.location.assign(readAndClearPostLoginRedirect() ?? '/expenses/breakdown'))
+      .then(() => window.location.assign(readAndClearPostLoginRedirect() ?? `${import.meta.env.BASE_URL}expenses/breakdown`))
       .catch((e) => setError(e instanceof Error ? e.message : 'Sign-in failed'))
   }, [])
 

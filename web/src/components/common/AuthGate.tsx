@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { SignInButton, TextLinkButton } from './Button'
 import { TextField } from './FormControls'
 import { SignInPanel } from './SignInPanel'
+import { getApiBaseUrl } from '../../utils/apiUrl'
 
 export function AuthGate({
   onLogin,
@@ -32,7 +33,7 @@ export function AuthGate({
     setError(null)
     setIsSubmitting(true)
 
-    const response = await fetch('/query', {
+    const response = await fetch(`${getApiBaseUrl()}/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

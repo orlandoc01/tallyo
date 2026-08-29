@@ -106,14 +106,9 @@ export function EditRuleModal({
         <ToggleSettingRow checked={applyRetroactively} onChange={setApplyRetroactively} title="Apply retroactively" />
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <button
-            className={`rounded-xl border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${confirmDelete ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : 'border-neutral-200 text-neutral-700 hover:bg-neutral-50'}`}
-            disabled={fetching}
-            onClick={handleDelete}
-            type="button"
-          >
+          <Button disabled={fetching} onClick={handleDelete} type="button" variant={confirmDelete ? 'danger-solid' : 'danger'}>
             {confirmDelete ? 'Confirm delete' : 'Delete rule'}
-          </button>
+          </Button>
           {confirmDelete ? (
             <Button onClick={() => setConfirmDelete(false)} type="button" variant="secondary">Cancel</Button>
           ) : (

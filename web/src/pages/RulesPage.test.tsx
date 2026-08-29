@@ -101,13 +101,13 @@ describe('RulesPage', () => {
     expect(screen.getByText('No rules yet')).toBeInTheDocument()
   })
 
-  it('shows click-to-edit hint for writers', async () => {
+  it('makes rows clickable for writers', async () => {
     await renderAndWait()
 
-    expect(screen.getByText('Click to edit')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /target/i })).toBeInTheDocument()
   })
 
-  it('does not show click-to-edit hint for readers', async () => {
+  it('does not make rows clickable for readers', async () => {
     vi.mocked(usePermissions).mockReturnValue({
       canRead: () => true,
       canWrite: () => false,
@@ -116,7 +116,7 @@ describe('RulesPage', () => {
 
     await renderAndWait()
 
-    expect(screen.queryByText('Click to edit')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /target/i })).not.toBeInTheDocument()
   })
 
   it('sends selected rule filters to the query', async () => {

@@ -8,7 +8,7 @@ export type ReportFilter = {
   isHidden?: boolean
 }
 
-const reportOnlyTransactions: Transaction[] = [
+const reportOnlyTransactions: Transaction[] = import.meta.env.MODE === 'demo' ? [] : [
   reportTransaction('report-2024-income', '2024-02-15', -2600, categories[2], 'Employer Direct Deposit'),
   reportTransaction('report-2024-groceries', '2024-02-17', 140, categories[0], 'Whole Foods'),
   reportTransaction('report-2024-restaurants', '2024-08-08', 180, categories[1], 'Local Diner'),

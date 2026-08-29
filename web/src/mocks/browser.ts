@@ -1,5 +1,6 @@
 import { setupWorker } from 'msw/browser'
 import { setTokens } from '../auth/tokenStore'
+import { demoHandlers } from './demoHandlers'
 import { handlers } from './handlers'
 
 const stubScopes = [
@@ -33,7 +34,8 @@ const worker = setupWorker(...handlers)
 
 export async function startStubApi() {
   setTokens(createStubJwt(stubScopes), 'stub-refresh-token')
-  await worker.start({ onUnhandledRequest: 'bypass' })
+  if (import.meta.env.MODE === 'demo') worker.use(...demoHandlers)
+  await worker.start({ onUnhandledRequest: 'bypass', serviceWorker: { url: `${import.meta.env.BASE_URL}mockServiceWorker.js` } })
 }
 
 function createStubJwt(scopes: string[]) {

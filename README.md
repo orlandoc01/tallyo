@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <strong><a href="https://orlandoc01.github.io/tallyo/">Live demo</a></strong> — the full UI running on fictional data in your browser (no backend, changes reset on reload)
+</p>
+
+<p align="center">
   <img src="media/desktop1.png" width="90%" alt="Tallyo desktop app" />
 </p>
 <p align="center">
@@ -65,12 +69,12 @@ That said, most features have been tested with Plaid credentials. Anyone in the 
 
 ### Docker (recommended)
 
-Create a `compose.yml` file. Pin `<full-version>` for persistent deployments; use `latest` only when you intentionally want the newest release:
+Create a `compose.yml` file. Pin a release version (for example `0.2.0`) for persistent deployments; use `latest` only when you intentionally want the newest release:
 
 ```yaml
 services:
   tallyo:
-    image: ghcr.io/orlandoc01/tallyo:<full-version>
+    image: ghcr.io/orlandoc01/tallyo:0.2.0
     restart: unless-stopped
     # substitute below with your own uid/gid
     user: "1000:1000" 
@@ -97,10 +101,10 @@ docker run -d --name tallyo --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v tallyo-data:/data \
   --user "$(id -u):$(id -g)" \
-  'ghcr.io/orlandoc01/tallyo:<full-version>'
+  'ghcr.io/orlandoc01/tallyo:0.2.0'
 ```
 
-Multi-arch images (amd64/arm64) are published for every release, tagged `latest`, `vX.Y`, and the full version.
+Multi-arch images (amd64/arm64) are published for every release. Image tags are the release version without the `v` prefix: `0.2.0` (exact), `0.2` (latest patch of a minor), and `latest`.
 
 For remote-host bootstrap, reverse proxies, database encryption, and bare-binary service setup, see [Installing Tallyo](docs/install.md).
 

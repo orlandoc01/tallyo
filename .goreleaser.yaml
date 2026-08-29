@@ -62,7 +62,7 @@ dockers_v2:
       - 'ghcr.io/orlandoc01/tallyo'
     tags:
       - '{{ .Version }}'
-      - 'v{{ .Major }}.{{ .Minor }}'
+      - '{{ .Major }}.{{ .Minor }}'
       - latest
     labels:
       org.opencontainers.image.created: '{{ .Date }}'
