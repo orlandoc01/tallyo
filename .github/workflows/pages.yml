@@ -1,8 +1,11 @@
 name: Pages
 
+# Triggered by the tag push, not the release: GoReleaser creates the release with GITHUB_TOKEN,
+# and GitHub never starts workflows from events raised by GITHUB_TOKEN.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
@@ -19,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -34,9 +39,8 @@ jobs:
 
       - working-directory: web
         env:
-          VITE_APP_VERSION: ${{ github.event.release.tag_name || github.ref_name }}
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
-        run: npm run build:demo
+        run: VITE_APP_VERSION="$(git describe --tags --abbrev=0)" npm run build:demo
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -61,9 +61,11 @@ Tallyo ships as a single `tallyo` binary with the web app embedded. It runs back
 
 Tallyo is built for household-scale self-hosting. Run it behind your own reverse proxy, VPN, or identity-aware proxy — do not expose it directly to the public internet. See [Security and Deployment Notes](docs/security.md) before publishing an instance.
 
+**US/USD only for now.** All amounts are stored and displayed as USD with no currency conversion. SimpleFIN rejects non-USD accounts and Plaid/CSV amounts are taken as USD verbatim.
+
 **Plaid is optional.** SimpleFIN sync, CSV import/export, crypto wallet tracking, and manual accounts (including real estate and manual holdings/liabilities) all work without a Plaid account, so you can track spending and net worth entirely without it.
 
-That said, most features have been tested with Plaid credentials. Anyone in the US and Canada can now signup for a free Plaid account and get [10 free logins/connections](https://support.plaid.com/hc/en-us/articles/39994173227159-What-is-the-Plaid-Trial-plan), which should be enough for most households to track their finances (note: you can configure more credentials in the app if other household members also sign up for their own). The SimpleFIN integration can also pull transactions for expense tracking, though categorization support is more limited, as is investment holding analysis.
+That said, most features have been tested with Plaid credentials. Anyone in the US (and Canada, though only USD accounts are supported) can now signup for a free Plaid account and get [10 free logins/connections](https://support.plaid.com/hc/en-us/articles/39994173227159-What-is-the-Plaid-Trial-plan), which should be enough for most households to track their finances (note: you can configure more credentials in the app if other household members also sign up for their own). The SimpleFIN integration can also pull transactions for expense tracking, though categorization support is more limited, as is investment holding analysis.
 
 ## Installation
 
