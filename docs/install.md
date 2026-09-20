@@ -71,28 +71,18 @@ Database migrations and reference-data updates run automatically whenever Tallyo
 
 ## Bare release binary
 
-Download the archive and `checksums.txt` for the same version from the [release page](https://github.com/orlandoc01/tallyo/releases). Verify the archive's SHA-256 checksum before extracting it. Release archives include the embedded web application and do not require CGO or a separately installed SQLite library.
+Download the archive and `checksums.txt` for the same version from the [release page](https://github.com/orlandoc01/tallyo/releases). Verify the archive's SHA-256 checksum before extracting it. Release archives are static binaries with the web application and SQLite embedded.
 
 Supported release artifacts are:
 
 | Operating system | amd64 | arm64 | Archive |
 |---|---:|---:|---|
 | Linux | Yes | Yes | `tar.gz` |
-| macOS | Yes | Yes | `tar.gz` |
-| Windows | Yes | No | `zip` |
 
-On Linux or macOS, set a writable database location because the default is intended for the container:
+Set a writable database location because the default is intended for the container:
 
 ```bash
 DB_PATH='<database-path>' PORT=8080 ./tallyo
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:DB_PATH = '<database-path>'
-$env:PORT = '8080'
-./tallyo.exe
 ```
 
 ## systemd
@@ -143,25 +133,24 @@ Keep the key outside the database storage and backups. Losing it makes the encry
 
 ## Build from source
 
-A source build requires the versions declared by the repository: Go 1.26.6, Node.js 24, and npm 11.
+A source build requires the versions declared by the repository: Rust 1.97.1, Node.js 24, and npm 11.
 
 From a clean checkout:
 
 ```bash
 npm --prefix web ci
 npm --prefix web run build
-make -C server sync-web
-cd server
-go build -trimpath -o tallyo ./cmd/tallyo
+make -C server-rs sync-web
+cargo build --release --manifest-path server-rs/Cargo.toml
 ```
 
-The resulting `server/tallyo` binary includes the built SPA. Set `DB_PATH` when running it outside the release container.
+The resulting `server-rs/target/release/tallyo` binary includes the built SPA. Set `DB_PATH` when running it outside the release container.
 
 ### Why plain `docker build` does not build a checkout
 
-The root `Dockerfile` is release packaging, not a source-build Dockerfile. GoReleaser first builds a binary for each target platform, arranges platform-specific build contexts, and then invokes the root Dockerfile. Its `COPY` expects a prebuilt `tallyo` binary under the target platform directory.
+The root `Dockerfile` is release packaging, not a source-build Dockerfile. The release workflow first builds a binary for each target platform, arranges platform-specific build contexts, and then invokes the root Dockerfile. Its `COPY` expects a prebuilt `tallyo` binary under the target platform directory.
 
-Consequently, a clean source checkout cannot be built directly with plain `docker build .`. Use the published image, build the binary from source as shown above, or run the repository's GoReleaser release process if you specifically need release-format images.
+Consequently, a clean source checkout cannot be built directly with plain `docker build .`. Use the published image, build the binary from source as shown above, or run the repository's release workflow if you specifically need release-format images.
 
 ## Upgrades
 

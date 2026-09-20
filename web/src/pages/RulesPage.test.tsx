@@ -22,7 +22,7 @@ type RuleInput = Record<string, unknown> & {
 
 type RuleMutationVariables = { input: RuleInput }
 
-function renderRulesPage(withActionsHost = false) {
+function renderRulesPage(withActionsHost = false, router: 'browser' | 'memory' = 'memory') {
   return renderWithProviders(
     <Routes>
       {SETTINGS_RULE_PATHS.map((path) => <Route element={<RulesPage />} key={path} path={absoluteRoutePath(path)} />)}
@@ -31,6 +31,7 @@ function renderRulesPage(withActionsHost = false) {
       auth: { scopes: [], masterPasswordStatus: 'DISABLED' },
       initialEntries: [initialRoute],
       probes: withActionsHost ? <MobileHeaderActionsHost /> : null,
+      router,
       withGraphql: true,
       withMobileHeader: true,
     },
@@ -80,6 +81,7 @@ function captureUpdateRule(retroactivelyUpdated = 0) {
 describe('RulesPage', () => {
   afterEach(() => {
     vi.useRealTimers()
+    window.history.replaceState({}, '', '/')
     initialRoute = '/settings/rules'
     vi.mocked(usePermissions).mockReturnValue(allowAllPermissionResult)
   })
@@ -406,6 +408,32 @@ describe('RulesPage', () => {
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Create rule' })).toBeInTheDocument()
+  })
+
+  it('filters rules immediately while pushing one global search session', async () => {
+    window.history.pushState({}, '', '/settings/rules')
+    const user = userEvent.setup()
+    renderRulesPage(false, 'browser')
+    await screen.findAllByText(/target/i)
+    const historyLengthBeforeSearch = window.history.length
+
+    const searchInput = screen.getByRole('textbox', { name: /search rules/i })
+    await user.type(searchInput, 'zzz-no-match')
+
+    expect(await screen.findByText('No matching rules')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(window.location.search).toBe('?q=zzz-no-match')
+    })
+    expect(window.history.length).toBe(historyLengthBeforeSearch + 1)
+  })
+
+  it('initializes rule search from q', async () => {
+    window.history.pushState({}, '', '/settings/rules?q=Target')
+
+    renderRulesPage(false, 'browser')
+
+    const searchInput = await screen.findByRole('textbox', { name: /search rules/i })
+    expect(searchInput).toHaveValue('Target')
   })
 
   it('opens rule filters from the compact mobile header action', async () => {

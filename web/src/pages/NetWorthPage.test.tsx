@@ -18,9 +18,14 @@ vi.mock('../components/institutions/AccountDetailModal', () => ({
   ),
 }))
 vi.mock('../components/wealth/NetWorthChart', () => ({
-  NetWorthChart: ({ onRangeChange }: { onRangeChange: (range: 'ONE_MONTH') => void }) => <button onClick={() => onRangeChange('ONE_MONTH')} type="button">Chart</button>,
+  NetWorthChart: ({ focusedDate, onFocusDate, onRangeChange }: { focusedDate?: string; onFocusDate: (date: string | null) => void; onRangeChange: (range: 'ONE_MONTH') => void }) => (
+    <div>
+      <button onClick={() => onRangeChange('ONE_MONTH')} type="button">Chart</button>
+      <button onClick={() => onFocusDate(focusedDate ? null : '2026-06-01')} type="button">{focusedDate ? `Focused ${focusedDate}` : 'Focus point'}</button>
+    </div>
+  ),
 }))
-vi.mock('../components/wealth/AssetsDonut', () => ({ AssetsDonut: () => <div>Donut</div> }))
+vi.mock('../components/wealth/AssetsDonut', () => ({ AssetsDonut: ({ totalAssets }: { totalAssets: number }) => <div><span>Donut</span><span data-testid="donut-total">{totalAssets}</span></div> }))
 vi.mock('../components/wealth/AccountSidebar', () => ({
   AccountSidebar: ({ amountsHidden, canReadHoldings = true, heading, onAccountClick, onAccountGroupClick }: { amountsHidden?: boolean; canReadHoldings?: boolean; heading?: string; onAccountClick?: (account: { id: string; name: string }) => void; onAccountGroupClick?: (groupId: 'DEPOSITS' | 'INVESTMENTS', accountIds: string[]) => void }) => (
     <div data-account-sidebar>
@@ -432,6 +437,85 @@ describe('NetWorthPage', () => {
     renderPage(['/net-worth/assets/asset-usd'])
 
     expect(screen.getByRole('dialog', { name: 'Edit US Dollar' })).toBeInTheDocument()
+  })
+
+  it('focuses a chart point in the URL and shows the breakdown as of that date', async () => {
+    mockedUseNetWorth.mockImplementation((input) => ({
+      fetching: false,
+      report: input.asOfDate ? { ...report, asOfDate: input.asOfDate, currentAssetsUSD: 900 } : report,
+    }) as unknown as ReturnType<typeof useNetWorth>)
+    renderPage()
+    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Focus point' })[0])
+
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?focus_date=2026-06-01')
+    expect(mockedUseNetWorth).toHaveBeenCalledWith(expect.objectContaining({ asOfDate: '2026-06-01' }), false)
+    expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.not.objectContaining({ asOfDate: expect.anything() }))
+    expect(screen.getAllByText('Breakdown as of')).toHaveLength(2)
+    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('900')
+    expect(screen.getByText('No asset snapshot yet')).toBeInTheDocument()
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Focused 2026-06-01' })[0])
+
+    expect(screen.getByTestId('location-search')).toHaveTextContent('')
+    expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+  })
+
+  it.each([
+    ['is still loading', { fetching: true, report: undefined }],
+    ['retains a previous date while loading', { fetching: true, report: { ...report, asOfDate: '2026-05-01', currentAssetsUSD: 900 } }],
+    ['settled on a different date', { fetching: false, report: { ...report, asOfDate: '2026-05-01', currentAssetsUSD: 900 } }],
+  ])('keeps the live breakdown under a loading banner while the focused report %s', (_, focused) => {
+    mockedUseNetWorth.mockImplementation((input) => (input.asOfDate ? focused : { fetching: false, report }) as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?focus_date=2026-06-01'])
+
+    expect(screen.getAllByText('Loading breakdown as of')).toHaveLength(2)
+    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+  })
+
+  it('offers a retry when the focused report fails and keeps the live breakdown', async () => {
+    const refetch = vi.fn()
+    mockedUseNetWorth.mockImplementation((input) => (input.asOfDate
+      ? { fetching: false, report: undefined, error: new CombinedError({ graphQLErrors: ['Nope'] }), refetch }
+      : { fetching: false, report }) as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?focus_date=2026-06-01'])
+
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Could not load the breakdown as of 2026-06-01')
+    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0])
+
+    expect(refetch).toHaveBeenCalledWith({ requestPolicy: 'network-only' })
+  })
+
+  it('accepts a leap day as a focus date', () => {
+    mockedUseNetWorth.mockImplementation((input) => ({ fetching: false, report: input.asOfDate ? { ...report, asOfDate: input.asOfDate } : report }) as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?focus_date=2028-02-29'])
+
+    expect(screen.getAllByText('Breakdown as of')).toHaveLength(2)
+  })
+
+  it('loads a focused date from the URL and clears it from the breakdown banner', async () => {
+    mockedUseNetWorth.mockImplementation((input) => ({ fetching: false, report: input.asOfDate ? { ...report, asOfDate: input.asOfDate } : report }) as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?focus_date=2026-06-01&owner=owner'])
+
+    expect(mockedUseNetWorth).toHaveBeenCalledWith({ ownerIds: ['owner'], asOfDate: '2026-06-01' }, false)
+    expect(screen.getAllByText('2026-06-01')).toHaveLength(2)
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Show current' })[0])
+
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?owner=owner')
+    expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
+  })
+
+  it.each(['2026-13-45', '2026-02-29', '2026-04-31', 'yesterday'])('ignores the malformed focus date %s', (focusDate) => {
+    mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
+    renderPage([`/net-worth?focus_date=${focusDate}`])
+
+    expect(mockedUseNetWorth).not.toHaveBeenCalledWith(expect.objectContaining({ asOfDate: expect.anything() }), expect.anything())
+    expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
   })
 
   it('renders negative trends and snapshot dates', () => {

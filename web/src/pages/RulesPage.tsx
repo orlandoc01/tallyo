@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery } from 'urql'
 import { Plus, SlidersHorizontal } from 'lucide-react'
-import { Card } from '../components/common/FormControls'
+import { Card, SearchInput } from '../components/common/FormControls'
 import { mobileHeaderActionClass } from '../components/common/mobileHeaderActionClass'
 import { PageHeader } from '../components/common/PageHeader'
 import { QueryGate } from '../components/common/QueryGate'
@@ -26,8 +26,9 @@ const emptyLocalRuleFilters: LocalRuleFilters = { accountIds: [], amountMin: '',
 export function RulesPage() {
   const [merchantPattern, setMerchantPattern] = useQueryParamState('merchant_pattern')
   const [originalPattern, setOriginalPattern] = useQueryParamState('original_pattern')
+  const [search, setSearch] = useQueryParamState('q')
   const [localFilters, setLocalFilters] = useState(emptyLocalRuleFilters)
-  const filters = useMemo<RuleFilterValues>(() => ({ merchantPattern, originalPattern, ...localFilters }), [merchantPattern, originalPattern, localFilters])
+  const filters = useMemo<RuleFilterValues>(() => ({ merchantPattern, originalPattern, search, ...localFilters }), [merchantPattern, originalPattern, search, localFilters])
   const rulesInput = useMemo(() => rulesInputFromFilters(filters), [filters])
   const [{ data, fetching, error }, reexecuteQuery] = useQuery<{ rules: { items: Rule[] } }, { input: RulesInput | null }>({ query: RULES_QUERY, variables: { input: rulesInput } })
   const { rule_id: ruleID } = useParams()
@@ -52,8 +53,9 @@ export function RulesPage() {
   const clearFilters = useCallback(() => {
     setMerchantPattern('')
     setOriginalPattern('')
+    setSearch('')
     setLocalFilters(emptyLocalRuleFilters)
-  }, [setMerchantPattern, setOriginalPattern])
+  }, [setMerchantPattern, setOriginalPattern, setSearch])
 
   const mobileHeaderActions = useMemo(() => {
     return (
@@ -114,7 +116,9 @@ export function RulesPage() {
           </>
         )}
         title="Rules"
-      />
+      >
+        <SearchInput ariaLabel="Search rules" className="w-full max-w-xl" onChange={setSearch} placeholder="Search rules..." value={search} />
+      </PageHeader>
       <QueryGate
         data={data}
         empty={rules.length === 0}
@@ -194,10 +198,12 @@ function rulesInputFromFilters(filters: RuleFilterValues): RulesInput | null {
   const input: RulesInput = {}
   const merchantPattern = filters.merchantPattern.trim()
   const originalPattern = filters.originalPattern.trim()
+  const search = filters.search.trim()
   const amountMin = optionalNumber(filters.amountMin)
   const amountMax = optionalNumber(filters.amountMax)
   if (merchantPattern) input.merchantPattern = merchantPattern
   if (originalPattern) input.originalPattern = originalPattern
+  if (search) input.search = search
   if (filters.accountIds.length) input.accountIds = filters.accountIds
   if (amountMin !== undefined) input.amountMin = amountMin
   if (amountMax !== undefined) input.amountMax = amountMax

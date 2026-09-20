@@ -1,0 +1,33 @@
+name: Set up cargo-zigbuild
+description: Installs zig, cargo-zigbuild and the requested Rust targets (pins mirror the private build-runner image)
+
+inputs:
+  targets:
+    description: Space-separated Rust target triples to add
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install zig
+      shell: bash
+      env:
+        ZIG_VERSION: 0.16.0
+        ZIG_SHA256: 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+      run: |
+        set -eu
+        curl -sSfL -o /tmp/zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+        echo "${ZIG_SHA256}  /tmp/zig.tar.xz" | sha256sum -c -
+        mkdir -p "$HOME/zig"
+        tar -xJf /tmp/zig.tar.xz -C "$HOME/zig" --strip-components=1
+        rm /tmp/zig.tar.xz
+        echo "$HOME/zig" >> "$GITHUB_PATH"
+
+    - uses: taiki-e/install-action@v2.87.16
+      with:
+        tool: cargo-zigbuild@0.23.4
+
+    - name: Install Rust targets
+      shell: bash
+      working-directory: server-rs
+      run: rustup target add ${{ inputs.targets }}

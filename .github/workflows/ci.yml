@@ -16,8 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - check_name: typecheck
-            command: npm run typecheck
           - check_name: lint
             command: npm run lint
           - check_name: coverage
@@ -39,43 +37,11 @@ jobs:
         working-directory: web
         run: ${{ matrix.command }}
 
-  server:
-    name: Server ${{ matrix.check_name }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - check_name: codegen
-            command: make check-codegen
-          - check_name: lint
-            command: make lint
-          - check_name: deadcode
-            command: make deadcode
-          - check_name: coverage
-            command: make coverage GO_TEST_PARALLEL="$(nproc)"
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
-
-      - name: Run ${{ matrix.check_name }}
-        working-directory: server
-        run: ${{ matrix.command }}
-
-  release-build:
-    name: Release build (snapshot)
+  web-build:
+    name: Web build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
 
       - uses: actions/setup-node@v7
         with:
@@ -83,8 +49,117 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Check GoReleaser config
-        run: go run github.com/goreleaser/goreleaser/v2@latest check
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
 
-      - name: Build release snapshot
-        run: go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean --skip=docker --skip=sbom
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: web
+        run: VITE_APP_VERSION="dev-$(git rev-parse --short HEAD)" npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+
+  checks:
+    name: Server checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: checks-${{ hashFiles('server-rs/rust-toolchain.toml') }}
+          workspaces: |
+            server-rs
+            server-rs/tools/graphql-gen
+
+      - uses: sqlc-dev/setup-sqlc@v5.0.0
+        with:
+          sqlc-version: "1.31.1"
+
+      - uses: taiki-e/install-action@v2.87.16
+        with:
+          tool: cargo-machete@0.9.2
+
+      - name: Lint
+        working-directory: server-rs
+        run: make lint
+
+      # if: always() so one failing check does not hide the others
+      - name: Check codegen
+        if: always()
+        working-directory: server-rs
+        run: make check-codegen
+
+      - name: Deadcode
+        if: always()
+        working-directory: server-rs
+        run: make deadcode
+
+      - name: Test graphql-gen
+        if: always()
+        working-directory: server-rs
+        run: make test-graphql-gen
+
+  coverage:
+    name: Server coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: coverage-${{ hashFiles('server-rs/rust-toolchain.toml') }}
+          workspaces: server-rs
+
+      - uses: taiki-e/install-action@v2.87.16
+        with:
+          tool: cargo-llvm-cov@0.8.7
+
+      - name: Coverage
+        working-directory: server-rs
+        run: make coverage
+
+  release-build:
+    name: Release build (dry run)
+    runs-on: ubuntu-latest
+    needs: [web-build]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: release-amd64-${{ hashFiles('server-rs/rust-toolchain.toml') }}
+          workspaces: server-rs
+
+      - uses: ./.github/actions/setup-zigbuild
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
+
+      - name: Embed web
+        run: make -C server-rs sync-web
+
+      - name: Build linux/amd64
+        working-directory: server-rs
+        run: cargo zigbuild --release --target x86_64-unknown-linux-musl
+
+      - name: Build image
+        env:
+          IMAGE: tallyo:ci-${{ github.run_id }}
+        run: |
+          set -eu
+          install -D server-rs/target/x86_64-unknown-linux-musl/release/tallyo dist/image/linux/amd64/tallyo
+          docker build --platform linux/amd64 -t "$IMAGE" -f Dockerfile dist/image
+          docker rmi "$IMAGE"

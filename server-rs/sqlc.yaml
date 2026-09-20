@@ -1,0 +1,78 @@
+version: "2"
+plugins:
+  - name: sqlc-gen-rust
+    wasm:
+      url: https://github.com/orlandoc01/sqlc-gen-rust/releases/download/v0.2.0/sqlc-gen-rust.wasm
+      sha256: 4ac84c65bb0f8c548db850ea3a51baa831ba4fc339e4cb8775c0b888e4ad0066
+sql:
+  - engine: sqlite
+    schema: [migrations/0001_schema_init.sql, migrations/0003_rules_fts.sql, sql/sqlc_fts_schema.sql]
+    queries: sql/queries
+    codegen:
+      - plugin: sqlc-gen-rust
+        out: src/database
+        options:
+          output: queries.rs
+          db_crate: sqlx-sqlite
+          query_parameter_limit: 0
+          dynfilters:
+            prepared: true
+            variants_skip: [TransactionRecords, CountTransactionRecords, TransactionRecordsSummary, TransactionIDsByFilter]
+          row_attributes:
+            .AuthCode: "#[derive(Clone, Debug, PartialEq, Eq)]"
+            .LoginSessions: "#[derive(Clone, Debug, PartialEq, Eq)]"
+            .WebAuthnCredentialsByUserID: "#[derive(Clone, Debug, PartialEq, Eq)]"
+            .WebAuthnRegistration: "#[derive(Clone, Debug, PartialEq, Eq)]"
+            .SimpleFinTokenSecrets: "#[derive(Clone, Debug, PartialEq, Eq)]"
+          overrides:
+            - db_type: datetime
+              rs_type: crate::database::Timestamp
+              copy_cheap: true
+              can_default: true
+            - db_type: boolean
+              rs_type: bool
+              copy_cheap: true
+            - column: .transactions.amount_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .budgets.amount_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .recurring_charges.average_amount_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .recurring_charges.last_amount_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .account_balance_daily_snapshots.balance_usd_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .account_balance_snapshot_reviews.provider_balance_usd_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .account_balance_snapshot_reviews.carry_forward_balance_usd_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .account_balance_snapshot_provider_states.provider_balance_usd_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .asset_daily_holdings.value_usd_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .rules.amount_min_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true
+            - column: .rules.amount_max_cents
+              rs_type: crate::money::Cents
+              copy_cheap: true
+              can_default: true

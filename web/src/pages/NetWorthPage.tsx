@@ -8,7 +8,7 @@ import { AmountVisibilityButton } from '../components/common/AmountVisibilityBut
 import { AnalysisFilterContent, AnalysisFilters } from '../components/portfolio/AnalysisFilters'
 import { AccountSidebar } from '../components/wealth/AccountSidebar'
 import { AssetEditModal } from '../components/wealth/AssetEditModal'
-import { NetWorthBreakdownPanels } from '../components/wealth/NetWorthBreakdownPanels'
+import { NetWorthBreakdownPanels, type FocusState } from '../components/wealth/NetWorthBreakdownPanels'
 import { NetWorthChart } from '../components/wealth/NetWorthChart'
 import { NetWorthHero } from '../components/wealth/NetWorthHero'
 import { useNetWorthModalRoutes } from '../components/wealth/useNetWorthModalRoutes'
@@ -38,7 +38,7 @@ function granularityForRange(range: NetWorthRange): Granularity {
 export function NetWorthPage() {
   const { canRead } = usePermissions()
   const canReadHoldings = canRead('holdings')
-  const { range, ownerIds, accountIds, amountsHidden, setRange, setOwnerIds, setAccountIds, toggleAmountsHidden, clearAccountFilters, clearFilters, replaceFilters } = useNetWorthParams()
+  const { range, ownerIds, accountIds, focusDate, amountsHidden, setRange, setOwnerIds, setAccountIds, setFocusDate, toggleAmountsHidden, clearAccountFilters, clearFilters, replaceFilters } = useNetWorthParams()
   const [selectedClassifier, setSelectedClassifier] = useState<AssetClassifier | null>(null)
   const [selectedLiabilityCategory, setSelectedLiabilityCategory] = useState<string | null>(null)
   const [view, setView] = useState<'ASSETS' | 'LIABILITIES'>('ASSETS')
@@ -50,13 +50,21 @@ export function NetWorthPage() {
   const historicalInput = useMemo(() => ({ range, granularity: granularityForRange(range), ...(hasNetWorthFilters(netWorthInput) ? { filters: netWorthInput } : {}) }), [range, netWorthInput])
   const selectedAccountIds = effectiveAccountIds
   const { report: sidebarReport } = useNetWorth(sidebarNetWorthInput, effectiveAccountIds.length === 0)
+  // The focused-date report only drives the breakdown panels; the hero, sidebar
+  // and range change stay on the live position.
+  const focusedInput = useMemo(() => focusDate ? { ...netWorthInput, asOfDate: focusDate } : netWorthInput, [focusDate, netWorthInput])
+  const focusedQuery = useNetWorth(focusedInput, !focusDate)
   const { report, fetching, error, refetch } = useNetWorth(netWorthInput)
+  // urql keeps the previous variables' data while a new request is in flight,
+  // so only a settled report for this exact date may stand in for it.
+  const focusState = focusStateFor(focusDate, focusedQuery)
+  const breakdownReport = focusState === 'ready' ? focusedQuery.report : report
   const { historicalReport } = useHistoricalNetWorth(historicalInput)
   const invalidIDError = isInvalidGlobalIDError(error)
   const accountSidebarReport = sidebarReport ?? report
   const netWorthAccounts = useMemo(() => accountSidebarReport ? accountsFromNetWorthReport(accountSidebarReport) : [], [accountSidebarReport])
   const selectedAccountGroupIds = useMemo(() => accountGroupIdsFromAccountIds(netWorthAccounts, effectiveAccountIds), [netWorthAccounts, effectiveAccountIds])
-  const modalRoutes = useNetWorthModalRoutes(report ?? null)
+  const modalRoutes = useNetWorthModalRoutes(breakdownReport ?? null)
   const pageClassName = 'lg:min-h-screen'
 
   useEffect(() => {
@@ -67,6 +75,9 @@ export function NetWorthPage() {
     setAccountIds((current) => toggleIds(current, groupAccountIds))
   }, [setAccountIds])
   const setAccountGroups = useCallback((groupIds: AccountGroupId[]) => setAccountIds(accountIdsForAccountGroupIds(netWorthAccounts, groupIds)), [netWorthAccounts, setAccountIds])
+  const clearFocusDate = useCallback(() => setFocusDate(null), [setFocusDate])
+  const refetchFocused = focusedQuery.refetch
+  const retryFocus = useCallback(() => refetchFocused({ requestPolicy: 'network-only' }), [refetchFocused])
 
   function clearAccountFiltersFromOutsideClick(event: MouseEvent<HTMLDivElement>) {
     if (!canReadHoldings || !accountIds.length) return
@@ -104,11 +115,15 @@ export function NetWorthPage() {
   const breakdownPanelProps = {
     amountsHidden,
     canReadHoldings,
-    report,
+    focusDate,
+    focusState: focusState ?? undefined,
+    report: breakdownReport ?? report,
     selectedClassifier,
     selectedLiabilityCategory,
     view,
     onAssetClick: modalRoutes.openAsset,
+    onClearFocus: clearFocusDate,
+    onRetryFocus: retryFocus,
     onSelectClassifier: setSelectedClassifier,
     onSelectLiabilityCategory: setSelectedLiabilityCategory,
     onViewChange: setView,
@@ -157,7 +172,7 @@ export function NetWorthPage() {
 
           <div className="hidden lg:block lg:space-y-4">
             <div data-net-worth-chart>
-              <NetWorthChart amountsHidden={amountsHidden} asOfDate={report.asOfDate} classifierSeries={historicalReport?.classifierSeries} liabilitySeries={historicalReport?.liabilitySeries} netWorthUSD={report.currentNetWorthUSD} onRangeChange={setRange} points={historicalReport?.series ?? []} positive={positive} range={range} />
+              <NetWorthChart amountsHidden={amountsHidden} asOfDate={report.asOfDate} classifierSeries={historicalReport?.classifierSeries} focusedDate={focusDate} liabilitySeries={historicalReport?.liabilitySeries} netWorthUSD={report.currentNetWorthUSD} onFocusDate={setFocusDate} onRangeChange={setRange} points={historicalReport?.series ?? []} positive={positive} range={range} />
             </div>
 
             <NetWorthBreakdownPanels variant="desktop" {...breakdownPanelProps} />
@@ -183,7 +198,7 @@ export function NetWorthPage() {
           </div>
 
           <div className="lg:hidden" data-net-worth-chart>
-            <NetWorthChart amountsHidden={amountsHidden} asOfDate={report.asOfDate} classifierSeries={historicalReport?.classifierSeries} liabilitySeries={historicalReport?.liabilitySeries} onRangeChange={setRange} points={historicalReport?.series ?? []} positive={positive} range={range} />
+            <NetWorthChart amountsHidden={amountsHidden} asOfDate={report.asOfDate} classifierSeries={historicalReport?.classifierSeries} focusedDate={focusDate} liabilitySeries={historicalReport?.liabilitySeries} onFocusDate={setFocusDate} onRangeChange={setRange} points={historicalReport?.series ?? []} positive={positive} range={range} />
           </div>
         </div>
       </div>
@@ -244,6 +259,13 @@ export function NetWorthPage() {
       ) : null}
     </div>
   )
+}
+
+function focusStateFor(focusDate: string | undefined, query: ReturnType<typeof useNetWorth>): FocusState | null {
+  if (!focusDate) return null
+  if (query.fetching) return 'loading'
+  if (query.error) return 'error'
+  return query.report?.asOfDate === focusDate ? 'ready' : 'loading'
 }
 
 function toggleIds<T extends string>(ids: T[], toggledIds: T[]): T[] {

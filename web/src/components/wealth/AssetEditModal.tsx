@@ -48,7 +48,7 @@ function initialAssetEditState(asset: Asset): AssetEditState {
       name: asset.name ?? '',
       classifier: asset.classifier,
       // Post-migration, a nonnull trackingTicker always means a genuine
-      // custom tracker (see server/internal/wealth.NormalizeTracking).
+      // custom tracker (see server-rs/src/wealth/tracking.rs).
       customTracking: asset.trackingTicker != null,
       trackingTicker: asset.trackingTicker ?? '',
       trackingMultiplier: String(asset.trackingMultiplier),
@@ -173,8 +173,8 @@ export function AssetEditModal({
     if (isSecurity) {
       if (isTrackingDirty) {
         // Empty string / 1 is the documented clear sentinel for updateAsset:
-        // gqlgen maps an omitted field and explicit null to the same nil, so
-        // only an explicit empty string can clear a previously stored ticker.
+        // The GraphQL binding maps an omitted field and explicit null to the same
+        // value, so only an explicit empty string can clear a stored ticker.
         input.trackingTicker = draft.customTracking ? draft.trackingTicker.trim() : ''
         input.trackingMultiplier = draft.customTracking ? trackingMultiplierValue : 1
       }

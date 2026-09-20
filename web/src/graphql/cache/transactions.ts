@@ -191,8 +191,8 @@ function transactionMatchesSearch(transaction: Transaction, search: string) {
 export function transactionMatchesFilter(transaction: Transaction, filter?: TransactionsFilter | null) {
   if (!filter) return true
 
-  // Keep this predicate aligned with transactionFilterConditions in
-  // server/internal/transactions/db/jet_transactions.go.
+  // Keep this predicate aligned with the transaction filters in
+  // server-rs/sql/queries/transactions.sql.
   const transactionTime = new Date(transaction.datetime).getTime()
   if (filter.datetimeRange?.from && transactionTime < new Date(filter.datetimeRange.from).getTime()) return false
   if (filter.datetimeRange?.to && transactionTime >= new Date(filter.datetimeRange.to).getTime()) return false

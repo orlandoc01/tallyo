@@ -1,0 +1,21 @@
+[package]
+name = "graphql-gen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+apollo-compiler = "1.33.0"
+heck = "0.5.0"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.5"
+
+[dev-dependencies]
+async-graphql = { version = "=7.2.1", default-features = false, features = ["chrono"] }
+chrono = { version = "0.4.45", default-features = false, features = ["std", "serde"] }
+schemars = { version = "1.2", features = ["chrono04"] }
+serde_json = "1.0.151"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+tempfile = "3.23.0"
+trybuild = "1.0"

@@ -1613,6 +1613,8 @@ export interface RulesInput {
   accountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   amountMin?: InputMaybe<Scalars['Money']['input']>;
   amountMax?: InputMaybe<Scalars['Money']['input']>;
+  /** Full-text query matched against merchant name, merchant pattern, and original pattern. */
+  search?: InputMaybe<Scalars['String']['input']>;
 }
 
 export interface SpendingFilter {
@@ -2018,7 +2020,14 @@ export interface LiabilityBreakdown {
   valueUSD: Scalars['Money']['output'];
   percentOfLiabilities: Scalars['Float']['output'];
   accountCount: Scalars['Int']['output'];
-  accounts: Array<Account>;
+  balances: Array<LiabilityAccountBalance>;
+}
+
+/** One account's balance inside a liability category, as of the report's date. */
+export interface LiabilityAccountBalance {
+  __typename?: 'LiabilityAccountBalance';
+  account: Account;
+  balanceUSD: Scalars['Money']['output'];
 }
 
 export interface NetWorthReport {
@@ -2096,6 +2105,8 @@ export interface AccountSnapshotEdge {
 export interface NetWorthInput {
   ownerIds?: InputMaybe<Array<Scalars['ID']['input']>>;
   accountIds?: InputMaybe<Array<Scalars['ID']['input']>>;
+  /** Report the position as of this date (latest snapshot per account on or before it). Omit for the current position. */
+  asOfDate?: InputMaybe<Scalars['Date']['input']>;
 }
 
 export interface HistoricalNetWorthInput {

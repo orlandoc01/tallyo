@@ -16,13 +16,12 @@ Unsolicited large pull requests may not be reviewed or merged, even when the cod
 Read the subsystem notes before making changes:
 
 - `AGENTS.md` for repository layout and shared GraphQL schema notes.
-- `server/AGENTS.md` for backend architecture, invariants, and Go commands.
+- `server-rs/AGENTS.md` for backend architecture, invariants, and Rust commands.
 - `web/AGENTS.md` for frontend architecture, routes, and React/TypeScript commands.
 
 Install dependencies from the repository root:
 
 ```bash
-go mod download
 cd web && npm ci
 ```
 
@@ -30,10 +29,10 @@ The frontend pins Node.js 24 and npm 11 in `web/.nvmrc`, `web/.node-version`, an
 
 ## Running Locally
 
-Run the backend from `server/`:
+Run the backend from `server-rs/`:
 
 ```bash
-go run ./cmd/tallyo
+cargo run --manifest-path server-rs/Cargo.toml
 ```
 
 Run the frontend from `web/` during UI development:
@@ -42,16 +41,16 @@ Run the frontend from `web/` during UI development:
 npm run dev
 ```
 
-The production image builds the frontend first, then embeds `web/dist` into the Go `tallyo` binary.
+The production image builds the frontend first, then embeds `web/dist` into the Rust `tallyo` binary.
 
 ## Testing and Quality Gates
 
 Run the checks relevant to the files you touched.
 
-For backend or schema work from `server/`:
+For backend or schema work from `server-rs/`:
 
 ```bash
-make coverage
+make -C server-rs test-all
 ```
 
 For frontend work from `web/`:
@@ -72,18 +71,18 @@ If you cannot run a relevant check, say so in the pull request and explain why.
 
 ## GraphQL Workflow
 
-The shared GraphQL schema lives in `schema/*.graphql` and is the source of truth for both the Go server and React client.
+The shared GraphQL schema lives in `schema/*.graphql` and is the source of truth for both the Rust server and React client.
 
 - Update schema files first when changing the API contract.
-- Run `go generate ./...` from `server/` after schema changes.
+- Run `make -C server-rs generate` after schema changes.
 - Run `npm run generate` from `web/` to refresh frontend schema artifacts.
-- Do not hand-edit generated files such as `server/internal/graph/generated.go`, `server/internal/graph/model/models_gen.go`, or `web/src/types/graphql.ts`.
+- Do not hand-edit generated files such as `server-rs/src/database/queries.rs`, `server-rs/src/schema/generated.rs`, or `web/src/types/graphql.ts`.
 
 Every GraphQL query and mutation takes exactly one argument, either a scalar or an input object. List queries return envelope objects such as `{ items: [...] }` for forward compatibility.
 
 ## Code Style
 
-Follow the conventions documented in `server/AGENTS.md` and `web/AGENTS.md`. A few high-level expectations:
+Follow the conventions documented in `server-rs/AGENTS.md` and `web/AGENTS.md`. A few high-level expectations:
 
 - Keep changes small and cohesive.
 - Prefer clear, direct code over broad abstractions.

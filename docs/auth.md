@@ -64,8 +64,8 @@ path, and trailing slash must agree.
 
 Tallyo requires OAuth authorization code flow with PKCE `S256`; plain PKCE is
 rejected. The default access-token lifetime is 15 minutes and the default
-refresh-token lifetime is 168 hours (7 days). These fields accept Go duration
-syntax such as `15m` and `168h` and can be modified in **Settings -> Security**. Authorization codes and login sessions expire
+refresh-token lifetime is 168 hours (7 days). These fields accept duration
+strings such as `15m` or `168h` (units: `ns`, `us`, `ms`, `s`, `m`, `h`) and can be modified in **Settings -> Security**. Authorization codes and login sessions expire
 after 10 minutes. Refresh tokens rotate, and a previously rotated token is no
 longer accepted.
 

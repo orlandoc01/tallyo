@@ -2,8 +2,8 @@
 
 This repository contains two independently documented subsystems:
 
-- **`server/`** — Go `tallyo` binary: GraphQL API, OAuth 2.1, Plaid/SimpleFIN/crypto sync loops, MCP, embedded SPA.
-  See [server/AGENTS.md](server/AGENTS.md) (invariants, decisions, pitfalls) and [server/README.md](server/README.md) (stack, layout, commands).
+- **`server-rs/`** — Rust `tallyo` binary: GraphQL API, OAuth 2.1, Plaid/SimpleFIN/crypto sync loops, MCP, embedded SPA.
+  See [server-rs/AGENTS.md](server-rs/AGENTS.md) and [server-rs/README.md](server-rs/README.md).
 - **`web/`** — React/TypeScript SPA + PWA frontend.
   See [web/AGENTS.md](web/AGENTS.md) and [web/README.md](web/README.md).
 
@@ -17,7 +17,7 @@ This repository contains two independently documented subsystems:
 - portfolio.graphql — portfolio analysis views (composition, Morningstar category/group, sectors)
 - admin.graphql — users, roles, runtime configuration
 
-**`Dockerfile`** at the repository root builds the release image from GoReleaser-built binaries.
+**`Dockerfile`** at the repository root packages binaries staged by the release workflow.
 
 Runtime general settings for disabling transaction or wealth tracking affect both subsystems: the web app hides matching routes, and the server skips the matching background pollers.
 
@@ -31,5 +31,4 @@ none. Comment only non-obvious constraints the code can't express.
 
 Each subsystem may pin a specific Node.js version. Before running `web/` commands, verify `node --version` matches `web/.nvmrc`. If it doesn't, prefix all `web/` commands with `mise exec --` (e.g. `mise exec -- npm run test:coverage`) so mise picks up the pinned version from `web/mise.toml` without requiring shell re-activation.
 
-Server tests should live under `server/internal/` packages. Do not add tests under `server/cmd/`.
-`server/cmd/**/main.go` files should stay minimal: bootstrap configuration, wire dependencies, and run the application. Move application logic into `server/internal/` packages.
+For Rust enum string conversions, prefer existing `strum` derives such as `EnumString` and `IntoStaticStr` over custom `parse` or `as_str` implementations.

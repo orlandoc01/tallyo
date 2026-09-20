@@ -178,7 +178,7 @@ The access token issuer/audience is the configured issuer. Changing the issuer i
 
 - Only users already present in Tallyo can sign in. The send endpoint intentionally gives the same success-style response for unknown addresses.
 - Codes and magic links expire after 10 minutes. A new-code request is limited to once per 60 seconds, and too many incorrect attempts require starting over.
-- Check SMTP host, port, sender, username, password, outbound DNS, and firewall. Tallyo uses SMTP with plain authentication through the Go SMTP client.
+- Check SMTP host, port, sender, username, password, outbound DNS, and firewall. Tallyo sends through the lettre SMTP transport with plain authentication over TLS.
 - If SMTP host is blank, Tallyo uses development log delivery and prints the full OTP and magic link to stdout. This is not production mail delivery and makes logs authentication-sensitive.
 - A magic link can open in a new tab because its short-lived PKCE verifier is carried through the server flow. Use the same external hostname so its callback cookie reaches `/auth/callback`.
 

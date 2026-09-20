@@ -1,7 +1,9 @@
 version: 2
 updates:
-  - package-ecosystem: gomod
-    directory: /server
+  - package-ecosystem: cargo
+    directories:
+      - /server-rs
+      - /server-rs/tools/graphql-gen
     schedule:
       interval: weekly
     open-pull-requests-limit: 0

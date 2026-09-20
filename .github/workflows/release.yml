@@ -10,17 +10,11 @@ permissions:
   packages: write
 
 jobs:
-  release:
+  web-build:
+    name: Web build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
 
       - uses: actions/setup-node@v7
         with:
@@ -28,7 +22,99 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - uses: docker/setup-qemu-action@v3
+      - name: Build
+        working-directory: web
+        env:
+          VITE_APP_VERSION: ${{ github.ref_name }}
+        run: npm ci && npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+
+  build:
+    name: Build linux/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    needs: [web-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            target: x86_64-unknown-linux-musl
+          - arch: arm64
+            target: aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          shared-key: release-${{ matrix.arch }}-${{ hashFiles('server-rs/rust-toolchain.toml') }}
+          workspaces: server-rs
+
+      - uses: ./.github/actions/setup-zigbuild
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
+
+      - name: Embed web
+        run: make -C server-rs sync-web
+
+      - name: Build
+        working-directory: server-rs
+        run: cargo zigbuild --release --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tallyo-linux-${{ matrix.arch }}
+          path: server-rs/target/${{ matrix.target }}/release/tallyo
+          if-no-files-found: error
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/tallyo
+    steps:
+      - uses: actions/checkout@v7
+
+      # Image tags and archive names drop the tag's v prefix: 0.2.1, 0.2, latest.
+      - name: Export version
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "MINOR=${version%.*}" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: tallyo-linux-amd64
+          path: dist/image/linux/amd64
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: tallyo-linux-arm64
+          path: dist/image/linux/arm64
+
+      # Artifacts drop the executable bit; the Dockerfile copies the mode as-is.
+      - name: Restore binary modes
+        run: chmod 0755 dist/image/linux/amd64/tallyo dist/image/linux/arm64/tallyo
+
+      - name: Archive
+        run: |
+          set -eu
+          mkdir -p dist/archives
+          for arch in amd64 arm64; do
+            tar -czf "dist/archives/tallyo_${VERSION}_linux_$arch.tar.gz" -C "dist/image/linux/$arch" tallyo -C "$GITHUB_WORKSPACE" README.md LICENSE
+          done
+          cd dist/archives
+          sha256sum tallyo_* > checksums.txt
 
       - uses: docker/setup-buildx-action@v4
 
@@ -39,11 +125,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Syft
-        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Build and push image
+        run: |
+          set -eu
+          docker buildx build --push \
+            --platform linux/amd64,linux/arm64 \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label org.opencontainers.image.licenses=Apache-2.0 \
+            --label org.opencontainers.image.name=tallyo \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$VERSION" \
+            -t "$IMAGE:$MINOR" \
+            -t "$IMAGE:latest" \
+            -f Dockerfile dist/image
 
-      - name: Run GoReleaser
+      # The release body is this version's section of CHANGELOG.md.
+      - name: Extract release notes
+        run: |
+          set -eu
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            /^## \[/ { on = 0 }
+            on { print }
+          ' CHANGELOG.md > dist/release-notes.md
+          test -s dist/release-notes.md
+
+      - name: Create GitHub release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VITE_APP_VERSION: ${{ github.ref_name }}
-        run: go run github.com/goreleaser/goreleaser/v2@latest release --clean
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file dist/release-notes.md dist/archives/*

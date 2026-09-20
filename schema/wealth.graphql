@@ -187,7 +187,12 @@ type LiabilityBreakdown {
   valueUSD: Money!
   percentOfLiabilities: Float!
   accountCount: Int!
-  accounts: [Account!]!
+  balances: [LiabilityAccountBalance!]!
+}
+"""One account's balance inside a liability category, as of the report's date."""
+type LiabilityAccountBalance {
+  account: Account!
+  balanceUSD: Money!
 }
 
 type NetWorthReport {
@@ -274,6 +279,8 @@ extend type Account {
 input NetWorthInput {
   ownerIds: [ID!]
   accountIds: [ID!]
+  """Report the position as of this date (latest snapshot per account on or before it). Omit for the current position."""
+  asOfDate: Date
 }
 
 input HistoricalNetWorthInput {

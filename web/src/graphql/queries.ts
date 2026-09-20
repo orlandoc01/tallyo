@@ -444,8 +444,11 @@ export const NET_WORTH_QUERY = gql`
         valueUSD
         percentOfLiabilities
         accountCount
-        accounts {
-          ...NetWorthAccountFields
+        balances {
+          balanceUSD
+          account {
+            ...NetWorthAccountFields
+          }
         }
       }
     }

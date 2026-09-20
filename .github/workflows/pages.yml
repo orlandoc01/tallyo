@@ -1,6 +1,6 @@
 name: Pages
 
-# Triggered by the tag push, not the release: GoReleaser creates the release with GITHUB_TOKEN,
+# Triggered by the tag push, not the release: release.yml creates the release with GITHUB_TOKEN,
 # and GitHub never starts workflows from events raised by GITHUB_TOKEN.
 on:
   push:

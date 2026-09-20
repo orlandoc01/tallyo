@@ -1,0 +1,68 @@
+[[resolver]]
+type = "Transaction"
+field = "tags"
+
+[[resolver]]
+type = "Connection"
+field = "provider"
+
+[[resolver]]
+type = "SimpleFinAccessToken"
+field = "connections"
+
+[[resolver]]
+type = "Account"
+field = "connection"
+
+[[resolver]]
+type = "Account"
+field = "latestSnapshot"
+
+[[resolver]]
+type = "Account"
+field = "accountWealthProperty"
+
+[[resolver]]
+type = "Account"
+field = "typeLocked"
+
+[[resolver]]
+type = "Account"
+field = "lastSyncedAt"
+
+[[resolver]]
+type = "PlaidItem"
+field = "credential"
+
+[[resolver]]
+type = "PlaidItem"
+field = "accounts"
+
+[[resolver]]
+type = "Rule"
+field = "tags"
+
+[[resolver]]
+type = "Rule"
+field = "accounts"
+
+[[resolver]]
+type = "Asset"
+field = "details"
+
+[[resolver]]
+type = "Asset"
+field = "adapterSources"
+
+[[resolver]]
+type = "Asset"
+field = "latestSnapshot"
+
+[[resolver]]
+type = "Holding"
+field = "account"
+
+[[complexity]]
+type = "Query"
+field = "nodes"
+expr = "ids.len().max(1) * child_complexity.max(1)"

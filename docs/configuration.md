@@ -29,11 +29,10 @@ All variables in this table are read at startup and require a process restart to
 |---|---|---|---|
 | `CONFIG_FILE_PATH` | None | Empty | Select an exact YAML file. Without it, optional `config.yaml` discovery is used. |
 | `DB_PATH` | `db_path` | `/data/tallyo.db` | SQLite database filename. The parent directory is created if needed. |
-| `DB_ENCRYPTION_KEY` | `db_encryption_key` | Empty | Optional 64-character hexadecimal key for Adiantum database encryption. |
+| `DB_ENCRYPTION_KEY` | `db_encryption_key` | Empty | Optional 64-character hexadecimal key for SQLCipher database encryption. |
 | `DB_ENCRYPTION_KEY_FILE` | `db_encryption_key_file` | Empty | File containing the encryption key. Its trimmed content takes precedence over the inline key. |
-| `DB_WARN_FULL_SCANS` | `db_warn_full_scans` | `false` | SQLite diagnostic that warns on actual full scans and automatic transient indexes. |
 | `PORT` | `port` | `8080` | HTTP listen port. |
-| `SYNC_OFF` | `sync_off` | `false` | Skips all background sync and backfill goroutines. |
+| `SYNC_OFF` | `sync_off` | `false` | Skips all background sync and backfill loops. |
 | `MASTER_PASSWORD` | `authorization.master_password` | Empty | Master-password and API-key credential. A nonempty startup value overrides the database value and grants all scopes. |
 | `DISABLE_ALL_AUTH` | `authorization.disable_all_auth` | `false` | Development-only override that forces all authentication off. If an issuer is configured, it must be loopback HTTP. |
 
@@ -66,8 +65,6 @@ authorization:
 
 Protect a YAML file that contains `master_password` or `db_encryption_key` as a secret. Prefer a key file or the host's secret-management facility over placing the database key inline.
 
-`DB_WARN_FULL_SCANS` is for temporary diagnostics and normally remains disabled. It emits a warning for each statement that reports runtime full-scan steps or automatic transient-index rows. Warnings contain placeholder SQL and runtime counters, never bound values. Intentional scans also warn, so the setting can be noisy. It uses SQLite runtime counters and does not execute `EXPLAIN QUERY PLAN`.
-
 ## Database-managed configuration
 
 The GraphQL API returns secret fields as `********`; it never returns their stored values. Saving that placeholder preserves the current secret. Provider credentials use separate APIs and are not part of the sections below.
@@ -82,8 +79,8 @@ Defaults need one distinction: an absent database section generally resolves to 
 | Master password | Unset | At least one master password, Google, email, or passkey method is required when setup completes. A nonempty `MASTER_PASSWORD` overrides this field. |
 | OAuth issuer URL | Wizard uses the browser origin | Required when any OAuth sign-in provider is enabled. It becomes the token issuer and base for callbacks. |
 | Frontend redirect URIs | Wizard uses `<public-origin>/auth/callback` | At least one is required with OAuth providers. OAuth redirect matching is exact, including scheme, port, path, and trailing slash. |
-| Access token lifetime | `15m0s` when written by the wizard | Go duration string; must parse and be greater than zero when OAuth is active. |
-| Refresh token lifetime | `168h0m0s` when written by the wizard | Go duration string; must parse and be greater than zero when OAuth is active. |
+| Access token lifetime | `15m0s` when written by the wizard | Duration string (`ns`, `us`, `ms`, `s`, `m`, `h`); must parse and be greater than zero when OAuth is active. |
+| Refresh token lifetime | `168h0m0s` when written by the wizard | Duration string (`ns`, `us`, `ms`, `s`, `m`, `h`); must parse and be greater than zero when OAuth is active. |
 | Development CORS allowed origins | Empty list | Comma-separated origins in the UI. Intended for a separate development frontend, not general reverse-proxy access. |
 
 Saving the Authorization card applies immediately: the server rebuilds its OAuth provider, token issuer, frontend redirect client, and CORS rules in place. No process restart is involved. Access tokens issued under a previous issuer URL stop validating, so users sign in again after an issuer change.
@@ -222,7 +219,7 @@ Merely adding an encryption key to an existing plaintext database does not encry
 
 ### Create a consistent plaintext backup
 
-Use Tallyo's SQLite backup operation instead of copying a live database file:
+Use Tallyo's backup command instead of copying a live database file:
 
 ```bash
 DB_PATH='<database-path>' \

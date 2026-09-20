@@ -112,7 +112,7 @@ For remote-host bootstrap, reverse proxies, database encryption, and bare-binary
 
 ### Bare metal (release binary)
 
-Every release publishes standalone archives for Linux and macOS (amd64 and arm64) and Windows (amd64), with SHA-256 checksums and SBOMs. Download the archive for your platform from the Releases page, extract it, and run the `tallyo` binary — the web app is embedded, and no CGO or external SQLite is needed:
+Every release publishes standalone static archives for Linux (amd64 and arm64), with SHA-256 checksums. Download the archive for your platform from the Releases page, extract it, and run the `tallyo` binary — the web app and SQLite are embedded, nothing else is needed:
 
 ```bash
 tar -xzf tallyo_<version>_linux_amd64.tar.gz
@@ -124,15 +124,16 @@ DB_PATH=./tallyo.db \
 
 ### Build from source
 
-Using the Go toolchain from `server/go.mod`, Node 24, and npm 11:
+Using Rust 1.97.1, Node 24, and npm 11:
 
 ```bash
-cd web && npm ci && npm run build && cd ..
-make -C server sync-web
-cd server && go build -trimpath -o tallyo ./cmd/tallyo
+npm --prefix web ci
+npm --prefix web run build
+make -C server-rs sync-web
+cargo build --release --manifest-path server-rs/Cargo.toml
 ```
 
-The root `Dockerfile` packages binaries produced by GoReleaser; it does not build a clean source checkout directly.
+The root `Dockerfile` packages binaries staged by the release workflow; it does not build a clean source checkout directly.
 
 ### Environment variables
 
@@ -141,9 +142,8 @@ Only a small set of env vars exists — everything else (auth methods, integrati
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DB_PATH` | `/data/tallyo.db` | SQLite database file path |
-| `DB_ENCRYPTION_KEY` | *(empty)* | Optional at-rest encryption key (64 hex chars, e.g. `openssl rand -hex 32`) |
+| `DB_ENCRYPTION_KEY` | *(empty)* | Optional SQLCipher at-rest encryption key (64 hex chars, e.g. `openssl rand -hex 32`) |
 | `DB_ENCRYPTION_KEY_FILE` | *(empty)* | File containing the key; takes precedence over `DB_ENCRYPTION_KEY` |
-| `DB_WARN_FULL_SCANS` | `false` | Restart-required SQLite diagnostic warning on actual full scans and automatic transient indexes |
 | `PORT` | `8080` | HTTP listen port |
 | `CONFIG_FILE_PATH` | *(empty)* | Optional YAML config file for all env vars |
 | `SYNC_OFF` | `false` | Skip starting background sync loops; manual sync actions still run |
@@ -293,15 +293,15 @@ Read [docs/security.md](docs/security.md) before deploying, and see [SECURITY.md
 
 | Path | Description |
 |------|-------------|
-| [`server/`](server/README.md) | Go server: GraphQL API, OAuth, sync loops, MCP, embedded SPA |
+| [`server-rs/`](server-rs/README.md) | Rust server: GraphQL API, OAuth, sync loops, MCP, embedded SPA |
 | [`web/`](web/README.md) | React/TypeScript SPA + PWA |
 | [`schema/`](schema/) | Shared GraphQL schema, split by domain |
 | [`docs/`](docs/security.md) | Security and deployment notes |
-| `Dockerfile` | Release image for GoReleaser-built binaries |
+| `Dockerfile` | Release image for binaries staged by the release workflow |
 
 ## Contributing
 
-Development setup, testing, and conventions live in the subsystem READMEs: [server/README.md](server/README.md) and [web/README.md](web/README.md). CI runs typecheck, lint, and coverage-gated tests for both subsystems on every PR. Commit messages in the `feat:` / `fix:` style are grouped into release changelogs.
+Development setup, testing, and conventions live in the subsystem READMEs: [server-rs/README.md](server-rs/README.md) and [web/README.md](web/README.md). CI runs typecheck, lint, and coverage-gated tests for both subsystems on every PR. Commit messages in the `feat:` / `fix:` style are grouped into release changelogs.
 
 ## License
 

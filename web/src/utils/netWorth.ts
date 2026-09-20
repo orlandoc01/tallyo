@@ -59,7 +59,7 @@ export function accountsFromNetWorthReport(report: NetWorthReport): Account[] {
     }
   }
   for (const liability of report.liabilityBreakdown) {
-    for (const account of liability.accounts) {
+    for (const { account } of liability.balances) {
       accountsById.set(account.id, account)
     }
   }

@@ -170,7 +170,7 @@ function netWorthReportsFor(accounts: Account[], snapshots: AccountSnapshot[]) {
   const current: NetWorthReport = { __typename: 'NetWorthReport', asOfDate: latestDate, currentNetWorthUSD: money(latest.assets - latest.liabilities), currentAssetsUSD: money(latest.assets), currentLiabilitiesUSD: money(latest.liabilities), classifierBreakdown, liabilityBreakdown: (['CARD', 'MORTGAGE'] as const).flatMap((category) => {
     const rows = liabilities.filter((item) => item.category === category)
     const valueUSD = money(rows.reduce((sum, item) => sum + item.valueUSD, 0))
-    return rows.length ? [{ __typename: 'LiabilityBreakdown' as const, category, label: category === 'CARD' ? 'Cards' : 'Mortgage', valueUSD, percentOfLiabilities: latest.liabilities ? valueUSD / latest.liabilities * 100 : 0, accountCount: rows.length, accounts: rows.map((item) => item.account) }] : []
+    return rows.length ? [{ __typename: 'LiabilityBreakdown' as const, category, label: category === 'CARD' ? 'Cards' : 'Mortgage', valueUSD, percentOfLiabilities: latest.liabilities ? valueUSD / latest.liabilities * 100 : 0, accountCount: rows.length, balances: rows.map((item) => ({ __typename: 'LiabilityAccountBalance' as const, account: item.account, balanceUSD: item.valueUSD })) }] : []
   }) }
   const history: HistoricalNetWorthReport = { __typename: 'HistoricalNetWorthReport', series: dates.map((date) => {
     const totals = totalsFor(date)

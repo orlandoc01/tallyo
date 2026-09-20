@@ -4,7 +4,6 @@ import { displayAmount } from './amountDisplay'
 import { useBreakdownSelection } from './useBreakdownSelection'
 import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
 import { formatQuantity } from '../../utils/amount'
-import { accountBalanceUSD } from '../../utils/accounts'
 import type { Asset, AssetClassifier, ClassifierBreakdown, HoldingRollup, LiabilityBreakdown } from '../../types/graphql'
 
 interface AssetClassTableProps {
@@ -44,7 +43,7 @@ export function AssetClassTable({ breakdown, liabilityBreakdown, selectedClassif
         <div className="space-y-3 p-4">
           {liabilityBreakdown.map((item) => {
             const expanded = open[item.category] ?? false
-            const canExpand = item.accounts.length > 0
+            const canExpand = item.balances.length > 0
             return (
               <OneLevelGroup
                 expanded={expanded}
@@ -67,14 +66,14 @@ export function AssetClassTable({ breakdown, liabilityBreakdown, selectedClassif
                 onHeaderClick={onSelectLiabilityCategory ? () => handleLiabilityClick(item.category) : undefined}
                 onToggle={() => toggleOpen(item.category)}
               >
-                {item.accounts.map((account) => (
+                {item.balances.map(({ account, balanceUSD }) => (
                   <OneLevelGroupRow key={account.id}>
                     <div className="flex items-start justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-neutral-900 dark:text-neutral-100" title={account.name}>{account.name}</p>
                         <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" title={account.owner.name}>{account.owner.name}</p>
                       </div>
-                      <p className="shrink-0 font-semibold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, formatSignedCurrency(-(accountBalanceUSD(account) ?? 0)))}</p>
+                      <p className="shrink-0 font-semibold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, formatSignedCurrency(-balanceUSD))}</p>
                     </div>
                   </OneLevelGroupRow>
                 ))}
