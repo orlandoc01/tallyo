@@ -11,20 +11,21 @@ on:
     - cron: "0 10 * * 1"
 
 jobs:
-  govulncheck:
-    name: govulncheck
+  cargo-audit:
+    name: cargo audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+      - uses: taiki-e/install-action@v2.87.16
         with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          tool: cargo-audit@0.22.2
 
-      - name: Run govulncheck
-        working-directory: server
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Run cargo audit
+        working-directory: server-rs
+        run: |
+          cargo audit
+          cargo audit --file tools/graphql-gen/Cargo.lock
 
   npm-audit:
     name: npm audit
@@ -49,15 +50,36 @@ jobs:
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      BEFORE_SHA: ${{ github.event.before }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: server/go.mod
-          cache: false
+      - name: Install gitleaks
+        run: |
+          set -eu
+          curl -sSfL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run gitleaks
-        run: go run github.com/zricethezav/gitleaks/v8@latest detect --source . --redact -v
+        run: |
+          set -eu
+
+          if [ -n "$BASE_SHA" ]; then
+            log_opts="$BASE_SHA..$HEAD_SHA"
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            log_opts="$BEFORE_SHA..$HEAD_SHA"
+          else
+            log_opts="-1 $HEAD_SHA"
+          fi
+
+          gitleaks detect --source . --redact -v --log-opts="$log_opts"

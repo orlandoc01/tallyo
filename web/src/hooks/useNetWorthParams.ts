@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import type { NetWorthRange } from '../types/graphql'
 import { amountVisibilityFromParams, HIDE_AMOUNTS_PARAM } from './amountVisibilityParam'
-import { clearParamUpdates, enumParam, listParam, paramUpdate, readParams } from './urlParams'
+import { clearParamUpdates, dateParam, enumParam, listParam, paramUpdate, readParams } from './urlParams'
 import { useSearchParamWriters } from './useSearchParamWriters'
 
 const NET_WORTH_RANGES = ['ONE_MONTH', 'THREE_MONTH', 'YTD', 'ONE_YEAR', 'ALL'] as const satisfies readonly NetWorthRange[]
@@ -9,13 +9,14 @@ const NET_WORTH_PARAMS = {
   range: enumParam('range', NET_WORTH_RANGES, 'YTD', true),
   ownerIds: listParam('owner'),
   accountIds: listParam('account_ids'),
+  focusDate: dateParam('focus_date'),
 }
 
 type ListUpdate = string[] | ((ids: string[]) => string[])
 
 export function useNetWorthParams() {
   const { searchParams, pushParams, replaceParams } = useSearchParamWriters()
-  const { range, ownerIds, accountIds } = useMemo(() => readParams(NET_WORTH_PARAMS, searchParams), [searchParams])
+  const { range, ownerIds, accountIds, focusDate } = useMemo(() => readParams(NET_WORTH_PARAMS, searchParams), [searchParams])
   const amountsHidden = amountVisibilityFromParams(searchParams)
 
   const setRange = useCallback((v: NetWorthRange) => {
@@ -29,6 +30,10 @@ export function useNetWorthParams() {
   const setAccountIds = useCallback((ids: ListUpdate) => {
     pushParams(paramUpdate(NET_WORTH_PARAMS.accountIds, resolveListUpdate(ids, accountIds)))
   }, [accountIds, pushParams])
+
+  const setFocusDate = useCallback((date: string | null) => {
+    pushParams(paramUpdate(NET_WORTH_PARAMS.focusDate, date ?? undefined))
+  }, [pushParams])
 
   const toggleAmountsHidden = useCallback(() => {
     pushParams({ [HIDE_AMOUNTS_PARAM]: amountsHidden ? null : 'true' })
@@ -53,10 +58,12 @@ export function useNetWorthParams() {
     range,
     ownerIds,
     accountIds,
+    focusDate,
     amountsHidden,
     setRange,
     setOwnerIds,
     setAccountIds,
+    setFocusDate,
     toggleAmountsHidden,
     clearAccountFilters,
     clearFilters,

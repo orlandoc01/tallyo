@@ -1,6 +1,6 @@
 # Tallyo Web
 
-React single-page app for [Tallyo](../README.md). In production it is compiled to static files and embedded into the Go `tallyo` binary — there is no separate web container. It's also a full PWA: installable on desktop and mobile, auto-updating via a service worker, with financial data always fetched live (never cached offline).
+React single-page app for [Tallyo](../README.md). In production it is compiled to static files and embedded into the Rust `tallyo` binary — there is no separate web container. It's also a full PWA: installable on desktop and mobile, auto-updating via a service worker, with financial data always fetched live (never cached offline).
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ React single-page app for [Tallyo](../README.md). In production it is compiled t
 - **PWA:** vite-plugin-pwa (auto-update service worker, web manifest)
 - **Tests:** Vitest, React Testing Library, MSW, Playwright
 
-Authentication is OAuth authorization-code + PKCE against the Go server's built-in OAuth provider. Access tokens stay in memory; refresh tokens in `localStorage`. Sign-in methods (Google, email OTP/magic link, passkeys, API key) are discovered at runtime from the backend's `/auth/config`.
+Authentication is OAuth authorization-code + PKCE against the Rust server's built-in OAuth provider. Access tokens stay in memory; refresh tokens in `localStorage`. Sign-in methods (Google, email OTP/magic link, passkeys, API key) are discovered at runtime from the backend's `/auth/config`.
 
 ## Setup
 
@@ -35,7 +35,7 @@ npm ci
 npm run dev
 ```
 
-The dev server proxies all API paths (`/query`, `/auth`, `/authorize`, `/token`, `/transactions/*`, …) to a locally running Go server at `http://localhost:8082` — override with `VITE_DEV_API_TARGET`. See [../server/README.md](../server/README.md) for running the backend.
+The dev server proxies all API paths (`/query`, `/auth`, `/authorize`, `/token`, `/transactions/*`, …) to a locally running Rust server at `http://localhost:8082` — override with `VITE_DEV_API_TARGET`. See [../server-rs/README.md](../server-rs/README.md) for running the backend.
 
 To iterate on UI without a backend at all:
 

@@ -285,6 +285,8 @@ input RulesInput {
   accountIds: [ID!]
   amountMin: Money
   amountMax: Money
+  "Full-text query matched against merchant name, merchant pattern, and original pattern."
+  search: String
 }
 
 input SpendingFilter {

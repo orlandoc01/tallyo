@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cashFlowPeriods, normalizeTransactionForGraphql, recurringCharges, transactionsSummary } from '../../mocks/fixtures'
 import { CashFlowPage } from '../../pages/CashFlowPage'
 import { buildCashFlowChartData, formatCashFlowAxisValue, getCashFlowChartDomain, getCashFlowPalette } from './cashFlowChart'
@@ -26,6 +26,10 @@ function normalizeRecurringChargeForGraphql(charge: RecurringCharge): RecurringC
 }
 
 describe('CashFlowPage', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders income and expenses from cashFlow query', async () => {
     renderCashFlow(<CashFlowPage />)
 
@@ -36,6 +40,10 @@ describe('CashFlowPage', () => {
   })
 
   it('shows income and expense category breakdowns', async () => {
+    // Pin "now" inside the fixture window (transactions end 2026-06); the page defaults to the last 3 months from the real clock.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-05-21T12:00:00Z'))
+
     renderCashFlow(<CashFlowPage />)
 
     expect(await screen.findByText(/Interest/)).toBeInTheDocument()

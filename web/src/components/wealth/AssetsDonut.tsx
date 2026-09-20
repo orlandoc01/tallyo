@@ -6,7 +6,6 @@ import { AssetBreakdownViewToggle } from './AssetBreakdownViewToggle'
 import { displayAmount } from './amountDisplay'
 import { useBreakdownSelection } from './useBreakdownSelection'
 import { formatCurrency, formatCurrencyCompact, formatSignedCurrency } from '../../utils/currency'
-import { accountBalanceUSD } from '../../utils/accounts'
 import type { AssetClassifier, ClassifierBreakdown, LiabilityBreakdown } from '../../types/graphql'
 
 const colors = ['#059669', '#2563eb', '#7c3aed', '#f59e0b', '#06b6d4', '#dc2626']
@@ -61,7 +60,7 @@ export function AssetsDonut({ breakdown, liabilityBreakdown, selectedClassifier,
             {liabilityBreakdown.map((item, index) => (
               <BreakdownLegendRow
                 color={colors[index % colors.length]}
-                expandable={expandableLegend && item.accounts.length > 0}
+                expandable={expandableLegend && item.balances.length > 0}
                 key={item.category}
                 label={item.label}
                 onClick={() => handleLiabilityClick(item.category)}
@@ -70,13 +69,13 @@ export function AssetsDonut({ breakdown, liabilityBreakdown, selectedClassifier,
                 percent={item.percentOfLiabilities}
                 selected={selectedLiabilityCategory === item.category}
               >
-                {item.accounts.map((account) => (
+                {item.balances.map(({ account, balanceUSD }) => (
                   <div className="flex min-w-0 items-start justify-between gap-3" key={account.id}>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-100" title={account.name}>{account.name}</p>
                       <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" title={account.owner.name}>{account.owner.name}</p>
                     </div>
-                    <p className="max-w-[45%] shrink-0 truncate text-sm font-semibold text-neutral-950 dark:text-neutral-50">{displayAmount(amountsHidden, formatSignedCurrency(-(accountBalanceUSD(account) ?? 0)))}</p>
+                    <p className="max-w-[45%] shrink-0 truncate text-sm font-semibold text-neutral-950 dark:text-neutral-50">{displayAmount(amountsHidden, formatSignedCurrency(-balanceUSD))}</p>
                   </div>
                 ))}
               </BreakdownLegendRow>

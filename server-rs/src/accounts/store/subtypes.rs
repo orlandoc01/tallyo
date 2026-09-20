@@ -1,0 +1,111 @@
+use std::{collections::HashMap, sync::LazyLock};
+
+use crate::accounts::AccountType;
+
+static ACCOUNT_SUBTYPES_BY_TYPE: LazyLock<HashMap<AccountType, &[&str]>> = LazyLock::new(|| {
+    HashMap::from([
+        (
+            AccountType::Depository,
+            &[
+                "cash",
+                "cash management",
+                "cd",
+                "checking",
+                "ebt",
+                "hsa",
+                "limited purpose checking",
+                "money market",
+                "paypal",
+                "prepaid",
+                "savings",
+            ][..],
+        ),
+        (
+            AccountType::Credit,
+            &["credit card", "bank issued credit card", "paypal credit card"][..],
+        ),
+        (
+            AccountType::Loan,
+            &[
+                "auto",
+                "business",
+                "commercial",
+                "construction",
+                "consumer",
+                "home equity",
+                "line of credit",
+                "loan",
+                "mortgage",
+                "overdraft",
+                "student",
+            ][..],
+        ),
+        (
+            AccountType::Investment,
+            &[
+                "529",
+                "401a",
+                "401k",
+                "403B",
+                "457b",
+                "brokerage",
+                "cash isa",
+                "crypto exchange",
+                "education savings account",
+                "fhsa",
+                "fixed annuity",
+                "gic",
+                "hra",
+                "hsa",
+                "ira",
+                "isa",
+                "keogh",
+                "lif",
+                "life insurance",
+                "lira",
+                "lrif",
+                "lrsp",
+                "mutual fund",
+                "non custodial wallet",
+                "non taxable brokerage account",
+                "other annuity",
+                "other insurance",
+                "pension",
+                "prif",
+                "profit sharing plan",
+                "qshr",
+                "rdsp",
+                "resp",
+                "retirement",
+                "rlif",
+                "roth",
+                "roth 401k",
+                "roth 403B",
+                "roth 457b",
+                "roth pension",
+                "roth profit sharing plan",
+                "roth thrift savings plan",
+                "rrif",
+                "rrsp",
+                "sarsep",
+                "sep ira",
+                "simple ira",
+                "sipp",
+                "stock plan",
+                "tfsa",
+                "thrift savings plan",
+                "trust",
+                "ugma",
+                "utma",
+                "variable annuity",
+            ][..],
+        ),
+        (AccountType::Other, &["payroll", "other"][..]),
+    ])
+});
+
+pub(super) fn is_valid_subtype_for_type(account_type: AccountType, subtype: &str) -> bool {
+    ACCOUNT_SUBTYPES_BY_TYPE
+        .get(&account_type)
+        .is_some_and(|subtypes| subtypes.contains(&subtype))
+}

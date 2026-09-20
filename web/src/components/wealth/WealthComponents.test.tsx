@@ -9,14 +9,19 @@ import { NetWorthChart } from './NetWorthChart'
 import type { Account, Asset, ClassifierBreakdown, Holding, LiabilityBreakdown, NetWorthPoint } from '../../types/graphql'
 
 const tooltipSpy = vi.fn()
+const activeTooltip = vi.hoisted(() => ({ label: undefined as string | undefined, active: false }))
 
 vi.mock('recharts', () => ({
+  useActiveTooltipLabel: () => activeTooltip.label,
+  useIsTooltipActive: () => activeTooltip.active,
   Area: () => null,
-  AreaChart: ({ children }: { children: ReactNode }) => <svg>{children}</svg>,
+  AreaChart: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => <svg data-testid="area-chart" onClick={onClick} tabIndex={0}>{children}</svg>,
   Cell: ({ onClick, onMouseEnter }: { onClick?: () => void; onMouseEnter?: () => void }) => <button data-testid="pie-cell" onClick={onClick} onMouseEnter={onMouseEnter} type="button" />,
   Line: () => null,
   Pie: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   PieChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ReferenceDot: () => <circle data-testid="focused-dot" />,
+  ReferenceLine: () => null,
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Tooltip: (props: unknown) => {
     tooltipSpy(props)
@@ -96,7 +101,7 @@ const liabilityBreakdown: LiabilityBreakdown[] = [
     valueUSD: 200,
     percentOfLiabilities: 100,
     accountCount: 1,
-    accounts: [{ id: 'card', name: 'Credit Card', type: 'CREDIT', owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-card', accountId: 'card', date: '2026-06-01', balanceUSD: 200, netContributionUSD: -200, holdings: [], flagged: false } }],
+    balances: [{ balanceUSD: 200, account: { id: 'card', name: 'Credit Card', type: 'CREDIT', owner: { id: 'owner', name: 'Alex' }, closed: false, hidden: false, needsReview: false, manual: false, typeLocked: false, createdAt: '', updatedAt: '', latestSnapshot: { id: 'snapshot-card', accountId: 'card', date: '2026-06-01', balanceUSD: 200, netContributionUSD: -200, holdings: [], flagged: false } } }],
   },
 ]
 
@@ -337,6 +342,41 @@ describe('wealth components', () => {
     expect(rangeControl.closest('section')).toContainElement(screen.getByText('Wealth history'))
     await userEvent.click(rangeControl)
     expect(onRangeChange).toHaveBeenCalledWith('ONE_YEAR')
+  })
+
+  it('focuses the active point by click or keyboard and clears the focus on the next activation', async () => {
+    const onFocusDate = vi.fn()
+    activeTooltip.label = '2026-05-01'
+    activeTooltip.active = true
+    const { rerender } = render(<NetWorthChart onFocusDate={onFocusDate} onRangeChange={vi.fn()} points={points} positive range="YTD" />)
+    expect(screen.getByText('$800.00')).toBeInTheDocument()
+    expect(screen.queryByTestId('focused-dot')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('area-chart'))
+    expect(onFocusDate).toHaveBeenCalledWith('2026-05-01')
+
+    onFocusDate.mockClear()
+    screen.getByTestId('area-chart').focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onFocusDate).toHaveBeenCalledWith('2026-05-01')
+    await userEvent.keyboard(' ')
+    expect(onFocusDate).toHaveBeenCalledTimes(2)
+
+    activeTooltip.active = false
+    rerender(<NetWorthChart onFocusDate={onFocusDate} onRangeChange={vi.fn()} points={points} positive range="YTD" />)
+    expect(screen.getByText('$1,000.00')).toBeInTheDocument()
+
+    rerender(<NetWorthChart focusedDate="2026-05-01" onFocusDate={onFocusDate} onRangeChange={vi.fn()} points={points} positive range="YTD" />)
+    expect(screen.getByText('$800.00')).toBeInTheDocument()
+    expect(screen.getByText('Focused · click chart to clear')).toBeInTheDocument()
+    expect(screen.getByTestId('focused-dot')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('area-chart'))
+    expect(onFocusDate).toHaveBeenLastCalledWith(null)
+
+    rerender(<NetWorthChart focusedDate="2025-01-01" onFocusDate={onFocusDate} onRangeChange={vi.fn()} points={points} positive range="YTD" />)
+    expect(screen.getByText('Focused · click chart to clear')).toBeInTheDocument()
+    expect(screen.queryByTestId('focused-dot')).not.toBeInTheDocument()
   })
 
   it('sorts the historical allocation tooltip by descending value', async () => {

@@ -1,3 +1,5 @@
+import { parseLocalDate, toDateInputValue } from '../utils/dates'
+
 export type ParamCodec<T> = {
   key: string
   keys?: readonly string[]
@@ -51,6 +53,21 @@ export function stringParam(key: string, fallback?: string) {
       if (value) params.set(key, value)
       else params.delete(key)
     },
+  }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+// Accepts only real YYYY-MM-DD dates so a malformed value never reaches a query.
+export function dateParam(key: string): ParamCodec<string | undefined> {
+  const raw = stringParam(key)
+  return {
+    key,
+    read(params) {
+      const value = raw.read(params)
+      return value && ISO_DATE.test(value) && toDateInputValue(parseLocalDate(value)) === value ? value : undefined
+    },
+    write: raw.write,
   }
 }
 

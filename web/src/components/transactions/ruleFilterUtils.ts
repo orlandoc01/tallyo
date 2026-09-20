@@ -4,6 +4,7 @@ export interface RuleFilterValues {
   accountIds: string[]
   amountMin: string
   amountMax: string
+  search: string
 }
 
 export function countActiveRuleFilters(filters: RuleFilterValues) {
@@ -12,4 +13,5 @@ export function countActiveRuleFilters(filters: RuleFilterValues) {
     + filters.accountIds.length
     + (filters.amountMin.trim() ? 1 : 0)
     + (filters.amountMax.trim() ? 1 : 0)
+    + (filters.search.trim() ? 1 : 0)
 }

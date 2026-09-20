@@ -55,7 +55,7 @@ function liabilityGroups(liabilityBreakdown: LiabilityBreakdown[]): AccountGroup
   return liabilityBreakdown.map((item) => ({
     id: item.category,
     label: item.label,
-    accounts: item.accounts,
+    accounts: item.balances.map((balance) => balance.account),
     total: -item.valueUSD,
     isLiability: true,
   }))

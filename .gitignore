@@ -9,4 +9,7 @@ web/dist/**
 web/coverage/
 web/test-results/
 web/issues/*
+server-rs/target/
+server-rs/tools/graphql-gen/target/
 .claude/settings.local.json
+/dist/

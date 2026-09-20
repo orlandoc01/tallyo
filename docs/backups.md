@@ -15,9 +15,10 @@ tallyo --backup-plain-data
 tallyo --backup-plain-data=/path/to/backup.db
 ```
 
-It opens the configured `DB_PATH`, uses SQLite `VACUUM INTO` to create a
-consistent destination database, logs the source and destination, and exits.
-It does not start the HTTP server or background sync loops.
+It opens the configured `DB_PATH`, exports every table into a new plaintext
+destination database in one transaction, logs the source and destination, and
+exits. It does not start the HTTP server, background sync loops, or database
+migrations.
 
 The built-in command does **not** schedule backups, encrypt backup files,
 upload them, apply retention, or restore them. Those are separate operator
@@ -30,8 +31,7 @@ tasks.
 - An explicit existing directory receives the same generated plaintext name.
 - An explicit file path is used as written.
 - Use the equals sign. `--backup-plain-data=/backup/tallyo.db` passes a path;
-  `--backup-plain-data /backup/tallyo.db` enables the flag but does not pass
-  that path to this boolean-style option.
+  `--backup-plain-data /backup/tallyo.db` is rejected with a usage error.
 - The destination parent directory must already exist.
 - The destination file must not already exist. Use a unique timestamp or move
   the previous file first.
@@ -99,10 +99,8 @@ result world-readable.
 ## Back Up Before Upgrading
 
 Create the pre-upgrade snapshot with the currently deployed Tallyo binary,
-then upgrade. The backup command opens the source through Tallyo's normal
-database initialization, which runs migrations before `VACUUM INTO`. Running a
-newer binary solely to make a "pre-upgrade" backup can therefore migrate the
-source before the snapshot exists.
+then upgrade. The backup command does not run migrations, so the snapshot
+matches the schema of the release that wrote it.
 
 Keep the pre-upgrade binary and its backup until the new release has been
 verified. Do not assume a database migrated by a newer release can be opened by

@@ -1,0 +1,5 @@
+[advisories]
+# rsa is lockfile-only: pulled in via sqlx-mysql, which is never enabled (we
+# build sqlite only — `cargo tree -i rsa` resolves to nothing). No fixed rsa
+# release exists yet; drop this when one ships and `cargo update -p rsa` clears it.
+ignore = ["RUSTSEC-2023-0071"]

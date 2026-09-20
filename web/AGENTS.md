@@ -2,7 +2,7 @@
 
 Agent/contributor reference for `web/`: routing, caching rules, and UI gotchas that aren't obvious from the code. Tech stack, setup, environment variables, and commands live in [README.md](README.md) — read that first.
 
-React SPA + PWA for a self-hosted household finance tracker; compiled to static files and embedded into the Go `tallyo` binary (`../server/`, see `server/AGENTS.md`). The shared GraphQL schema is `../schema/*.graphql`. Auth is OAuth authorization-code + PKCE against the server's built-in provider. Owners, sign-in methods, and feature toggles are configured on the backend and fetched at runtime — never hardcoded.
+React SPA + PWA for a self-hosted household finance tracker; compiled to static files and embedded into the Rust `tallyo` binary (`../server-rs/`, see `server-rs/AGENTS.md`). The shared GraphQL schema is `../schema/*.graphql`. Auth is OAuth authorization-code + PKCE against the server's built-in provider. Owners, sign-in methods, and feature toggles are configured on the backend and fetched at runtime — never hardcoded.
 
 ## Directory Layout
 

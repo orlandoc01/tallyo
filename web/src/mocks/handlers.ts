@@ -448,7 +448,9 @@ export const handlers = [
     const merchantPattern = input?.merchantPattern?.trim().toLowerCase() ?? ''
     const originalPattern = input?.originalPattern?.trim().toLowerCase() ?? ''
     const accountIds = input?.accountIds ?? []
+    const search = input?.search?.trim().toLowerCase()
     const filteredRules = rules
+      .filter((rule) => !search || [rule.merchantName, rule.merchantPattern, rule.originalPattern].some((value) => value?.toLowerCase().includes(search)))
       .filter((rule) => !merchantPattern || (rule.merchantPattern ?? '').toLowerCase().includes(merchantPattern))
       .filter((rule) => !originalPattern || (rule.originalPattern ?? '').toLowerCase().includes(originalPattern))
       .filter((rule) => !accountIds.length || rule.accounts?.some((account) => accountIds.includes(account.id)))
@@ -749,7 +751,7 @@ export const handlers = [
   }),
   api.query('NetWorth', ({ variables }) => {
     if (demoNetWorthReport) return HttpResponse.json({ data: { netWorth: demoNetWorthReport } })
-    const includeHoldings = Boolean((variables as { includeHoldings?: boolean }).includeHoldings)
+    const { includeHoldings, input } = variables as { includeHoldings?: boolean; input?: { asOfDate?: string | null } }
     const cashAccount: Account = { ...accounts[0], latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-cash', balanceUSD: 4500, netContributionUSD: 300 }, lastSyncedAt: '2026-05-21T10:00:00Z' }
     const taxAdvantagedInvestmentAccount: Account = { ...accounts[1], id: 'acct-invest-tax-advantaged', name: 'Roth 401k', type: 'INVESTMENT', subtype: 'roth 401k', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-tax-advantaged', accountId: 'acct-invest-tax-advantaged', balanceUSD: 12200, netContributionUSD: 950 }, closed: false, lastSyncedAt: '2026-05-21T10:00:00Z' }
     const investmentAccount: Account = { ...accounts[1], id: 'acct-invest-brokerage', name: 'Brokerage', type: 'INVESTMENT', subtype: 'brokerage', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-brokerage', accountId: 'acct-invest-brokerage', balanceUSD: 6000, netContributionUSD: 300 }, closed: false, lastSyncedAt: '2026-05-21T10:00:00Z' }
@@ -757,15 +759,15 @@ export const handlers = [
     const rollupHoldings = (asset: Asset, rows: Array<{ account: Account; quantity: number | null; valueUSD: number }>): Holding[] | null => (
       includeHoldings ? rows.map((row) => ({ __typename: 'Holding' as const, assetId: asset.id, asset, accountId: row.account.id, account: row.account, quantity: row.quantity, valueUSD: row.valueUSD, manual: false })) : null
     )
+    const totals = input?.asOfDate
+      ? { asOfDate: input.asOfDate, currentNetWorthUSD: 19850, currentAssetsUSD: 21000, currentLiabilitiesUSD: 1150 }
+      : { asOfDate: '2026-05-21', currentNetWorthUSD: 23000, currentAssetsUSD: 24200, currentLiabilitiesUSD: 1200 }
 
     return HttpResponse.json({
       data: {
         netWorth: {
           __typename: 'NetWorthReport',
-          asOfDate: '2026-05-21',
-          currentNetWorthUSD: 23000,
-          currentAssetsUSD: 24200,
-          currentLiabilitiesUSD: 1200,
+          ...totals,
           classifierBreakdown: [
             {
               __typename: 'ClassifierBreakdown',
@@ -800,10 +802,10 @@ export const handlers = [
               __typename: 'LiabilityBreakdown',
               category: 'CARD',
               label: 'Cards',
-              valueUSD: 1200,
+              valueUSD: totals.currentLiabilitiesUSD,
               percentOfLiabilities: 100,
               accountCount: 1,
-              accounts: [creditAccount],
+              balances: [{ __typename: 'LiabilityAccountBalance', account: creditAccount, balanceUSD: totals.currentLiabilitiesUSD }],
             },
           ],
         },
