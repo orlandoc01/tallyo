@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
+import clsx from 'clsx'
 import { Button } from '../common/Button'
+import { checkboxClass } from '../common/FormControls'
 import type { Category, Tag } from '../../types/graphql'
 import { BulkDeleteTransactionsModal } from './BulkDeleteTransactionsModal'
 import { BulkEditTransactionsModal } from './BulkEditTransactionsModal'
 import type { useBulkTransactionActions } from './useBulkTransactionActions'
 
-export function BulkActionBar({ selectedCount, onDelete, onEdit }: { selectedCount: number; onDelete: () => void; onEdit: () => void }) {
+export function BulkActionBar({ className, selectedCount, onDelete, onEdit }: { className?: string; selectedCount: number; onDelete: () => void; onEdit: () => void }) {
   return (
-    <div className="fixed bottom-20 left-1/2 z-30 flex w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-2xl lg:bottom-6">
-      <span className="text-sm font-semibold text-neutral-700">{selectedCount} selected</span>
+    <div className={clsx('sticky top-[68px] z-20 flex items-center justify-between gap-4 rounded-md border border-border-strong bg-raised px-4 py-2 lg:top-4', className)}>
+      <span className="text-[13px] font-medium text-text-1">{selectedCount} selected</span>
       <div className="flex items-center gap-2">
-        <Button disabled={selectedCount === 0} onClick={onEdit}>Edit</Button>
-        <Button disabled={selectedCount === 0} onClick={onDelete} variant="danger">Delete</Button>
+        <Button disabled={selectedCount === 0} onClick={onEdit} size="sm">Edit</Button>
+        <Button disabled={selectedCount === 0} onClick={onDelete} size="sm" variant="danger">Delete</Button>
       </div>
     </div>
   )
@@ -40,17 +42,17 @@ export function BulkSelectAllCheckbox({
   }, [someSelected])
 
   return (
-    <label className="flex h-10 shrink-0 items-center gap-2 rounded-2xl border border-neutral-200 bg-white px-3 text-sm font-medium text-neutral-600">
+    <label className="flex h-9 shrink-0 items-center gap-2 rounded-md border border-border-strong bg-raised px-3 lg:h-10">
       <input
         aria-label="Select all transactions in current filter"
         checked={allSelected}
-        className="h-4 w-4 rounded accent-brand-600 disabled:opacity-50"
+        className={clsx(checkboxClass, 'h-4 w-4')}
         disabled={selecting}
         onChange={onToggle}
         ref={checkboxRef}
         type="checkbox"
       />
-      {selecting ? <Loader2 aria-hidden className="h-4 w-4 animate-spin text-brand-600" /> : null}
+      {selecting ? <Loader2 aria-hidden className="h-4 w-4 animate-spin text-accent" /> : null}
     </label>
   )
 }

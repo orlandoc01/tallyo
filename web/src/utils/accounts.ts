@@ -25,3 +25,31 @@ export function accountBalanceUSD(account: Pick<Account, 'latestSnapshot'>): num
 export function accountNetContributionUSD(account: Pick<Account, 'latestSnapshot'>): number | null {
   return account.latestSnapshot?.netContributionUSD ?? null
 }
+
+export function groupAccountsByInstitution(accounts: Account[]) {
+  const grouped = accounts.reduce<Record<string, { key: string; label: string; accounts: Account[]; isManual: boolean }>>((groups, account) => {
+    const connection = account.connection
+    if (!connection) {
+      const group = groups['manual'] ?? { key: 'manual', label: 'Manual', accounts: [], isManual: true }
+      return { ...groups, manual: { ...group, accounts: [...group.accounts, account] } }
+    }
+
+    const key = connection.id
+    const label = connectionProviderLabel(connection)
+    const group = groups[key] ?? { key, label, accounts: [], isManual: false }
+    return { ...groups, [key]: { ...group, accounts: [...group.accounts, account] } }
+  }, {})
+
+  return Object.values(grouped).sort((a, b) => Number(a.isManual) - Number(b.isManual))
+}
+
+function connectionProviderLabel(connection: NonNullable<Account['connection']>) {
+  if (connection.name) {
+    return connection.name
+  }
+  const provider = connection.provider
+  if (provider && 'address' in provider) {
+    return 'Crypto wallet'
+  }
+  return 'Connected accounts'
+}

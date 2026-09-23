@@ -15,6 +15,7 @@ import { OwnersStep } from './setup/OwnersStep'
 import { PasswordSetupStep } from './setup/PasswordSetupStep'
 import { RegisterAccountStep } from './setup/RegisterAccountStep'
 import { SecurityChoiceStep } from './setup/SecurityChoiceStep'
+import { SetupLayout } from './setup/SetupLayout'
 import { SetupContext } from './setup/setupContextValue'
 import { SetupProvider } from './setup/SetupContext'
 import { buildSetupConfigurationInput } from './setup/setupConfigurationInput'
@@ -109,6 +110,7 @@ describe('setup wizard pages', () => {
       webauthnRpName: 'Tallyo',
       webauthnRpOrigins: '',
       registeredEmail: '',
+      dataProviderSummary: [],
     }
 
     expect(buildSetupConfigurationInput(base)).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password' } })
@@ -142,7 +144,7 @@ describe('setup wizard pages', () => {
     await user.clear(screen.getByLabelText(/frontend redirect uri/i))
     await user.type(screen.getByLabelText(/frontend redirect uri/i), 'https://spend.example/auth/callback')
     // Enable passkey first so its fields are visible
-    await user.click(screen.getByRole('button', { name: /^passkey$/i }))
+    await user.click(screen.getByRole('switch', { name: 'Passkey' }))
     await user.type(await screen.findByLabelText(/^rp id$/i), 'spend.example')
     await user.type(screen.getByLabelText(/^origins$/i), 'https://spend.example')
     // Email is enabled by default so SMTP fields are already visible
@@ -157,7 +159,7 @@ describe('setup wizard pages', () => {
     const user = userEvent.setup()
     renderSetup('/setup/oauth-setup', <AuthConfigStep />, '/setup/register', 'Register next')
 
-    await user.click(screen.getByRole('button', { name: /^google$/i }))
+    await user.click(screen.getByRole('switch', { name: 'Google' }))
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('heading', { name: /before you continue/i })).toBeInTheDocument()
@@ -234,7 +236,7 @@ describe('setup wizard pages', () => {
     renderSetup('/setup/oauth-setup', <AuthConfigStep />, '/setup/register', 'Register next')
 
     // Email is the only provider enabled by default; disable it to leave none selected
-    await user.click(screen.getByRole('button', { name: /^email$/i }))
+    await user.click(screen.getByRole('switch', { name: 'Email' }))
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByText(/enable at least one sign-in method/i)).toBeInTheDocument()
@@ -262,8 +264,8 @@ describe('setup wizard pages', () => {
       </>,
     )
 
-    await user.click(screen.getByRole('button', { name: /^passkey$/i }))
-    await user.click(screen.getByRole('button', { name: /^email$/i }))
+    await user.click(screen.getByRole('switch', { name: 'Passkey' }))
+    await user.click(screen.getByRole('switch', { name: 'Email' }))
     await user.click(screen.getByRole('button', { name: /continue/i }))
     await user.type(await screen.findByLabelText(/admin email address/i), 'owner@example.com')
     await user.click(screen.getByRole('button', { name: /continue/i }))
@@ -438,5 +440,114 @@ describe('setup wizard pages', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByText(/email already exists/i)).toBeInTheDocument()
+  })
+
+  it('shows the selected providers as tags on the register step', async () => {
+    const user = userEvent.setup()
+    renderSetupFlow(
+      '/setup/oauth-setup',
+      <>
+        <Route element={<AuthConfigStep />} path="/setup/oauth-setup" />
+        <Route element={<RegisterAccountStep />} path="/setup/register" />
+      </>,
+    )
+
+    await user.click(screen.getByRole('switch', { name: 'Passkey' }))
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    const providers = await screen.findByText('Selected providers')
+    expect(providers).toHaveTextContent(/Passkey/)
+    expect(providers).toHaveTextContent(/Email/)
+    expect(providers).not.toHaveTextContent(/Google/)
+  })
+
+  it('summarizes the configured setup on the finish step', async () => {
+    renderWithProviders(
+      <SetupContext.Provider value={{ ...initialSetupState, passwordEnabled: true, oauthEnabled: true, passkeyEnabled: true, registeredEmail: 'admin@example.com', dataProviderSummary: ['Plaid (sandbox)', 'SimpleFIN · 1 connection'], updateSetup: vi.fn() }}>
+        <CompleteStep />
+      </SetupContext.Provider>,
+      { initialEntries: ['/setup/complete'], withGraphql: true },
+    )
+
+    expect(screen.getByText('Single password + OAuth · Passkey, Email')).toBeInTheDocument()
+    expect(screen.getByText('admin@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Plaid (sandbox) · SimpleFIN · 1 connection')).toBeInTheDocument()
+    expect(await screen.findByText(/alex/)).toBeInTheDocument()
+    expect(screen.getByText(/sign-in settings apply immediately/i)).toBeInTheDocument()
+  })
+
+  it('records saved Plaid and SimpleFIN credentials for the finish summary', async () => {
+    const user = userEvent.setup()
+    renderSetupFlow(
+      '/setup/connections',
+      <>
+        <Route element={<ConnectionsStep />} path="/setup/connections" />
+        <Route element={<CompleteStep />} path="/setup/complete" />
+      </>,
+    )
+
+    await user.type(screen.getByLabelText(/client id/i), 'client-id')
+    await user.type(screen.getByLabelText(/^secret$/i), 'secret')
+    await user.click(screen.getByRole('radio', { name: 'production' }))
+    await user.click(screen.getByRole('button', { name: /save credentials/i }))
+    expect(await screen.findByText(/plaid credentials saved/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /simplefin/i }))
+    await user.type(screen.getByLabelText(/setup token/i), 'setup-token')
+    await user.selectOptions(await screen.findByLabelText(/owner/i), 'owner-1')
+    await user.click(screen.getByRole('button', { name: /save token/i }))
+    expect(await screen.findByText(/simplefin token saved with/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
+
+    expect(await screen.findByText(/^Plaid \(production\) · SimpleFIN · \d+ connections?$/)).toBeInTheDocument()
+    expect(screen.getByText('Not chosen')).toBeInTheDocument()
+    expect(screen.getByText('Master password')).toBeInTheDocument()
+  })
+
+  it('lets the stepper jump back to completed steps only', async () => {
+    const user = userEvent.setup()
+    renderSetupFlow(
+      '/setup/owners',
+      <Route element={<SetupLayout />} path="/setup">
+        <Route element={<h1>Welcome page</h1>} path="welcome" />
+        <Route element={<h1>Password page</h1>} path="password-setup" />
+        <Route element={<h1>Auth page</h1>} path="oauth-setup" />
+        <Route element={<h1>Owners page</h1>} path="owners" />
+        <Route element={<h1>Complete page</h1>} path="complete" />
+      </Route>,
+    )
+
+    expect(screen.getByText('First-time setup · Step 4 of 6')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /owners/i })).toHaveAttribute('aria-current', 'step')
+    expect(screen.queryByRole('button', { name: /connections/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /finish/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /auth/i }))
+    expect(await screen.findByRole('heading', { name: 'Auth page' })).toBeInTheDocument()
+    expect(screen.getByText('First-time setup · Step 3 of 6')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /welcome/i }))
+    expect(await screen.findByRole('heading', { name: 'Welcome page' })).toBeInTheDocument()
+  })
+
+  it('routes the stepper Auth entry to password setup when a password is enabled', async () => {
+    const user = userEvent.setup()
+    renderSetupFlow(
+      '/setup/security',
+      <Route element={<SetupLayout />} path="/setup">
+        <Route element={<SecurityChoiceStep />} path="security" />
+        <Route element={<PasswordSetupStep />} path="password-setup" />
+        <Route element={<h1>Auth page</h1>} path="oauth-setup" />
+        <Route element={<h1>Owners page</h1>} path="owners" />
+      </Route>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
+    await user.type(await screen.findByLabelText(/^master password$/i), 'master-password')
+    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password')
+    await user.click(screen.getByRole('button', { name: /^continue$/i }))
+    expect(await screen.findByRole('heading', { name: 'Owners page' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^auth$/i }))
+    expect(await screen.findByRole('heading', { name: 'Master password' })).toBeInTheDocument()
   })
 })

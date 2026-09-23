@@ -54,7 +54,7 @@ export function PlaidConnectionForm({
       {isLoading ? (
         <CenteredSpinner />
       ) : noPlaidCredentials ? (
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <div className="mt-6 rounded-2xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-2">
           Please configure a Plaid Credential in{' '}
           <Link className="font-semibold text-brand-600 hover:text-brand-800" to="/settings/connections?provider=plaid">
             settings
@@ -72,7 +72,7 @@ export function PlaidConnectionForm({
           ) : null}
 
           {!isFetching && !error && credentials.length === 1 ? (
-            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+            <div className="rounded-2xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-2">
               Using {credentials[0].label || credentials[0].clientId} for this connection.
             </div>
           ) : null}

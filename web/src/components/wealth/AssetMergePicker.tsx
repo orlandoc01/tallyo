@@ -3,7 +3,9 @@ import { useClient, useMutation } from 'urql'
 import { MERGE_ASSET_MUTATION } from '../../graphql/mutations'
 import { ASSETS_QUERY } from '../../graphql/queries'
 import type { Asset, AssetAdapterSource } from '../../types/graphql'
-import { TextField } from '../common/FormControls'
+import { Button } from '../common/Button'
+import { SectionLabel, TextField } from '../common/FormControls'
+import { Tag } from '../common/Tag'
 
 type MergePickerState = {
   source: AssetAdapterSource
@@ -87,59 +89,49 @@ export function AssetMergePicker({
 
   return (
     <section className="space-y-2" aria-label="Tracked by">
-      <h3 className="text-sm font-semibold text-neutral-700">Tracked by</h3>
+      <SectionLabel as="h3">Tracked by</SectionLabel>
       <div className="space-y-2">
         {asset.adapterSources.map((source) => (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-neutral-100 px-3 py-2 text-sm sm:items-center" key={`${source.sourceAdapter}:${source.sourceId}`}>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-md border border-border px-3 py-2 text-sm sm:items-center" key={`${source.sourceAdapter}:${source.sourceId}`}>
             <div className="min-w-0">
-              <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                {adapterLabel(source.sourceAdapter)}
-              </span>
-              <code className="mt-1 block truncate text-xs text-neutral-500">{source.sourceId}</code>
+              <Tag tint="teal">{adapterLabel(source.sourceAdapter)}</Tag>
+              <code className="mt-1 block truncate font-mono text-xs text-text-muted">{source.sourceId}</code>
             </div>
             {canEdit ? (
-              <button
-                className="rounded-xl border border-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                onClick={() => handleOpenMergePicker(source)}
-                type="button"
-              >
-                Merge
-              </button>
+              <Button onClick={() => handleOpenMergePicker(source)} size="sm" variant="secondary">Merge</Button>
             ) : null}
           </div>
         ))}
       </div>
       {mergePicker ? (
-        <div className="space-y-3 rounded-xl border border-brand-100 bg-white p-3">
+        <div className="space-y-3 rounded-md border border-brand-600 bg-surface-2 p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h4 className="text-sm font-semibold text-neutral-800">Choose surviving asset</h4>
-              <p className="text-xs text-neutral-500">The selected {asset.assetType.toLowerCase()} asset survives. This asset is deleted after its history and sources move.</p>
+              <SectionLabel as="h4">Choose surviving asset</SectionLabel>
+              <p className="text-xs text-text-muted">The selected {asset.assetType.toLowerCase()} asset survives. This asset is deleted after its history and sources move.</p>
             </div>
-            <button className="text-xs font-semibold text-neutral-500 hover:text-neutral-700" onClick={() => setMergePicker(null)} type="button">
-              Close
-            </button>
+            <Button onClick={() => setMergePicker(null)} size="sm" variant="ghost">Close</Button>
           </div>
           <TextField ariaLabel="Search merge target assets" hideLabel label="Search merge target assets" onChange={handleMergeSearch} onKeyDown={(event) => {
             if (event.key === 'Enter') event.preventDefault()
           }} placeholder="Search assets..." type="search" value={mergePicker.search} />
-          {mergePicker.isLoading ? <p className="text-sm text-neutral-500">Loading assets...</p> : null}
-          {mergePicker.error ? <p className="text-sm text-red-600">{mergePicker.error}</p> : null}
+          {mergePicker.isLoading ? <p className="text-[13px] text-text-muted">Loading assets...</p> : null}
+          {mergePicker.error ? <p className="text-[13px] text-negative">{mergePicker.error}</p> : null}
           {!mergePicker.isLoading && !mergePicker.error && mergeTargetAssets.length === 0 ? (
-            <p className="text-sm text-neutral-500">No other {asset.assetType.toLowerCase()} assets match this search.</p>
+            <p className="text-[13px] text-text-muted">No other {asset.assetType.toLowerCase()} assets match this search.</p>
           ) : null}
           {mergeTargetAssets.length > 0 ? (
             <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
               {mergeTargetAssets.map((target) => (
                 <button
-                  className="block w-full rounded-xl border border-neutral-200 px-3 py-2 text-left text-sm hover:bg-neutral-50 disabled:opacity-50"
+                  className="block w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-left text-sm hover:bg-raised disabled:opacity-50"
                   disabled={mergePicker.isMerging}
                   key={target.id}
                   onClick={() => handleMergeTarget(target)}
                   type="button"
                 >
-                  <span className="block font-medium text-neutral-800">{assetLabel(target)}</span>
-                  <span className="block text-xs text-neutral-500">{target.assetType} - {target.identifier}</span>
+                  <span className="block font-medium text-text-1">{assetLabel(target)}</span>
+                  <span className="block text-xs text-text-muted">{target.assetType} - {target.identifier}</span>
                 </button>
               ))}
             </div>

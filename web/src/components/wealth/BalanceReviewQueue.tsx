@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from 'urql'
+import { DataGridHeader, DataGridRow, dataGridNumericCell, dataGridTextCell } from '../common/DataGrid'
 import { Card } from '../common/FormControls'
 import { QueryGate } from '../common/QueryGate'
+import { Tag } from '../common/Tag'
 import { BALANCE_REVIEWS_QUERY } from '../../graphql/queries'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { BalanceSnapshotReview, BalanceSnapshotReviewList } from '../../types/graphql'
 import { accountMaskedName } from '../../utils/accounts'
 import { formatAccountType } from '../../utils/accountSubtypes'
@@ -10,17 +13,22 @@ import { formatCurrencyCompact } from '../../utils/currency'
 import { formatDisplayDate } from '../../utils/dates'
 import { BalanceReviewModal } from './BalanceReviewModal'
 
+const DESKTOP_COLUMNS = 'minmax(0,1.6fr) minmax(0,1fr) 120px 120px 170px'
+const MOBILE_COLUMNS = 'minmax(0,1fr) 90px'
+
 export function BalanceReviewQueue() {
+  const isMobile = useIsMobile()
   const [{ data, fetching, error }, reexecuteQuery] = useQuery<{ balanceSnapshotReviews: BalanceSnapshotReviewList }>({ query: BALANCE_REVIEWS_QUERY })
   const [selectedReview, setSelectedReview] = useState<BalanceSnapshotReview | null>(null)
 
   const reviews = data?.balanceSnapshotReviews.items ?? []
+  const columns = isMobile ? MOBILE_COLUMNS : DESKTOP_COLUMNS
 
   return (
     <QueryGate
       data={data}
       empty={reviews.length === 0}
-      emptyTitle="No flagged balance snapshots to review."
+      emptyTitle="No flagged balance snapshots"
       emptyDescription="Provider balance anomalies will appear here when a sync carries forward prior values."
       error={error}
       errorPrefix="Failed to load balance review queue"
@@ -28,53 +36,49 @@ export function BalanceReviewQueue() {
       loadingLabel="Loading balance review queue"
       onRetry={() => reexecuteQuery({ requestPolicy: 'network-only' })}
     >
-      <div className="space-y-4">
-        <Card>
-          {reviews.map((review) => (
-            <button
-              className="grid w-full gap-4 border-b border-neutral-100 px-5 py-4 text-left transition last:border-b-0 hover:bg-neutral-50 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-center"
-              key={review.id}
-              onClick={() => setSelectedReview(review)}
-              type="button"
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-neutral-950">{accountMaskedName(review.account)}</p>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Balance anomaly</span>
-                </div>
-                <p className="mt-1 text-sm text-neutral-500">{formatAccountType(review.account.type)}{review.account.subtype ? ` / ${review.account.subtype}` : ''}</p>
+      <Card>
+        <DataGridHeader gridTemplateColumns={columns} variant="list">
+          <div>Account</div>
+          {isMobile ? null : <div>Type</div>}
+          <div className={dataGridNumericCell}>Provider</div>
+          {isMobile ? null : <div className={dataGridNumericCell}>Carry-forward</div>}
+          {isMobile ? null : <div className={dataGridNumericCell}>Flagged</div>}
+        </DataGridHeader>
+        {reviews.map((review) => (
+          <DataGridRow gridTemplateColumns={columns} key={review.id} onClick={() => setSelectedReview(review)}>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-text-1">{accountMaskedName(review.account)}</span>
+              {isMobile ? null : <Tag className="shrink-0" tint="amber">Balance anomaly</Tag>}
+            </div>
+            {isMobile ? null : <div className={`${dataGridTextCell} text-[13px] text-text-3`}>{formatAccountType(review.account.type)}{review.account.subtype ? ` / ${review.account.subtype}` : ''}</div>}
+            <div className={`${dataGridNumericCell} font-medium text-warning`}>{formatCurrencyCompact(review.providerBalanceUSD)}</div>
+            {isMobile ? null : <div className={`${dataGridNumericCell} font-medium text-positive`}>{formatCurrencyCompact(review.carryForwardBalanceUSD)}</div>}
+            {isMobile ? null : (
+              <div className={`${dataGridNumericCell} text-[13px] text-text-3`}>
+                {dateRangeLabel(review)}
+                <span className="text-text-muted"> · </span>
+                <span className="text-text-muted">{snapshotCountLabel(review.flaggedSnapshotCount)}</span>
               </div>
-              <BalanceValue label="Provider detected" tone="provider" value={review.providerBalanceUSD} />
-              <BalanceValue label="System carry-forward" tone="carry" value={review.carryForwardBalanceUSD} />
-              <div className="rounded-2xl bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-700 sm:text-right">
-                <div>{dateRangeLabel(review)}</div>
-                <div className="text-xs text-neutral-500">{review.flaggedSnapshotCount} {review.flaggedSnapshotCount === 1 ? 'snapshot' : 'snapshots'}</div>
-              </div>
-            </button>
-          ))}
-        </Card>
-        {selectedReview ? (
-          <BalanceReviewModal
-            onClose={() => setSelectedReview(null)}
-            onResolved={() => {
-              setSelectedReview(null)
-              reexecuteQuery({ requestPolicy: 'network-only' })
-            }}
-            review={selectedReview}
-          />
-        ) : null}
-      </div>
+            )}
+          </DataGridRow>
+        ))}
+      </Card>
+      {selectedReview ? (
+        <BalanceReviewModal
+          onClose={() => setSelectedReview(null)}
+          onResolved={() => {
+            setSelectedReview(null)
+            reexecuteQuery({ requestPolicy: 'network-only' })
+          }}
+          review={selectedReview}
+        />
+      ) : null}
     </QueryGate>
   )
 }
 
-function BalanceValue({ label, tone, value }: { label: string; tone: 'provider' | 'carry'; value: number }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{label}</p>
-      <p className={tone === 'provider' ? 'text-lg font-bold text-amber-700' : 'text-lg font-bold text-emerald-700'}>{formatCurrencyCompact(value)}</p>
-    </div>
-  )
+function snapshotCountLabel(count: number) {
+  return `${count} ${count === 1 ? 'snapshot' : 'snapshots'}`
 }
 
 function dateRangeLabel(review: BalanceSnapshotReview) {

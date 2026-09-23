@@ -3,7 +3,8 @@ import { useMutation } from 'urql'
 import { Button } from '../common/Button'
 import { FormError } from '../common/FormControls'
 import { Modal } from '../common/Modal'
-import { ModalCloseButton } from '../common/ModalHeader'
+import { ModalHeader } from '../common/ModalHeader'
+import { StatBlock, StatGrid } from '../common/StatBlock'
 import { RESOLVE_BALANCE_REVIEW_MUTATION } from '../../graphql/mutations'
 import { usePermissions } from '../../hooks/usePermissions'
 import type { BalanceReviewAction, BalanceSnapshotReview, ResolveBalanceReviewPayload } from '../../types/graphql'
@@ -40,49 +41,45 @@ export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: (
   }
 
   return (
-    <Modal className="dark:bg-neutral-950 dark:ring-1 dark:ring-neutral-800" labelledBy="balance-review-title" onClose={onClose} scrollable size="lg">
-      <div className="space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Balance review</p>
-            <h2 className="mt-1 text-2xl font-bold text-neutral-950 dark:text-neutral-50" id="balance-review-title">{accountMaskedName(review.account)}</h2>
-            <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{formatAccountType(review.account.type)}{review.account.subtype ? ` / ${review.account.subtype}` : ''}</p>
-          </div>
-          <ModalCloseButton className="dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100" onClick={onClose} />
-        </header>
+    <Modal label={`Balance review for ${accountMaskedName(review.account)}`} onClose={onClose} scrollable size="lg">
+      <div className="space-y-5">
+        <ModalHeader
+          onClose={onClose}
+          subtitle={`${formatAccountType(review.account.type)}${review.account.subtype ? ` / ${review.account.subtype}` : ''}`}
+          title={accountMaskedName(review.account)}
+        />
 
-        <section className="grid gap-3 rounded-2xl bg-neutral-50 p-4 dark:bg-neutral-900/70 sm:grid-cols-3">
-          <TimelineValue label="First flagged" value={formatDisplayDate(review.firstFlaggedDate)} />
-          <TimelineValue label="Latest flagged" value={formatDisplayDate(review.latestFlaggedDate)} />
-          <TimelineValue label="Snapshots" value={String(review.flaggedSnapshotCount)} />
-        </section>
+        <StatGrid className="rounded-md bg-surface-2 p-4" columns={2}>
+          <StatBlock label="First flagged" value={formatDisplayDate(review.firstFlaggedDate)} />
+          <StatBlock label="Latest flagged" value={formatDisplayDate(review.latestFlaggedDate)} />
+          <StatBlock label="Snapshots" value={String(review.flaggedSnapshotCount)} />
+        </StatGrid>
 
-        <section className="grid gap-3 sm:grid-cols-2">
-          <ComparisonCard label="Provider detected" tone="provider" value={formatCurrency(review.providerBalanceUSD)} />
-          <ComparisonCard label="System carry-forward" tone="carry" value={formatCurrency(review.carryForwardBalanceUSD)} />
-        </section>
+        <StatGrid columns={2}>
+          <StatBlock label="Provider detected" value={<span className="text-warning">{formatCurrency(review.providerBalanceUSD)}</span>} />
+          <StatBlock label="System carry-forward" value={<span className="text-positive">{formatCurrency(review.carryForwardBalanceUSD)}</span>} />
+        </StatGrid>
 
-        <section className="rounded-2xl border border-neutral-200 p-4 dark:border-neutral-800">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Difference</p>
-          <p className="mt-1 text-xl font-bold text-neutral-950 dark:text-neutral-50">{formatSignedCurrency(difference)}</p>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{deviation == null ? 'Deviation unavailable because the carry-forward balance is zero.' : `${formatPercentChange(deviation)} versus the carry-forward balance.`}</p>
-        </section>
+        <StatBlock
+          label="Difference"
+          sublabel={deviation == null ? 'Deviation unavailable because the carry-forward balance is zero.' : `${formatPercentChange(deviation)} versus the carry-forward balance.`}
+          value={formatSignedCurrency(difference)}
+        />
 
         {review.flagReason ? (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
-            <p className="font-semibold">Flag reason</p>
-            <p className="mt-1">{review.flagReason}</p>
-          </section>
+          <div className="rounded-md border border-border px-4 py-3 text-[13px]">
+            <p className="text-xs text-text-muted">Flag reason</p>
+            <p className="mt-0.5 text-text-2">{review.flagReason}</p>
+          </div>
         ) : null}
 
-        {!canResolve ? <p className="rounded-2xl bg-neutral-100 p-3 text-sm text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">You need account write access to resolve balance reviews.</p> : null}
+        {!canResolve ? <p className="rounded-md bg-raised px-4 py-3 text-[13px] text-text-2">You need account write access to resolve balance reviews.</p> : null}
         {confirmUseProvider ? <FormError>Confirming will replace flagged carry-forward snapshots with provider balances and provider holdings for this date range.</FormError> : null}
         {mutationError ? <FormError>{mutationError}</FormError> : null}
 
         <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button className="dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-neutral-50" disabled={resolving !== null} onClick={onClose} variant="ghost">Cancel</Button>
+          <Button disabled={resolving !== null} onClick={onClose} variant="ghost">Cancel</Button>
           <Button
-            className={confirmUseProvider ? undefined : 'dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800'}
             disabled={!canResolve || resolving !== null}
             onClick={() => {
               if (!confirmUseProvider) {
@@ -101,23 +98,5 @@ export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: (
         </footer>
       </div>
     </Modal>
-  )
-}
-
-function TimelineValue({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{label}</p>
-      <p className="mt-1 font-semibold text-neutral-950 dark:text-neutral-100">{value}</p>
-    </div>
-  )
-}
-
-function ComparisonCard({ label, tone, value }: { label: string; tone: 'provider' | 'carry'; value: string }) {
-  return (
-    <div className={tone === 'provider' ? 'rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-500/10' : 'rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-500/10'}>
-      <p className={tone === 'provider' ? 'text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300' : 'text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300'}>{label}</p>
-      <p className={tone === 'provider' ? 'mt-2 text-2xl font-bold text-amber-900 dark:text-amber-100' : 'mt-2 text-2xl font-bold text-emerald-900 dark:text-emerald-100'}>{value}</p>
-    </div>
   )
 }

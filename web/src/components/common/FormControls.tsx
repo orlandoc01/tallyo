@@ -2,8 +2,9 @@ import clsx from 'clsx'
 import { Search } from 'lucide-react'
 import type { HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
-const labelClass = 'text-sm font-medium text-neutral-700'
-const controlClass = 'mt-1 block w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:opacity-50'
+const labelClass = 'text-xs text-text-muted'
+const controlClass = 'mt-1 block w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] text-text-1 placeholder:text-text-faint focus:border-brand-600 focus:outline-none disabled:opacity-50 dark:bg-bg'
+const inputHeightClass = 'h-9 lg:h-8'
 
 type FieldProps = {
   label: string
@@ -13,6 +14,7 @@ type FieldProps = {
   hideLabel?: boolean
   labelClassName?: string
   labelSuffix?: ReactNode
+  mono?: boolean
   onChange: (value: string) => void
 }
 
@@ -36,20 +38,20 @@ type SelectFieldProps<T extends string> = Omit<SelectHTMLAttributes<HTMLSelectEl
   onChange: (value: T) => void
 }
 
-export function TextField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, onChange, ...props }: TextFieldProps) {
+export function TextField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, mono = false, onChange, ...props }: TextFieldProps) {
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <input aria-label={ariaLabel ?? label} className={clsx(controlClass, hideLabel && 'mt-0', controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
+      <input aria-label={ariaLabel ?? label} className={clsx(controlClass, inputHeightClass, hideLabel && 'mt-0', mono && 'font-mono text-xs', controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
     </label>
   )
 }
 
-export function TextAreaField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, minHeight, onChange, ...props }: TextAreaFieldProps) {
+export function TextAreaField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, minHeight, mono = false, onChange, ...props }: TextAreaFieldProps) {
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <textarea aria-label={ariaLabel ?? label} className={clsx(controlClass, hideLabel && 'mt-0', minHeight, controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
+      <textarea aria-label={ariaLabel ?? label} className={clsx(controlClass, 'py-2', hideLabel && 'mt-0', mono && 'font-mono', minHeight, controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
     </label>
   )
 }
@@ -58,7 +60,7 @@ export function SelectField<T extends string>({ ariaLabel, className, controlCla
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <select aria-label={ariaLabel ?? label} className={clsx(controlClass, hideLabel && 'mt-0', controlClassName)} onChange={(event) => onChange(event.target.value as T)} {...props}>
+      <select aria-label={ariaLabel ?? label} className={clsx(controlClass, inputHeightClass, hideLabel && 'mt-0', controlClassName)} onChange={(event) => onChange(event.target.value as T)} {...props}>
         {options.map((option) => {
           const value = typeof option === 'string' ? option : option.value
           const disabled = typeof option === 'string' ? false : option.disabled
@@ -77,27 +79,32 @@ export function CheckboxField({ checked, label, onChange }: {
   return (
     <label className="flex items-center justify-between gap-2">
       <span>
-        <span className="block text-sm font-medium text-neutral-700">{label}</span>
+        <span className="block text-sm font-medium text-text-1">{label}</span>
       </span>
-      <input aria-label={label} checked={checked} className="h-4 w-4 rounded border-neutral-300 text-brand-500 focus:ring-brand-500 disabled:opacity-50" onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+      <input aria-label={label} checked={checked} className={clsx(checkboxClass, 'h-4 w-4')} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
     </label>
   )
 }
 
-export function SearchInput({ ariaLabel, placeholder, value, onChange, className, type }: {
+export const checkboxClass = 'shrink-0 cursor-pointer appearance-none rounded border border-handle bg-surface checked:border-brand-600 checked:bg-brand-600 checked:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2016%2016%27%20fill=%27none%27%20stroke=%27white%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M3.5%208.5l3%203%206-7%27/%3E%3C/svg%3E)] checked:bg-center checked:bg-no-repeat indeterminate:border-brand-600 indeterminate:bg-brand-600 indeterminate:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2016%2016%27%20fill=%27none%27%20stroke=%27white%27%20stroke-width=%272%27%20stroke-linecap=%27round%27%3E%3Cpath%20d=%27M4%208h8%27/%3E%3C/svg%3E)] indeterminate:bg-center indeterminate:bg-no-repeat focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-bg'
+
+export const radioClass = 'shrink-0 cursor-pointer appearance-none rounded-full border border-handle bg-surface checked:border-brand-600 checked:bg-brand-600 checked:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2016%2016%27%3E%3Ccircle%20cx=%278%27%20cy=%278%27%20r=%273%27%20fill=%27white%27/%3E%3C/svg%3E)] checked:bg-center checked:bg-no-repeat focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-bg'
+
+export function SearchInput({ ariaLabel, placeholder, value, onChange, className, size = 'md', type }: {
   ariaLabel: string
   placeholder: string
   value: string
   onChange: (value: string) => void
   className?: string
+  size?: 'md' | 'lg'
   type?: 'search' | 'text'
 }) {
   return (
     <div className={clsx('relative', className)}>
-      <Search aria-hidden className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+      <Search aria-hidden className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
       <input
         aria-label={ariaLabel}
-        className="w-full rounded-xl border border-neutral-200 bg-white py-2.5 pl-9 pr-4 text-sm outline-none focus:border-brand-500"
+        className={clsx('w-full border border-border bg-surface pl-9 pr-4 text-[13px] text-text-1 outline-none placeholder:text-text-faint focus:border-brand-600', size === 'lg' ? 'h-9 rounded-md lg:h-10 lg:rounded-lg lg:text-sm' : 'h-9 rounded-md lg:h-8')}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         type={type}
@@ -112,30 +119,32 @@ export function FieldLabel({ children, label }: { children: ReactNode; label: st
 }
 
 export function FormError({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return <p className={clsx('rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-200', className)} id={id}>{children}</p>
+  return <p className={clsx('rounded-md bg-negative/10 px-4 py-3 text-sm text-negative', className)} id={id}>{children}</p>
 }
 
 export function FormSuccess({ children }: { children: ReactNode }) {
-  return <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{children}</p>
+  return <p className="rounded-md bg-positive/10 px-4 py-3 text-sm text-positive">{children}</p>
 }
 
-export function SectionLabel({ as: Component = 'h2', children, className, tone = 'default' }: HTMLAttributes<HTMLElement> & { as?: 'h2' | 'h3' | 'h4' | 'p'; tone?: 'default' | 'muted' }) {
-  return <Component className={clsx('text-sm font-semibold', tone === 'muted' ? 'text-neutral-400' : 'text-neutral-500', className)}>{children}</Component>
+export function SectionLabel({ as: Component = 'h2', children, className }: HTMLAttributes<HTMLElement> & { as?: 'h2' | 'h3' | 'h4' | 'p' }) {
+  return <Component className={clsx('text-sm font-semibold text-text-1', className)}>{children}</Component>
 }
 
-export function Card({ as: Component = 'div', children, className, padded = false, compact = false, overflow = 'hidden', ...props }: HTMLAttributes<HTMLElement> & {
-  as?: 'article' | 'div' | 'form' | 'nav' | 'section'
-  compact?: boolean
-  overflow?: 'hidden' | 'visible'
+const cardOverflowClass = { hidden: 'overflow-hidden', visible: 'overflow-visible', auto: 'overflow-y-auto' } as const
+
+export function Card({ as: Component = 'div', children, className, padded = false, overflow = 'hidden', variant = 'default', ...props }: HTMLAttributes<HTMLElement> & {
+  as?: 'article' | 'aside' | 'div' | 'form' | 'nav' | 'section'
+  overflow?: keyof typeof cardOverflowClass
   padded?: boolean
+  variant?: 'default' | 'dashed'
 }) {
   return (
     <Component
       className={clsx(
-        overflow === 'hidden' ? 'overflow-hidden' : 'overflow-visible',
-        'border border-neutral-200 bg-white',
-        compact ? 'rounded-2xl shadow-sm' : 'rounded-2xl shadow-card',
-        padded && 'p-5',
+        cardOverflowClass[overflow],
+        'rounded-lg border bg-surface',
+        variant === 'dashed' ? 'border-dashed border-border-emph px-5 py-10 text-center lg:px-6 lg:py-12' : 'border-border',
+        padded && 'p-4 lg:px-6 lg:py-5',
         className,
       )}
       {...props}

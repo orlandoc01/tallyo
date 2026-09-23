@@ -21,7 +21,15 @@ export const chartPalette = [
   '#b56576',
 ]
 
-export const everythingElseColor = '#9ca3af'
+// tokens.json › chart-palette: institution avatars and generic series.
+export const seriesPalette = ['#0d9488', '#2563eb', '#7c3aed', '#f97316', '#06b6d4', '#65a30d', '#db2777', '#475569', '#8b5cf6', '#b45309', '#dc2626', '#0ea5e9']
+
+export function institutionColor(name: string) {
+  const hash = [...name].reduce((total, character) => total + character.charCodeAt(0), 0)
+  return seriesPalette[hash % seriesPalette.length]
+}
+
+export const everythingElseColor = '#8a847d'
 export const CASH_FLOW_INCOME_BAR_FILL = '#30a46c'
 export const CASH_FLOW_EXPENSE_BAR_FILL = '#E5484D'
 

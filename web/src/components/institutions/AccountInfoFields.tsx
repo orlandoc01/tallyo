@@ -43,7 +43,7 @@ export function AccountInfoFields({
 
   return (
     <>
-      <TextField aria-invalid={!draft.name.trim()} label="Name" labelSuffix={<span aria-hidden="true" className="text-red-500"> *</span>} onChange={(name) => onDraftChange({ name })} required type="text" value={draft.name} />
+      <TextField aria-invalid={!draft.name.trim()} label="Name" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} onChange={(name) => onDraftChange({ name })} required type="text" value={draft.name} />
 
       <FieldLabel label="Owner">
         <OwnerSelect
@@ -80,15 +80,15 @@ export function AccountInfoFields({
       </div>
 
       {hasEVMWallet ? (
-        <fieldset className="space-y-2 rounded-2xl border border-neutral-200 p-4">
-          <legend className="px-1 text-sm font-semibold text-neutral-950">Chains</legend>
+        <fieldset className="space-y-2 rounded-2xl border border-border p-4">
+          <legend className="px-1 text-sm font-semibold text-text-1">Chains</legend>
           <ChainPicker chainIds={draft.chainIds} onChange={(chainIds) => onDraftChange({ chainIds })} />
-          {draft.chainIds.length === 0 ? <p className="text-xs text-red-600">Select at least one chain.</p> : null}
+          {draft.chainIds.length === 0 ? <p className="text-xs text-negative">Select at least one chain.</p> : null}
         </fieldset>
       ) : null}
 
       {needsTypeReview ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="rounded-2xl border border-warning/40 bg-warning/[0.12] px-4 py-3 text-sm text-warning">
           Verify this account type and save to clear it from review.
         </p>
       ) : null}
@@ -139,7 +139,7 @@ export function AccountInfoActions({
   onViewTransactions,
 }: AccountInfoActionsProps) {
   return (
-    <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
+    <div className="flex items-center justify-between border-t border-border pt-3">
       {!isProperty ? (
         <Button onClick={onViewTransactions} type="button" variant="secondary">
           View transactions
@@ -163,10 +163,10 @@ export function AccountInfoActions({
 
 function AccountStatusToggle({ checked, description, label, onChange }: { checked: boolean; description: string; label: string; onChange: (value: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-neutral-950">{label}</p>
-        <p className="mt-1 text-sm text-neutral-500">{description}</p>
+        <p className="text-sm font-semibold text-text-1">{label}</p>
+        <p className="mt-1 text-sm text-text-3">{description}</p>
       </div>
       <ToggleSwitch checked={checked} label={label} onChange={onChange} />
     </div>

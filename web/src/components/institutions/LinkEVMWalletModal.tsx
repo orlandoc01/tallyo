@@ -76,7 +76,7 @@ export function LinkEVMWalletModal({
                 autoComplete="off"
                 controlClassName="font-mono"
                 label="Wallet address"
-                labelSuffix={<span className="text-red-500"> *</span>}
+                labelSuffix={<span className="text-negative"> *</span>}
                 onChange={(value) => {
                   setAddress(value)
                   setAddressError(null)
@@ -86,10 +86,10 @@ export function LinkEVMWalletModal({
                 type="text"
                 value={address}
               />
-              {addressError ? <p className="mt-1 text-xs text-red-600" id={addressErrorId}>{addressError}</p> : null}
+              {addressError ? <p className="mt-1 text-xs text-negative" id={addressErrorId}>{addressError}</p> : null}
             </div>
 
-            <TextField ariaLabel="Wallet label" label="Label" labelSuffix={<span className="text-xs font-normal text-neutral-400"> (optional)</span>} onChange={setLabel} placeholder="e.g. Main wallet" type="text" value={label} />
+            <TextField ariaLabel="Wallet label" label="Label" labelSuffix={<span className="text-xs font-normal text-text-muted"> (optional)</span>} onChange={setLabel} placeholder="e.g. Main wallet" type="text" value={label} />
 
             <OwnerSelectField
               canCreateOwner={canCreateOwner}
@@ -102,11 +102,11 @@ export function LinkEVMWalletModal({
             />
 
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-neutral-950">
-                Chains <span className="text-red-500">*</span>
+              <legend className="mb-2 text-sm font-semibold text-text-1">
+                Chains <span className="text-negative">*</span>
               </legend>
               <ChainPicker chainIds={chainIds} onChange={setChainIds} />
-              {chainIds.length === 0 ? <p className="mt-1 text-xs text-red-600">Select at least one chain.</p> : null}
+              {chainIds.length === 0 ? <p className="mt-1 text-xs text-negative">Select at least one chain.</p> : null}
             </fieldset>
 
             {submitError ? <FormError>{submitError}</FormError> : null}

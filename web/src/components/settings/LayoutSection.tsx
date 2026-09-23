@@ -22,6 +22,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { ALL_NAV_ITEMS, MAX_NAVBAR_ITEMS, type NavItemDef, type NavItemId } from '../../hooks/navItems'
 import { useNavLayout } from '../../hooks/useNavLayout'
 import { usePermissions } from '../../hooks/usePermissions'
+import { Tag } from '../common/Tag'
 
 const NAVBAR = 'navbar' as const
 const SIDEMENU = 'sidemenu' as const
@@ -42,12 +43,12 @@ function NavItemRow({ item, overlay }: { item: NavItemDef; overlay?: boolean }) 
   return (
     <div
       className={clsx(
-        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
-        overlay && 'rounded-xl bg-white shadow-xl ring-1 ring-neutral-200',
+        'flex h-10 items-center gap-2.5 rounded-md px-2.5 text-sm font-medium text-text-1',
+        overlay && 'border border-border-strong bg-raised shadow-dropdown',
       )}
     >
-      <GripVertical className="h-4 w-4 shrink-0 text-neutral-300" />
-      <Icon className="h-5 w-5 shrink-0 text-neutral-500" />
+      <GripVertical className="h-4 w-4 shrink-0 text-handle" />
+      <Icon className="h-4 w-4 shrink-0 text-text-muted" strokeWidth={1.6} />
       {item.label}
     </div>
   )
@@ -92,17 +93,13 @@ function DroppableList({
   return (
     <div>
       <div className="mb-2 flex items-center gap-2">
-        <span className="text-sm font-semibold text-neutral-700">{label}</span>
-        {badge ? (
-          <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-            {badge}
-          </span>
-        ) : null}
+        <span className="text-[13px] font-semibold text-text-2">{label}</span>
+        {badge ? <Tag>{badge}</Tag> : null}
       </div>
-      <p className="mb-2 text-xs text-neutral-400">{subtitle}</p>
+      <p className="mb-2 text-xs text-text-muted">{subtitle}</p>
       <div
         ref={setNodeRef}
-        className="min-h-[120px] space-y-1.5 rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-3"
+        className="min-h-[120px] space-y-1 rounded-md border border-dashed border-border-emph bg-surface-2 p-2"
       >
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           {items.map((id) => (
@@ -110,11 +107,11 @@ function DroppableList({
           ))}
         </SortableContext>
         {items.length === 0 ? (
-          <p className="py-2 text-center text-xs text-neutral-400">Drop items here</p>
+          <p className="py-2 text-center text-xs text-text-faint">Drop items here</p>
         ) : null}
       </div>
       {warning ? (
-        <p className="mt-1 text-xs text-amber-600">{warning}</p>
+        <p className="mt-1 text-xs text-warning">{warning}</p>
       ) : null}
     </div>
   )
@@ -258,7 +255,7 @@ export function LayoutSection() {
       onDragStart={handleDragStart}
       sensors={sensors}
     >
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
         <DroppableList
           badge={`${navbarItems.length}/${MAX_NAVBAR_ITEMS}`}
           containerId={NAVBAR}
@@ -281,7 +278,7 @@ export function LayoutSection() {
 
       {/* Preview strip showing what the user actually sees */}
       {visibleNavbar.length < navbarItems.length || visibleSidemenu.length < sidemenuItems.length ? (
-        <p className="mt-3 text-xs text-neutral-400">
+        <p className="mt-3 text-xs text-text-muted">
           Some items are hidden based on your permissions.
         </p>
       ) : null}

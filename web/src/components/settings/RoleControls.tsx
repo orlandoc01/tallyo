@@ -1,4 +1,7 @@
 import type { Role } from '../../types/graphql'
+import type { TagTint } from '../../utils/tagTints'
+import { SelectField } from '../common/FormControls'
+import { Tag } from '../common/Tag'
 
 const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Admin',
@@ -8,6 +11,16 @@ const ROLE_LABELS: Record<Role, string> = {
   CASHFLOW_TRACKER: 'Cashflow tracker',
   NET_WORTH_TRACKER: 'Net worth tracker',
   PORTFOLIO_TRACKER: 'Portfolio tracker',
+}
+
+const ROLE_TINTS: Record<Role, TagTint> = {
+  ADMIN: 'teal',
+  WRITER: 'blue',
+  READONLY: 'gray',
+  SPEND_TRACKER: 'blue',
+  CASHFLOW_TRACKER: 'blue',
+  NET_WORTH_TRACKER: 'blue',
+  PORTFOLIO_TRACKER: 'blue',
 }
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
@@ -21,14 +34,7 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
 ]
 
 export function RoleBadge({ role }: { role: Role }) {
-  const label = ROLE_LABELS[role] ?? role
-  if (role === 'ADMIN') {
-    return <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700">{label}</span>
-  }
-  if (role === 'READONLY') {
-    return <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-semibold text-neutral-500">{label}</span>
-  }
-  return <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">{label}</span>
+  return <Tag tint={ROLE_TINTS[role] ?? 'blue'}>{ROLE_LABELS[role] ?? role}</Tag>
 }
 
 export function RoleSelect({
@@ -45,19 +51,16 @@ export function RoleSelect({
   disabled?: boolean
 }) {
   return (
-    <select
-      className="rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+    <SelectField<Role>
+      className="min-w-0"
       disabled={disabled}
+      hideLabel={!id}
       id={id}
+      label="Role"
       onBlur={onBlur}
-      onChange={(e) => onChange(e.target.value as Role)}
+      onChange={onChange}
+      options={ROLE_OPTIONS}
       value={value}
-    >
-      {ROLE_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    />
   )
 }

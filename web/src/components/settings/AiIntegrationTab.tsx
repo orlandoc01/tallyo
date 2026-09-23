@@ -1,6 +1,6 @@
 import type { Configuration } from '../../types/graphql'
 import { EmptyState } from '../common/EmptyState'
-import { ConfigCard, ConfigStatus, pickDirtyFields, TextInput, ToggleInput } from './ConfigFormControls'
+import { ConfigCard, ConfigStatus, pickDirtyFields, TextInput } from './ConfigFormControls'
 import { splitCSV } from './configParsing'
 import { useConfigurationForm } from './useConfigFormState'
 
@@ -36,14 +36,15 @@ export function AiIntegrationTab() {
   } satisfies Record<SectionKey, Set<FieldKey>>
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-3">
       <ConfigStatus configuration={configuration} error={error} fetching={fetching} mutationError={mutationResult.error} />
 
       {!fetching && !error && configuration ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-[repeat(auto-fit,minmax(300px,1fr))]">
           <ConfigCard
             dirty={sectionDirtyFields.llm.size > 0}
             disabled={!canWriteSettings || mutationResult.fetching}
+            enabled={{ label: 'Enabled', checked: state.llmEnabled, dirty: sectionDirtyFields.llm.has('llmEnabled'), onChange: (llmEnabled) => setState((s) => ({ ...s, llmEnabled })) }}
             title="LLM Categorization"
             onSubmit={() => void save({
               llmCategorization: {
@@ -53,7 +54,6 @@ export function AiIntegrationTab() {
               },
             })}
           >
-            <ToggleInput dirty={sectionDirtyFields.llm.has('llmEnabled')} label="Enabled" checked={state.llmEnabled} onChange={(llmEnabled) => setState((s) => ({ ...s, llmEnabled }))} />
             <TextInput disabled={!state.llmEnabled} dirty={sectionDirtyFields.llm.has('ollamaUrl')} label="Ollama URL" value={state.ollamaUrl} onChange={(ollamaUrl) => setState((s) => ({ ...s, ollamaUrl }))} />
             <TextInput disabled={!state.llmEnabled} dirty={sectionDirtyFields.llm.has('ollamaModel')} label="Ollama model" value={state.ollamaModel} onChange={(ollamaModel) => setState((s) => ({ ...s, ollamaModel }))} />
           </ConfigCard>
@@ -61,6 +61,7 @@ export function AiIntegrationTab() {
           <ConfigCard
             dirty={sectionDirtyFields.mcp.size > 0}
             disabled={!canWriteSettings || mutationResult.fetching}
+            enabled={{ label: 'Enabled', checked: state.mcpEnabled, dirty: sectionDirtyFields.mcp.has('mcpEnabled'), onChange: (mcpEnabled) => setState((s) => ({ ...s, mcpEnabled })) }}
             title="MCP"
             onSubmit={() => void save({
               mcp: {
@@ -69,7 +70,6 @@ export function AiIntegrationTab() {
               },
             })}
           >
-            <ToggleInput dirty={sectionDirtyFields.mcp.has('mcpEnabled')} label="Enabled" checked={state.mcpEnabled} onChange={(mcpEnabled) => setState((s) => ({ ...s, mcpEnabled }))} />
             <TextInput disabled={!state.mcpEnabled} dirty={sectionDirtyFields.mcp.has('mcpDynamicRedirectHosts')} label="Redirect hosts (comma-separated)" value={state.mcpDynamicRedirectHosts} onChange={(mcpDynamicRedirectHosts) => setState((s) => ({ ...s, mcpDynamicRedirectHosts }))} />
           </ConfigCard>
         </div>

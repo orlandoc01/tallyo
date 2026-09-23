@@ -42,40 +42,38 @@ function OpenTransactionsFilterOnMount() {
 }
 
 describe('mobile filters', () => {
-  it('anchors the expenses filter dropdown below the header action', async () => {
+  it('opens the expenses filter as a bottom sheet', async () => {
     renderMobileFilters(<OpenReportsFilterOnMount />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Filters' })
-    expect(dialog).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
-    expect(dialog).toHaveStyle({ top: '48px' })
-    expect(dialog.firstElementChild).toHaveClass('absolute', 'right-0', 'top-0')
-    expect(dialog.firstElementChild).toHaveClass('w-[min(20rem,100vw)]')
-    expect(dialog.firstElementChild).toHaveClass('rounded-b-3xl')
-    expect(dialog.firstElementChild).toHaveClass('max-h-full')
-    expect(dialog.firstElementChild).toHaveClass('min-h-0')
-    expect(dialog.firstElementChild).toHaveClass('overflow-hidden')
-    expect(dialog.firstElementChild?.children[1]).toHaveClass('min-h-0', 'overflow-y-auto')
+    expect(dialog).toHaveClass('fixed', 'inset-0', 'bg-overlay')
+    expect(dialog.firstElementChild).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
+    expect(dialog.firstElementChild).toHaveClass('rounded-t-2xl')
+    expect(dialog.firstElementChild).toHaveClass('shadow-sheet')
+    expect(dialog.firstElementChild).toHaveClass('max-h-[78%]')
+    expect(dialog.firstElementChild).toHaveClass('flex-col')
+    expect(dialog.firstElementChild).toHaveClass('bg-surface')
+    expect(dialog.firstElementChild?.children[2]).toHaveClass('min-h-0', 'overflow-y-auto')
 
     fireEvent.click(dialog.firstElementChild!)
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
   })
 
-  it('anchors the transactions filter dropdown below the header action', async () => {
+  it('opens the transactions filter as a bottom sheet', async () => {
     renderMobileFilters(<OpenTransactionsFilterOnMount />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Filters' })
-    expect(dialog).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
-    expect(dialog).toHaveStyle({ top: '48px' })
-    expect(dialog.firstElementChild).toHaveClass('absolute', 'right-0', 'top-0')
-    expect(dialog.firstElementChild).toHaveClass('w-[min(20rem,100vw)]')
-    expect(dialog.firstElementChild).toHaveClass('rounded-b-3xl')
-    expect(dialog.firstElementChild).toHaveClass('max-h-full')
-    expect(dialog.firstElementChild).toHaveClass('min-h-0')
-    expect(dialog.firstElementChild).toHaveClass('overflow-hidden')
-    expect(dialog.firstElementChild?.children[1]).toHaveClass('min-h-0', 'overflow-y-auto')
+    expect(dialog).toHaveClass('fixed', 'inset-0', 'bg-overlay')
+    expect(dialog.firstElementChild).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
+    expect(dialog.firstElementChild).toHaveClass('rounded-t-2xl')
+    expect(dialog.firstElementChild).toHaveClass('shadow-sheet')
+    expect(dialog.firstElementChild).toHaveClass('max-h-[78%]')
+    expect(dialog.firstElementChild).toHaveClass('flex-col')
+    expect(dialog.firstElementChild).toHaveClass('bg-surface')
+    expect(dialog.firstElementChild?.children[2]).toHaveClass('min-h-0', 'overflow-y-auto')
     expect(screen.getAllByRole('heading', { name: 'Filters' })).toHaveLength(1)
-    expect(dialog.firstElementChild?.children[1].firstElementChild).not.toHaveClass('rounded-3xl')
-    expect(dialog.firstElementChild?.children[1].firstElementChild).not.toHaveClass('border')
+    expect(dialog.firstElementChild?.children[2].firstElementChild).not.toHaveClass('rounded-3xl')
+    expect(dialog.firstElementChild?.children[2].firstElementChild).not.toHaveClass('border')
 
     fireEvent.click(dialog.firstElementChild!)
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()

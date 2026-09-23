@@ -5,6 +5,7 @@ import { CREATE_OWNER_MUTATION, DELETE_OWNER_MUTATION } from '../../graphql/muta
 import { useOwners } from '../../hooks/useEntityQueries'
 import type { Owner } from '../../types/graphql'
 import { Button } from '../common/Button'
+import { TextField } from '../common/FormControls'
 
 export function OwnersSection({ canWriteOwners }: { canWriteOwners: boolean }) {
   const { owners, fetching, error, refetch } = useOwners()
@@ -54,58 +55,59 @@ export function OwnersSection({ canWriteOwners }: { canWriteOwners: boolean }) {
   }
 
   if (fetching) {
-    return <p className="text-sm text-neutral-500">Loading owners…</p>
+    return <p className="mt-2 text-[13px] text-text-muted">Loading owners…</p>
   }
 
   if (error) {
-    return <p className="text-sm text-red-600">Failed to load owners.</p>
+    return <p className="mt-2 text-[13px] text-negative">Failed to load owners.</p>
   }
 
   return (
-    <div className="max-w-md space-y-4">
+    <div className="mt-2 max-w-[360px]">
       {owners.length === 0 ? (
-        <p className="text-sm text-neutral-500">No owners yet.</p>
+        <p className="text-[13px] text-text-muted">No owners yet.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul>
           {owners.map((owner) => (
-            <li key={owner.id}>
-              <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2">
-                <span className="text-sm font-medium text-neutral-900">{owner.name}</span>
+            <li className="border-t border-border" key={owner.id}>
+              <div className="flex h-10 items-center justify-between gap-3">
+                <span className="truncate text-sm font-medium text-text-1">{owner.name}</span>
                 {canWriteOwners ? (
                   <button
                     aria-label={`Delete ${owner.name}`}
-                    className="rounded-xl p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-md p-1 text-text-muted transition hover:bg-negative/10 hover:text-negative"
                     onClick={() => void handleDelete(owner)}
                     type="button"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" strokeWidth={1.6} />
                   </button>
                 ) : null}
               </div>
               {deleteErrors[owner.id] ? (
-                <p className="mt-1 px-1 text-xs text-red-600">{deleteErrors[owner.id]}</p>
+                <p className="pb-2 text-xs text-negative">{deleteErrors[owner.id]}</p>
               ) : null}
             </li>
           ))}
         </ul>
       )}
 
-      {canWriteOwners ? <div className="space-y-2">
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+      {canWriteOwners ? <div className="border-t border-border pt-3">
+        <div className="flex items-center gap-2">
+          <TextField
+            className="min-w-0 flex-1"
             disabled={isAdding}
-            onChange={(e) => setNewName(e.target.value)}
+            hideLabel
+            label="New owner name"
+            onChange={setNewName}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleAdd() } }}
             placeholder="New owner name"
-            type="text"
             value={newName}
           />
           <Button disabled={isAdding || !newName.trim()} onClick={() => void handleAdd()} type="button">
             {isAdding ? 'Adding…' : 'Add'}
           </Button>
         </div>
-        {addError ? <p className="text-xs text-red-600">{addError}</p> : null}
+        {addError ? <p className="mt-2 text-xs text-negative">{addError}</p> : null}
       </div> : null}
     </div>
   )

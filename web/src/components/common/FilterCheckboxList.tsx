@@ -1,4 +1,7 @@
+import clsx from 'clsx'
 import type { ReactNode } from 'react'
+import { nextGroupSelectedIds, nextSelectedIds } from '../../utils/selection'
+import { checkboxClass } from './FormControls'
 
 export interface FilterCheckboxOption {
   id: string
@@ -35,7 +38,7 @@ interface GroupedFilterCheckboxListProps {
 
 export function FilterCheckboxList({ options, selectedIds, onChange, selectionMode = 'multi' }: FilterCheckboxListProps) {
   return (
-    <div className="space-y-1.5">
+    <div>
       {options.map((option) => (
         <FilterCheckboxRow
           checked={selectedIds.includes(option.id)}
@@ -48,9 +51,31 @@ export function FilterCheckboxList({ options, selectedIds, onChange, selectionMo
   )
 }
 
+export function FilterRadioList<T extends string>({ options, selectedId, onChange }: { options: Array<FilterCheckboxOption & { id: T }>; selectedId: T; onChange: (id: T) => void }) {
+  return (
+    <div role="radiogroup">
+      {options.map((option) => (
+        <button
+          aria-checked={selectedId === option.id}
+          aria-label={option.ariaLabel}
+          className={clsx(filterRowClassName, selectedId === option.id ? 'text-text-1' : 'text-text-2')}
+          key={option.id}
+          onClick={() => onChange(option.id)}
+          role="radio"
+          type="button"
+        >
+          <span className="min-w-0 flex-1 truncate">{option.label}</span>
+          {option.trailing ? <span className={filterCheckboxTrailingClassName}>{option.trailing}</span> : null}
+          {selectedId === option.id ? <span aria-hidden className="h-2 w-2 rounded-full bg-brand-600" /> : null}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function GroupedFilterCheckboxList({ groups, selectedIds, onChange }: GroupedFilterCheckboxListProps) {
   return (
-    <div className="space-y-2.5">
+    <div>
       {groups.map((group) => {
         const optionIds = group.options.map((option) => option.id)
         const groupOptionIds = group.allOptionIds ?? optionIds
@@ -62,7 +87,7 @@ export function GroupedFilterCheckboxList({ groups, selectedIds, onChange }: Gro
               option={{ id: group.id, label: group.label, ariaLabel: group.ariaLabel, trailing: group.summary }}
               onChange={(nextChecked) => onChange(nextGroupSelectedIds(selectedIds, groupOptionIds, nextChecked))}
             />
-            <div className="relative mt-1.5 space-y-1.5 pl-5 before:absolute before:bottom-2 before:left-2.5 before:top-0 before:w-px before:bg-neutral-200 dark:before:bg-neutral-800">
+            <div className="pl-6">
               {group.options.map((option) => (
                 <FilterCheckboxRow
                   checked={selectedIds.includes(option.id)}
@@ -81,11 +106,11 @@ export function GroupedFilterCheckboxList({ groups, selectedIds, onChange }: Gro
 
 function FilterCheckboxRow({ option, checked, onChange }: { option: FilterCheckboxOption; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className={filterCheckboxRowClassName(checked)}>
+    <label className={clsx(filterRowClassName, 'cursor-pointer text-text-1')}>
       <input
         aria-label={option.ariaLabel}
         checked={checked}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        className={clsx(checkboxClass, 'h-[18px] w-[18px]')}
         onChange={(event) => onChange(event.target.checked)}
         type="checkbox"
       />
@@ -99,29 +124,7 @@ function FilterCheckboxRow({ option, checked, onChange }: { option: FilterCheckb
   )
 }
 
-function filterCheckboxRowClassName(checked: boolean) {
-  return `relative flex cursor-pointer items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-sm transition-colors focus-within:outline-none focus-within:ring-1 focus-within:ring-inset focus-within:ring-brand-500/40 dark:focus-within:ring-brand-400/30 ${checked ? 'bg-brand-50 text-neutral-900 ring-1 ring-inset ring-brand-200 dark:bg-brand-500/10 dark:text-neutral-100 dark:ring-brand-400/30' : 'bg-transparent text-neutral-700 [@media(hover:hover)]:hover:border-brand-300 dark:text-neutral-200 dark:[@media(hover:hover)]:hover:border-brand-500/60'}`
-}
-
-const filterCheckboxLabelClassName = 'block truncate font-medium text-neutral-900 dark:text-neutral-100'
-const filterCheckboxDescriptionClassName = 'mt-0.5 block text-xs text-neutral-500 dark:text-neutral-400'
-const filterCheckboxTrailingClassName = 'shrink-0 text-[0.68rem] font-semibold text-neutral-500 dark:text-neutral-400'
-
-function nextSelectedIds(selectedIds: string[], id: string, checked: boolean, selectionMode: 'multi' | 'single') {
-  if (selectionMode === 'single') {
-    return checked ? [id] : []
-  }
-  const selected = new Set(selectedIds)
-  if (checked) selected.add(id)
-  else selected.delete(id)
-  return [...selected]
-}
-
-function nextGroupSelectedIds(selectedIds: string[], optionIds: string[], checked: boolean) {
-  const selected = new Set(selectedIds)
-  for (const id of optionIds) {
-    if (checked) selected.add(id)
-    else selected.delete(id)
-  }
-  return [...selected]
-}
+const filterRowClassName = 'flex min-h-11 w-full items-center gap-3 rounded-md px-2 text-left text-sm transition-colors [@media(hover:hover)]:hover:bg-raised'
+const filterCheckboxLabelClassName = 'block truncate'
+const filterCheckboxDescriptionClassName = 'mt-0.5 block text-xs text-text-muted'
+const filterCheckboxTrailingClassName = 'shrink-0 text-xs text-text-muted'

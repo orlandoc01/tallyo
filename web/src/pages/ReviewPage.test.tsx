@@ -5,7 +5,14 @@ import { absoluteRoutePath, REVIEW_PATHS } from '../routes'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { ReviewPage } from './ReviewPage'
 
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+
+vi.mock('../hooks/useIsMobile', () => ({
+  useIsMobile: () => mockViewport.isMobile,
+}))
+
 const mockPermissions = vi.hoisted(() => ({
+  canReadSettings: true,
   canWriteAccounts: true,
   canWriteAssets: true,
   canWriteTransactions: true,
@@ -28,7 +35,7 @@ vi.mock('../auth/useAuth', () => ({
 
 vi.mock('../hooks/usePermissions', () => ({
   usePermissions: () => ({
-    canRead: () => true,
+    canRead: (resource: string) => resource !== 'settings' || mockPermissions.canReadSettings,
     canWrite: (resource: string) => {
       if (resource === 'accounts') return mockPermissions.canWriteAccounts
       if (resource === 'assets') return mockPermissions.canWriteAssets
@@ -80,6 +87,8 @@ vi.mock('../components/institutions/connectionReview', () => ({
 
 describe('ReviewPage', () => {
   afterEach(() => {
+    mockViewport.isMobile = false
+    mockPermissions.canReadSettings = true
     mockPermissions.canWriteAccounts = true
     mockPermissions.canWriteAssets = true
     mockPermissions.canWriteTransactions = true
@@ -89,28 +98,51 @@ describe('ReviewPage', () => {
   it('shows review counts and switches tabs', () => {
     renderReviewPage()
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Transactions!',
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual([
+      'Transactions1',
       'Accounts1',
       'Balances1',
       'Assets1',
     ])
 
     expect(screen.getByText('Transactions queue')).toBeTruthy()
-    expect(screen.getAllByText('1')).toHaveLength(3)
-    expect(screen.getByText('!')).toBeTruthy()
+    expect(screen.getAllByText('1')).toHaveLength(4)
+    expect(screen.getByRole('tab', { name: /Transactions/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('link', { name: 'Open LLM categorization settings' })).toHaveAttribute('href', '/settings/ai-integration')
 
-    fireEvent.click(screen.getByRole('link', { name: /Accounts/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /Accounts/i }))
 
     expect(screen.getByText('Connections queue')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Open LLM categorization settings' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('link', { name: /Balances/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /Balances/i }))
 
     expect(screen.getByText('Balances queue')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('link', { name: /Assets/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /Assets/i }))
 
     expect(screen.getByText('Assets queue')).toBeTruthy()
+  })
+
+  it('renders the tabs as a track with the LLM link beneath on mobile', () => {
+    mockViewport.isMobile = true
+
+    renderReviewPage()
+
+    const tablist = screen.getByRole('tablist', { name: 'Review sections' })
+    expect(tablist).toHaveClass('bg-surface-2')
+    const link = screen.getByRole('link', { name: 'Open LLM categorization settings' })
+    expect(tablist.compareDocumentPosition(link)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(link).toHaveClass('h-7')
+  })
+
+  it('hides the LLM settings link without settings read access', () => {
+    mockPermissions.canReadSettings = false
+
+    renderReviewPage()
+
+    expect(screen.getByText('Transactions queue')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Open LLM categorization settings' })).not.toBeInTheDocument()
   })
 
   it('hides transaction review without transaction write scope', () => {
@@ -118,7 +150,7 @@ describe('ReviewPage', () => {
 
     renderReviewPage('/review/transactions')
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual([
       'Accounts1',
       'Balances1',
       'Assets1',
@@ -134,7 +166,7 @@ describe('ReviewPage', () => {
 
     renderReviewPage()
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Transactions!'])
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual(['Transactions1'])
     expect(screen.getByText('Transactions queue')).toBeTruthy()
     expect(screen.queryByText('Connections queue')).not.toBeInTheDocument()
   })
@@ -144,8 +176,8 @@ describe('ReviewPage', () => {
 
     renderReviewPage('/review/balances')
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
-      'Transactions!',
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual([
+      'Transactions1',
       'Balances1',
       'Assets1',
     ])
@@ -160,7 +192,7 @@ describe('ReviewPage', () => {
 
     renderReviewPage('/review/assets')
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Balances1'])
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual(['Balances1'])
     expect(screen.getByText('Balances queue')).toBeTruthy()
     expect(screen.queryByText('Assets queue')).not.toBeInTheDocument()
   })
@@ -172,7 +204,7 @@ describe('ReviewPage', () => {
 
     renderReviewPage('/review/balances')
 
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Assets1'])
+    expect(screen.getAllByRole('tab').map((link) => link.textContent)).toEqual(['Assets1'])
     expect(screen.getByText('Assets queue')).toBeTruthy()
     expect(screen.queryByText('Balances queue')).not.toBeInTheDocument()
   })

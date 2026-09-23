@@ -3,7 +3,12 @@ import clsx from 'clsx'
 import { Link } from 'react-router'
 import type { BudgetLine } from '../../types/graphql'
 import { formatCurrency } from '../../utils/currency'
-import { BudgetProgressBar } from './BudgetProgressBar'
+import { Button } from '../common/Button'
+import { DottedBar } from '../common/DottedBar'
+import { TextField } from '../common/FormControls'
+import { BUDGET_BAR_COLOR, budgetBarPercent, budgetPercent, budgetTone, budgetToneClass, formatBudgetDelta } from './budgetMath'
+
+const rowClass = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 border-t border-border px-4 py-2.5 [grid-template-areas:'name_actual'_'progress_planned'] lg:h-11 lg:grid-cols-[var(--budget-line-cols)] lg:items-center lg:gap-x-3 lg:py-0 lg:[grid-template-areas:'name_progress_planned_actual']"
 
 export function BudgetLineRow({
   editable,
@@ -21,6 +26,8 @@ export function BudgetLineRow({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(line.budgeted.toFixed(2))
   const isIncome = line.category.kind === 'INCOME'
+  const percent = budgetPercent(line.actual, line.budgeted)
+  const tone = budgetTone(line.actual, line.budgeted, isIncome)
 
   function commit(e?: FormEvent) {
     e?.preventDefault()
@@ -31,64 +38,56 @@ export function BudgetLineRow({
     setEditing(false)
   }
 
-  const delta = line.actual - line.budgeted
-  const unfavorableDelta = isIncome ? delta < 0 : delta > 0
   return (
-    <div className="border-b border-neutral-100 px-4 py-3 last:border-b-0 dark:border-neutral-800">
-      <div className="mb-1 flex justify-end">
-        <div className="flex shrink-0 items-baseline justify-end gap-2 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          <span>Planned:</span>
-          {editing && editable ? (
-            <form className="flex items-center gap-1" onSubmit={commit}>
-              <span aria-hidden className="text-neutral-400">$</span>
-              <input
-                aria-label={`Budget amount for ${line.category.name}`}
-                autoFocus
-                className="w-20 rounded-xl border border-neutral-200 bg-white px-2 py-1 text-right text-sm normal-case tracking-normal tabular-nums focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900"
-                disabled={saving}
-                inputMode="decimal"
-                onBlur={() => commit()}
-                onChange={(e) => setDraft(e.target.value)}
-                value={draft}
-              />
-            </form>
-          ) : editable ? (
-            <button
-              aria-label={`Edit budget for ${line.category.name}`}
-              className="rounded-xl px-1.5 py-0.5 text-sm font-normal normal-case tracking-normal tabular-nums text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-neutral-800"
-              onClick={() => { setDraft(line.budgeted.toFixed(2)); setEditing(true) }}
-              type="button"
-            >
-              {formatCurrency(line.budgeted)}
-            </button>
-          ) : (
-            <span className="px-1.5 py-0.5 text-sm font-normal normal-case tracking-normal tabular-nums text-neutral-900 dark:text-neutral-100">
-              {formatCurrency(line.budgeted)}
-            </span>
-          )}
-        </div>
-      </div>
+    <div className={rowClass}>
       <Link
         aria-label={`View ${line.category.name} transactions for this month`}
-        className="group block rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400"
+        className="flex min-w-0 items-center gap-2 rounded-md text-sm font-medium text-text-1 [grid-area:name] hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
         to={transactionLinkTo}
       >
-        <BudgetProgressBar actual={line.actual} budgeted={line.budgeted} category={line.category}>
-          <span aria-hidden className="mr-1.5">{line.category.emoji}</span>
-          <span className="truncate">{line.category.name}</span>
-        </BudgetProgressBar>
+        <span aria-hidden>{line.category.emoji}</span>
+        <span className="truncate">{line.category.name}</span>
       </Link>
-      <div className="mt-1 flex justify-between gap-3 text-xs text-neutral-500">
-        <span>{line.budgeted > 0 ? `${Math.round((line.actual / line.budgeted) * 100)}%` : 'No budget'}</span>
-        <span className={clsx('tabular-nums', unfavorableDelta ? 'text-rose-600' : 'text-emerald-600')}>
-          <span className="font-semibold uppercase tracking-wide">Actual:</span> {formatCurrency(line.actual)} ({formatBudgetDelta(delta)})
+      <div className="flex min-w-0 items-center gap-3 [grid-area:progress]">
+        <DottedBar color={isIncome ? BUDGET_BAR_COLOR.INCOME : BUDGET_BAR_COLOR.EXPENSE} percent={budgetBarPercent(line.actual, line.budgeted)} />
+        <span className="shrink-0 text-[11px] tabular-nums text-text-muted lg:min-w-[60px] lg:text-right lg:text-xs">
+          {percent === null ? 'No budget' : `${percent}%`}
+          <span className="lg:hidden"> of</span>
         </span>
+      </div>
+      <div className="flex items-center justify-end text-[11px] tabular-nums text-text-muted [grid-area:planned] lg:text-sm lg:text-text-3">
+        {editing && editable ? (
+          <form className="w-24" onSubmit={commit}>
+            <TextField
+              autoFocus
+              controlClassName="text-right"
+              disabled={saving}
+              hideLabel
+              inputMode="decimal"
+              label={`Budget amount for ${line.category.name}`}
+              onBlur={() => commit()}
+              onChange={setDraft}
+              value={draft}
+            />
+          </form>
+        ) : editable ? (
+          <Button
+            aria-label={`Edit budget for ${line.category.name}`}
+            className="tabular-nums"
+            onClick={() => { setDraft(line.budgeted.toFixed(2)); setEditing(true) }}
+            size="sm"
+            variant="ghost-muted"
+          >
+            {formatCurrency(line.budgeted)}
+          </Button>
+        ) : (
+          <span>{formatCurrency(line.budgeted)}</span>
+        )}
+      </div>
+      <div className={clsx('text-right text-[13px] font-medium tabular-nums [grid-area:actual] lg:text-sm', budgetToneClass[tone])}>
+        {formatCurrency(line.actual)}
+        <span className="hidden lg:inline"> ({formatBudgetDelta(line.actual - line.budgeted)})</span>
       </div>
     </div>
   )
-}
-
-function formatBudgetDelta(delta: number) {
-  if (delta === 0) return formatCurrency(0)
-  return `${delta > 0 ? '+' : '-'}${formatCurrency(delta)}`
 }

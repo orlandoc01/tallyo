@@ -66,8 +66,8 @@ export function AddManualAccountModal({
         ) : null}
 
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-          <p className="text-xs text-neutral-500"><span aria-hidden="true" className="text-red-500">*</span> Required</p>
-          <TextField aria-invalid={!name.trim()} autoFocus label="Account name" labelSuffix={<span aria-hidden="true" className="text-red-500"> *</span>} onChange={setName} placeholder="e.g. Old Amex Gold" required type="text" value={name} />
+          <p className="text-xs text-text-3"><span aria-hidden="true" className="text-negative">*</span> Required</p>
+          <TextField aria-invalid={!name.trim()} autoFocus label="Account name" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} onChange={setName} placeholder="e.g. Old Amex Gold" required type="text" value={name} />
 
           <FieldLabel label="Owner">
             <OwnerSelect

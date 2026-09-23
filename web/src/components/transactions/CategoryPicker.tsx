@@ -25,10 +25,10 @@ export function CategoryPicker({
   const firstVisibleCategory = groupEntries.flatMap(([, groupCategories]) => groupCategories)[0]
 
   return (
-    <div className="w-full rounded-2xl border border-neutral-200 bg-white p-3 shadow-card">
+    <div className="w-full">
       <input
         autoFocus={autoFocus}
-        className="mb-3 w-full rounded-xl border border-neutral-200 px-3 py-2 text-base outline-none focus:border-brand-500"
+        className="mb-2 h-8 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] text-text-1 outline-none placeholder:text-text-faint focus:border-brand-600 dark:bg-bg"
         onChange={(event) => setSearch(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || !firstVisibleCategory) return
@@ -41,10 +41,10 @@ export function CategoryPicker({
       <div className="max-h-72 overflow-auto">
         {groupEntries.map(([groupName, groupCategories]) => (
           <div className="mb-3" key={groupName}>
-            <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{groupName}</div>
+            <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.6px] text-text-muted">{groupName}</div>
             {groupCategories.map((category) => (
               <button
-                className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm hover:bg-brand-50 ${firstVisibleCategory?.id === category.id ? 'bg-neutral-50' : ''}`}
+                className={`flex h-[34px] w-full items-center gap-2 rounded-[5px] px-2 text-left text-[13px] text-text-1 hover:bg-hover ${firstVisibleCategory?.id === category.id && search ? 'bg-hover' : ''}`}
                 key={category.id}
                 onClick={() => onSelect(category)}
                 type="button"
@@ -55,7 +55,7 @@ export function CategoryPicker({
             ))}
           </div>
         ))}
-        {groupEntries.length === 0 ? <div className="px-2 py-3 text-sm text-neutral-500">No categories found.</div> : null}
+        {groupEntries.length === 0 ? <div className="px-2 py-3 text-[13px] text-text-muted">No categories found.</div> : null}
       </div>
     </div>
   )

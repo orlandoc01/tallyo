@@ -39,3 +39,12 @@ export function buildComparisonPoints(
     }
   })
 }
+
+// Labels at the given fractions of the series, deduplicated, so short series
+// (a week) still get every day and long ones get evenly spaced ticks.
+export function comparisonTickLabels(points: ComparisonPoint[], fractions: number[]): string[] {
+  const n = points.length
+  if (n === 0) return []
+  if (n <= fractions.length + 1) return points.map((point) => point.label)
+  return [...new Set(fractions.map((fraction) => Math.min(Math.round((n - 1) * fraction), n - 1)))].map((index) => points[index].label)
+}

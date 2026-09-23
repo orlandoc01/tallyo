@@ -207,3 +207,75 @@ describe('CategoriesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
+
+describe('CategoriesPage group card', () => {
+  it('collapses and expands a group from its header', async () => {
+    const user = userEvent.setup()
+    renderCategoriesPage()
+
+    await screen.findByText('Groceries')
+    const header = screen.getByRole('button', { name: /food expense/i })
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'Groceries' })).not.toBeInTheDocument()
+
+    await user.click(header)
+    expect(screen.getByRole('button', { name: 'Groceries' })).toBeInTheDocument()
+  })
+
+  it('offers rename and delete from the mobile group menu, also when collapsed', async () => {
+    const user = userEvent.setup()
+    renderCategoriesPage()
+
+    await screen.findByText('Food')
+    await user.click(screen.getByRole('button', { name: /food expense/i }))
+    const trigger = screen.getByRole('button', { name: 'Food group actions' })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const popover = screen.getByRole('dialog', { name: 'Food group actions' })
+    expect(within(popover).getByRole('button', { name: 'Rename' })).toBeVisible()
+    expect(within(popover).getByRole('button', { name: 'Delete' })).toBeDisabled()
+
+    await user.click(within(popover).getByRole('button', { name: 'Rename' }))
+    expect(screen.getByRole('dialog', { name: /edit group/i })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Food group actions' })).not.toBeInTheDocument()
+  })
+
+  it('shows a delete error under the header of a collapsed group', async () => {
+    const user = userEvent.setup()
+    mockQuery('CategoryGroups', { categoryGroups: { __typename: 'CategoryGroupList', items: [{ ...categoryGroups[0], categories: [] }] } })
+    mockGraphqlError('DeleteCategoryGroup', 'Cannot delete group', { kind: 'mutation' })
+    renderCategoriesPage()
+
+    await screen.findByText('Food')
+    await user.click(screen.getByRole('button', { name: /food expense/i }))
+    expect(screen.queryByRole('button', { name: /add category/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /delete food group/i }))
+
+    expect(await screen.findByText(/Cannot delete group/)).toBeInTheDocument()
+  })
+
+  it('activates keyboard reordering from the drag handle', async () => {
+    const user = userEvent.setup()
+    renderCategoriesPage()
+
+    await screen.findByText('Groceries')
+    const handle = screen.getAllByRole('button', { name: /drag to reorder/i })[0]
+    expect(handle).toHaveAttribute('aria-roledescription', 'sortable')
+    handle.focus()
+    await user.keyboard(' ')
+
+    await waitFor(() => expect(handle).toHaveAttribute('aria-pressed', 'true'))
+  })
+
+  it('shows the empty state when there are no groups', async () => {
+    mockQuery('CategoryGroups', { categoryGroups: { __typename: 'CategoryGroupList', items: [] } })
+    renderCategoriesPage()
+
+    expect(await screen.findByText('No categories yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new group/i })).toBeInTheDocument()
+  })
+})

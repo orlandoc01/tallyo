@@ -159,22 +159,22 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
   }
 
   return (
-    <section className="mt-4 space-y-4 border-t border-neutral-100 pt-4" aria-label="Balance snapshot editor">
+    <section className="mt-4 space-y-4 border-t border-border pt-4" aria-label="Balance snapshot editor">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <input
             aria-label="Snapshot date"
-            className="w-36 rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-neutral-50 disabled:text-neutral-500"
+            className="w-36 rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-raised disabled:text-text-3"
             disabled={isSaving}
             onChange={(e) => handleDateChange(e.target.value)}
             type="date"
             value={selectedDate}
           />
           <div className="flex items-center gap-2">
-            <div className="text-right text-sm font-semibold text-neutral-900">{snapshotNetContribution}</div>
+            <div className="text-right text-sm font-semibold text-text-1">{snapshotNetContribution}</div>
             {canWriteWealth && mode === 'view' ? (
               <button
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-2 hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!snapshot || isLoadingSnapshot}
                 onClick={() => setMode('editing')}
                 type="button"
@@ -185,11 +185,11 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
           </div>
         </div>
 
-        {queryInput !== null && result.error ? <p className="text-sm text-red-600">Could not load snapshot: {result.error.message}</p> : null}
-        {saveError ? <p className="text-sm text-red-600">Could not save snapshot: {saveError}</p> : null}
-        {isLoadingSnapshot && !snapshot ? <p className="text-sm text-neutral-500">Loading snapshot...</p> : null}
+        {queryInput !== null && result.error ? <p className="text-sm text-negative">Could not load snapshot: {result.error.message}</p> : null}
+        {saveError ? <p className="text-sm text-negative">Could not save snapshot: {saveError}</p> : null}
+        {isLoadingSnapshot && !snapshot ? <p className="text-sm text-text-3">Loading snapshot...</p> : null}
         {!isLoadingSnapshot && !snapshot ? (
-          <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-3 py-3 text-sm text-neutral-500">
+          <div className="rounded-xl border border-dashed border-border bg-surface-2 px-3 py-3 text-sm text-text-3">
             No snapshot for this day.
           </div>
         ) : null}
@@ -197,8 +197,8 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
         {snapshot ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-neutral-700">{snapshotSectionTitle}</h3>
-              {snapshot.flagged ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">Flagged</span> : null}
+              <h3 className="text-sm font-semibold text-text-2">{snapshotSectionTitle}</h3>
+              {snapshot.flagged ? <span className="rounded-full bg-warning/[0.15] px-2 py-0.5 text-xs font-semibold text-warning">Flagged</span> : null}
             </div>
             {balanceOnly ? null : lines.map((line) => (
               <SnapshotHoldingRow
@@ -223,12 +223,12 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
               />
             ) : null}
             {balanceOnly || lines.length === 0 ? (
-              <div className="flex items-center justify-between rounded-xl border border-neutral-100 px-3 py-2 text-sm">
-                <div className="font-medium text-neutral-900">Balance</div>
+              <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">
+                <div className="font-medium text-text-1">Balance</div>
                 {balanceOnly && !controlsDisabled ? (
                   <input
                     aria-label="Snapshot balance"
-                    className="w-32 rounded-xl border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className="w-32 rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-2 py-1.5 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
                     disabled={lines.length === 0 && !usdAsset}
                     onChange={(e) => changeLines(linesWithBalance(lines, usdAsset, e.target.value, liabilityBalance))}
                     step="any"
@@ -236,7 +236,7 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
                     value={liabilityBalance ? lines[0]?.valueText.replace(/^-/, '') ?? String(displayBalanceUSD) : lines[0]?.valueText ?? String(displayBalanceUSD)}
                   />
                 ) : (
-                  <div aria-label="Snapshot balance" className="font-semibold tabular-nums text-neutral-800">{formatCurrency(displayBalanceUSD)}</div>
+                  <div aria-label="Snapshot balance" className="font-semibold tabular-nums text-text-1">{formatCurrency(displayBalanceUSD)}</div>
                 )}
               </div>
             ) : null}
@@ -244,7 +244,7 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
         ) : null}
 
         {mode !== 'view' ? (
-          <div className="flex justify-end gap-2 border-t border-neutral-100 pt-3">
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
             <Button
               disabled={isSaving}
               onClick={() => {

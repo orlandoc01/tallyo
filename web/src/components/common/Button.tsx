@@ -1,51 +1,72 @@
 import clsx from 'clsx'
 import { ArrowUpRight } from 'lucide-react'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode, Ref } from 'react'
 import { Link } from 'react-router'
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-solid' | 'ghost'
-type ButtonSize = 'sm' | 'md' | 'lg'
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-solid' | 'ghost' | 'ghost-muted' | 'outline-accent'
+type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 
 const variantClass: Record<ButtonVariant, string> = {
-  primary: 'border-brand-600 bg-brand-600 text-white shadow-brand-600/20 hover:bg-brand-700',
-  secondary: 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50',
-  danger: 'border-red-300 bg-transparent text-red-600 hover:bg-red-50 dark:border-red-400/35 dark:text-red-400 dark:hover:bg-red-500/10',
-  'danger-solid': 'border-red-600 bg-red-600 text-white hover:bg-red-700',
-  ghost: 'border-transparent text-neutral-600 shadow-none hover:bg-neutral-100 hover:text-neutral-950',
+  primary: 'bg-brand-600 font-semibold text-white hover:bg-brand-700',
+  secondary: 'bg-raised font-medium text-text-1 hover:bg-border-strong',
+  danger: 'bg-transparent font-medium text-negative hover:bg-negative/10',
+  'danger-solid': 'bg-negative font-semibold text-white hover:bg-negative/90 dark:text-bg',
+  ghost: 'font-medium text-text-1 hover:bg-raised',
+  'ghost-muted': 'font-normal text-text-3 hover:bg-raised hover:text-text-1',
+  'outline-accent': 'bg-brand-600/[0.12] font-semibold text-accent',
+}
+
+const variantBorderClass: Record<ButtonVariant, string> = {
+  primary: 'border-brand-600',
+  secondary: 'border-border-strong',
+  danger: 'border-negative/35',
+  'danger-solid': 'border-negative',
+  ghost: 'border-transparent',
+  'ghost-muted': 'border-transparent',
+  'outline-accent': 'border-brand-600',
 }
 
 const sizeClass: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs font-semibold',
-  md: 'h-10 px-4 text-sm font-semibold',
-  lg: 'h-12 px-5 text-sm font-bold',
+  xs: 'h-[26px] rounded-[13px] px-2.5 text-xs',
+  sm: 'h-7 rounded-md px-2.5 text-xs',
+  md: 'h-9 rounded-md px-3 lg:h-8',
+  lg: 'h-10 rounded-md px-3.5',
+}
+
+type ButtonStyleProps = { active?: boolean; className?: string; highlighted?: boolean; pressed?: boolean; size?: ButtonSize; variant?: ButtonVariant }
+
+function buttonClassName({ active = false, className, highlighted = false, pressed = false, size = 'md', variant = 'primary' }: ButtonStyleProps) {
+  return clsx(
+    'inline-flex items-center justify-center gap-1.5 border text-[13px] transition disabled:cursor-not-allowed disabled:opacity-50',
+    pressed
+      ? 'border-brand-600 bg-brand-600/[0.15] font-medium text-accent'
+      : active ? 'border-brand-600 bg-border-strong font-medium text-text-1' : [variantClass[variant], highlighted ? 'border-brand-600' : variantBorderClass[variant]],
+    sizeClass[size],
+    className,
+  )
 }
 
 export function Button({
   className,
-  active = false,
-  size = 'md',
-  variant = 'primary',
+  active,
+  highlighted,
+  pressed,
+  size,
+  variant,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean; size?: ButtonSize; variant?: ButtonVariant }) {
-  return (
-    <button
-      className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded-full border shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
-        active ? 'border-brand-400 bg-white text-brand-700 hover:bg-neutral-50 dark:border-brand-500 dark:bg-neutral-900 dark:text-brand-300 dark:hover:bg-neutral-800' : variantClass[variant],
-        sizeClass[size],
-        className,
-      )}
-      type="button"
-      {...props}
-    />
-  )
+}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonStyleProps & { ref?: Ref<HTMLButtonElement> }) {
+  return <button className={buttonClassName({ active, className, highlighted, pressed, size, variant })} type="button" {...props} />
+}
+
+export function ButtonLink({ children, className, size, to, variant, ...props }: Omit<ComponentProps<typeof Link>, 'className'> & Pick<ButtonStyleProps, 'className' | 'size' | 'variant'>) {
+  return <Link className={buttonClassName({ className, size, variant })} to={to} {...props}>{children}</Link>
 }
 
 export function SignInButton({ className, type = 'button', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       className={clsx(
-        'w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 font-semibold text-neutral-700 shadow-sm transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60',
+        'w-full rounded-md border border-border-strong bg-raised px-4 py-3 font-semibold text-text-1 transition hover:bg-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
       type={type}
@@ -58,7 +79,7 @@ export function ArrowUpRightLink({ children, label, to }: { children?: ReactNode
   return (
     <Link
       aria-label={label}
-      className="inline-flex items-center gap-1 rounded-xl p-1.5 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+      className="inline-flex items-center gap-1 rounded-md p-1.5 text-text-muted hover:bg-raised hover:text-text-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       to={to}
     >
       {children}
@@ -67,12 +88,34 @@ export function ArrowUpRightLink({ children, label, to }: { children?: ReactNode
   )
 }
 
-export function IconButton({ ariaLabel, onClick, children }: { ariaLabel: string; onClick: () => void; children: ReactNode }) {
+const iconButtonSizeClass = { xs: 'h-7 w-7', sm: 'h-8 w-8', md: 'h-9 w-9 lg:h-8 lg:w-8' } as const
+
+export function IconButton({ ariaLabel, className, disabled = false, expanded, haspopup, onClick, pressed = false, size = 'md', title, children }: {
+  ariaLabel: string
+  className?: string
+  disabled?: boolean
+  expanded?: boolean
+  haspopup?: 'menu' | 'dialog'
+  onClick: () => void
+  pressed?: boolean
+  size?: keyof typeof iconButtonSizeClass
+  title?: string
+  children: ReactNode
+}) {
   return (
     <button
+      aria-expanded={expanded}
+      aria-haspopup={haspopup}
       aria-label={ariaLabel}
-      className="rounded-xl border border-neutral-200 bg-white p-2 text-neutral-600 shadow-sm hover:bg-neutral-50 hover:text-neutral-950"
+      className={clsx(
+        'inline-flex shrink-0 items-center justify-center rounded-md border border-border-strong transition hover:bg-border-strong disabled:cursor-not-allowed disabled:opacity-40',
+        iconButtonSizeClass[size],
+        pressed ? 'bg-border-strong text-accent' : 'bg-raised text-text-2',
+        className,
+      )}
+      disabled={disabled}
       onClick={onClick}
+      title={title}
       type="button"
     >
       {children}
@@ -82,7 +125,7 @@ export function IconButton({ ariaLabel, onClick, children }: { ariaLabel: string
 
 export function TextLinkButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button className="w-full text-sm text-neutral-500 underline hover:text-neutral-700" onClick={onClick} type="button">
+    <button className="w-full text-sm text-text-muted underline hover:text-text-1" onClick={onClick} type="button">
       {label}
     </button>
   )

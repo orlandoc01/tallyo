@@ -42,15 +42,20 @@ export function mockGraphqlError(
 
 export function captureMutation<T extends Data = Data>(name: string, data: Data) {
   let variables: CapturedVariables<T> | undefined
+  let calls = 0
 
   server.use(
     graphql.link('/query').mutation<Data, CapturedVariables<T>>(name, ({ variables: nextVariables }) => {
       variables = nextVariables
+      calls += 1
       return HttpResponse.json({ data })
     }),
   )
 
   return {
+    get calls() {
+      return calls
+    },
     get variables() {
       return variables
     },

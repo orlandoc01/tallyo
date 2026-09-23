@@ -3,6 +3,8 @@ import {
   formatDisplayDate,
   formatCompactDisplayDate,
   formatRelativeTime,
+  formatScheduleTime,
+  isSyncStale,
   formatTransactionDatetime,
   getCurrentPeriod,
   getLastThreePeriodDateRange,
@@ -62,6 +64,14 @@ describe('date utilities', () => {
 
     expect(formatRelativeTime('2026-05-14T12:00:00Z', now)).toBe('3m ago')
     expect(formatRelativeTime('2026-05-13T12:03:00Z', now)).toBe('1d ago')
+    expect(formatRelativeTime('2026-04-20T12:03:00Z', now)).toBe('24d ago')
+  })
+
+  it('formats stale sync times in months and years', () => {
+    const now = new Date('2026-09-20T12:00:00Z').getTime()
+
+    expect(formatRelativeTime('2026-01-20T12:00:00Z', now)).toBe('8mo ago')
+    expect(formatRelativeTime('2024-06-20T12:00:00Z', now)).toBe('2y ago')
   })
 
   it('formats UTC datetimes using the browser local date', () => {
@@ -70,6 +80,7 @@ describe('date utilities', () => {
 
   it('formats transaction date-only sentinels as ISO dates', () => {
     expect(formatTransactionDatetime('2026-05-28T12:00:00Z')).toBe('2026-05-28')
+    expect(formatTransactionDatetime('2026-05-28T12:00:00Z', 'long')).toBe('May 28, 2026')
   })
 
   it('formats transaction timestamps as ISO date and compact local time', () => {
@@ -89,5 +100,13 @@ describe('date utilities', () => {
     const range = localDateRangeToUtcDateTimeRange('2026-05-14', '2026-05-14')
 
     expect(localDateRangeFromDateTimeRange(range)).toEqual({ dateFrom: '2026-05-14', dateTo: '2026-05-14' })
+  })
+
+  it('flags syncs older than 30 days and formats schedule times', () => {
+    const now = new Date('2026-09-20T12:00:00Z').getTime()
+    expect(isSyncStale('2026-09-15T12:00:00Z', now)).toBe(false)
+    expect(isSyncStale('2026-08-01T12:00:00Z', now)).toBe(true)
+    expect(formatScheduleTime(null)).toBe('not scheduled')
+    expect(formatScheduleTime('2026-09-14T23:00:00')).toBe('9/14 11:00 PM')
   })
 })

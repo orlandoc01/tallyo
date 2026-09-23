@@ -30,28 +30,17 @@ export function InviteUserForm({ onAdded, onCancel }: { onAdded: () => void; onC
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3">
-        <TextField id="invite-email" label="Email address" onChange={setEmail} placeholder="user@example.com" type="email" value={email} />
-        <div className="flex items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-neutral-500" htmlFor="invite-role">
-              Role
-            </label>
-            <RoleSelect
-              id="invite-role"
-              onChange={setRole}
-              value={role}
-            />
-          </div>
-          <Button disabled={!email.trim() || adding} onClick={() => void handleAdd()} type="button">
-            {adding ? 'Sending invite...' : 'Invite'}
-          </Button>
-          <Button onClick={onCancel} type="button" variant="secondary">
-            Cancel
-          </Button>
-        </div>
+      <TextField className="max-w-[360px]" id="invite-email" label="Email address" onChange={setEmail} placeholder="user@example.com" type="email" value={email} />
+      <div className="flex flex-wrap items-end gap-3">
+        <RoleSelect id="invite-role" onChange={setRole} value={role} />
+        <Button disabled={!email.trim() || adding} onClick={() => void handleAdd()} type="button">
+          {adding ? 'Sending invite...' : 'Invite'}
+        </Button>
+        <Button onClick={onCancel} type="button" variant="secondary">
+          Cancel
+        </Button>
       </div>
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="text-xs text-negative">{error}</p> : null}
     </div>
   )
 }

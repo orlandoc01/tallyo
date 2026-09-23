@@ -1,29 +1,21 @@
-import { useCallback, useMemo, useState } from 'react'
-import { Area, ComposedChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
-import { ChevronDown } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { Area, CartesianGrid, ComposedChart, Line, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts'
 import { useQuery } from 'urql'
-import {
-  differenceInCalendarDays,
-  endOfISOWeek,
-  endOfMonth,
-  endOfYear,
-  startOfISOWeek,
-  startOfMonth,
-  startOfYear,
-  subMonths,
-  subWeeks,
-  subYears,
-} from 'date-fns'
+import { differenceInCalendarDays, endOfISOWeek, endOfMonth, endOfYear, startOfISOWeek, startOfMonth, startOfYear, subMonths, subWeeks, subYears } from 'date-fns'
 import { SPENDING_TOTALS_QUERY } from '../../graphql/queries'
 import type { SpendingByCategoryReport, SpendingFilter } from '../../types/graphql'
-import { localDateRangeToUtcDateTimeRange, toDateInputValue } from '../../utils/dates'
-import { formatCurrency, formatCurrencyCompact } from '../../utils/currency'
 import { useIsMobile } from '../../hooks/useIsMobile'
-import { Card } from '../common/FormControls'
-import { reportChartAxes } from './chartAxes'
-import { buildComparisonPoints, type ComparisonMode, type ComparisonPoint } from './spendingComparisonData'
+import { CHART_CURSOR, CHART_SURFACE, chartTheme, mobileTooltipProps } from '../../utils/chartStyles'
+import { formatCurrency, formatCurrencyCompact } from '../../utils/currency'
+import { localDateRangeToUtcDateTimeRange, toDateInputValue } from '../../utils/dates'
+import { SelectField } from '../common/FormControls'
+import { ChartTooltipBox, ChartTooltipRow, ChartTooltipTitle } from '../common/ChartTooltip'
+import { buildComparisonPoints, comparisonTickLabels, type ComparisonMode, type ComparisonPoint } from './spendingComparisonData'
 
-const COMPARISON_OPTIONS: { value: ComparisonMode; label: string }[] = [
+const CURRENT_COLOR = '#f76b15'
+const HISTORICAL_COLOR = 'rgb(var(--text-faint))'
+
+const COMPARISON_OPTIONS: ReadonlyArray<{ value: ComparisonMode; label: string }> = [
   { value: 'month-vs-last-month', label: 'This month vs. last month' },
   { value: 'month-vs-last-year', label: 'This month vs. last year' },
   { value: 'year-vs-last-year', label: 'This year vs. last year' },
@@ -38,66 +30,45 @@ interface PeriodConfig {
   historicalEnd: Date
   currentLabel: string
   historicalLabel: string
-  periodTitle: string
 }
 
-type PeriodDefinition = Pick<PeriodConfig, 'granularity' | 'currentLabel' | 'historicalLabel' | 'periodTitle'> & { start: (date: Date) => Date; end: (date: Date) => Date; shift: (date: Date) => Date }
+type PeriodDefinition = Pick<PeriodConfig, 'granularity' | 'currentLabel' | 'historicalLabel'> & { start: (date: Date) => Date; end: (date: Date) => Date; shift: (date: Date) => Date }
 
 const PERIOD_DEFINITIONS: Record<ComparisonMode, PeriodDefinition> = {
-  'month-vs-last-month': { granularity: 'DAILY', start: startOfMonth, end: endOfMonth, shift: (date) => subMonths(date, 1), currentLabel: 'This month', historicalLabel: 'Last month', periodTitle: 'this month' },
-  'month-vs-last-year': { granularity: 'DAILY', start: startOfMonth, end: endOfMonth, shift: (date) => subYears(date, 1), currentLabel: 'This month', historicalLabel: 'This month last year', periodTitle: 'this month' },
-  'year-vs-last-year': { granularity: 'WEEKLY', start: startOfYear, end: endOfYear, shift: (date) => subYears(date, 1), currentLabel: 'This year', historicalLabel: 'Last year', periodTitle: 'this year' },
-  'week-vs-last-week': { granularity: 'DAILY', start: startOfISOWeek, end: endOfISOWeek, shift: (date) => subWeeks(date, 1), currentLabel: 'This week', historicalLabel: 'Last week', periodTitle: 'this week' },
+  'month-vs-last-month': { granularity: 'DAILY', start: startOfMonth, end: endOfMonth, shift: (date) => subMonths(date, 1), currentLabel: 'This month', historicalLabel: 'Last month' },
+  'month-vs-last-year': { granularity: 'DAILY', start: startOfMonth, end: endOfMonth, shift: (date) => subYears(date, 1), currentLabel: 'This month', historicalLabel: 'This month last year' },
+  'year-vs-last-year': { granularity: 'WEEKLY', start: startOfYear, end: endOfYear, shift: (date) => subYears(date, 1), currentLabel: 'This year', historicalLabel: 'Last year' },
+  'week-vs-last-week': { granularity: 'DAILY', start: startOfISOWeek, end: endOfISOWeek, shift: (date) => subWeeks(date, 1), currentLabel: 'This week', historicalLabel: 'Last week' },
 }
 
 function getPeriodConfig(mode: ComparisonMode, now: Date): PeriodConfig {
   const { start, end, shift, ...labels } = PERIOD_DEFINITIONS[mode]
   const historical = shift(now)
-  return {
-    ...labels,
-    currentStart: start(now),
-    currentEnd: end(now),
-    historicalStart: start(historical),
-    historicalEnd: end(historical),
-  }
+  return { ...labels, currentStart: start(now), currentEnd: end(now), historicalStart: start(historical), historicalEnd: end(historical) }
 }
 
-function quarterTicks(points: ComparisonPoint[]): string[] {
-  const n = points.length
-  if (n === 0) return []
-  return [0, 0.25, 0.5, 0.75]
-    .map((frac) => Math.min(Math.round(n * frac), n - 1))
-    .filter((idx, i, arr) => arr.indexOf(idx) === i)
-    .map((idx) => points[idx].label)
-}
-
-export function SpendingComparison({ categoryIds, owners }: { categoryIds: string[]; owners?: string[] }) {
+export function SpendingComparison({ accountIds, categoryIds, owners, showHidden = false }: { accountIds?: string[]; categoryIds: string[]; owners?: string[]; showHidden?: boolean }) {
   const [mode, setMode] = useState<ComparisonMode>('month-vs-last-month')
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const isMobile = useIsMobile()
+  const containerRef = useRef<HTMLDivElement>(null)
   const now = useMemo(() => new Date(), [])
   const config = useMemo(() => getPeriodConfig(mode, now), [mode, now])
 
   const makeFilter = useCallback((start: Date, end: Date): SpendingFilter => ({
     datetimeRange: localDateRangeToUtcDateTimeRange(toDateInputValue(start), toDateInputValue(end)) ?? {},
     granularity: config.granularity,
-    isHidden: false,
+    isHidden: showHidden ? undefined : false,
     ...(categoryIds.length ? { categoryIds } : {}),
+    ...(accountIds?.length ? { accountIds } : {}),
     ...(owners?.length ? { ownerIds: owners } : {}),
-  }), [config.granularity, categoryIds, owners])
+  }), [config.granularity, categoryIds, accountIds, owners, showHidden])
 
   const currentFilter = useMemo(() => makeFilter(config.currentStart, config.currentEnd), [makeFilter, config.currentStart, config.currentEnd])
   const historicalFilter = useMemo(() => makeFilter(config.historicalStart, config.historicalEnd), [makeFilter, config.historicalStart, config.historicalEnd])
 
-  const [currentResult] = useQuery<{ spendingByCategory: SpendingByCategoryReport }, { filter: SpendingFilter }>({
-    query: SPENDING_TOTALS_QUERY,
-    variables: { filter: currentFilter },
-  })
-  const [historicalResult] = useQuery<{ spendingByCategory: SpendingByCategoryReport }, { filter: SpendingFilter }>({
-    query: SPENDING_TOTALS_QUERY,
-    variables: { filter: historicalFilter },
-  })
+  const [currentResult] = useQuery<{ spendingByCategory: SpendingByCategoryReport }, { filter: SpendingFilter }>({ query: SPENDING_TOTALS_QUERY, variables: { filter: currentFilter } })
+  const [historicalResult] = useQuery<{ spendingByCategory: SpendingByCategoryReport }, { filter: SpendingFilter }>({ query: SPENDING_TOTALS_QUERY, variables: { filter: historicalFilter } })
 
-  const currentTotal = currentResult.data?.spendingByCategory.totalAmount ?? 0
   const todayIndex = useMemo(() => {
     const diff = differenceInCalendarDays(now, config.currentStart)
     return config.granularity === 'WEEKLY' ? Math.floor(diff / 7) : diff
@@ -107,137 +78,59 @@ export function SpendingComparison({ categoryIds, owners }: { categoryIds: strin
     () => buildComparisonPoints(currentResult.data?.spendingByCategory.periods ?? [], historicalResult.data?.spendingByCategory.periods ?? [], mode, todayIndex),
     [currentResult.data?.spendingByCategory.periods, historicalResult.data?.spendingByCategory.periods, mode, todayIndex],
   )
-
-  const isMobile = useIsMobile()
-  const chartHeight = isMobile ? 260 : 320
-  const yAxisWidth = isMobile ? 56 : 88
-  const yAxisFormatter = isMobile ? formatCurrencyCompact : formatCurrency
-  const desktopInterval = mode === 'week-vs-last-week' ? 0 : mode === 'year-vs-last-year' ? 3 : 2
-  const mobileXTicks = isMobile && mode !== 'week-vs-last-week' ? quarterTicks(points) : undefined
-
-  const modeLabel = COMPARISON_OPTIONS.find((o) => o.value === mode)?.label ?? ''
+  const showCurrent = todayIndex >= 1
+  const todayPoint = points[todayIndex]
+  const ticks = comparisonTickLabels(points, isMobile ? [0, 0.32, 0.65, 1] : [0, 0.2, 0.4, 0.6, 0.8, 1])
 
   return (
-    <Card as="section" overflow="visible">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-100 p-5">
-        <div className="min-w-0">
-          <span className="text-base font-bold">Spending </span>
-          <span className="text-base font-bold" style={{ color: '#f97316' }}>{formatCurrency(currentTotal)}</span>
-          <span className="ml-1.5 text-sm text-neutral-500">{config.periodTitle}</span>
-        </div>
-        <div className="relative shrink-0">
-          <button
-            aria-expanded={dropdownOpen}
-            className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50"
-            onClick={() => setDropdownOpen((o) => !o)}
-            type="button"
-          >
-            {modeLabel}
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
-          </button>
-          {dropdownOpen && (
-            <div className="absolute right-0 z-20 mt-1 w-64 rounded-2xl border border-neutral-200 bg-white py-1 shadow-card">
-              {COMPARISON_OPTIONS.map((option) => (
-                <button
-                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-neutral-50 ${mode === option.value ? 'font-semibold text-brand-600' : 'text-neutral-700'}`}
-                  key={option.value}
-                  onClick={() => { setMode(option.value); setDropdownOpen(false) }}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+    <div className="mt-5 lg:mt-7">
+      <SelectField className="w-full lg:w-56" hideLabel label="Comparison period" onChange={setMode} options={COMPARISON_OPTIONS} value={mode} />
+      <div className="mt-4 h-[180px] lg:h-[280px]" ref={containerRef}>
+        <ResponsiveContainer height="100%" width="100%">
+          <ComposedChart data={points} margin={{ top: 8, right: isMobile ? 4 : 24, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="comparisonFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={CURRENT_COLOR} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={CURRENT_COLOR} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={chartTheme.grid.stroke} strokeDasharray={chartTheme.grid.strokeDasharray} vertical={false} />
+            <XAxis axisLine={false} dataKey="label" interval={0} tick={chartTheme.axisTick} tickLine={false} tickMargin={10} ticks={ticks} />
+            <YAxis axisLine={false} domain={[0, 'auto']} hide={isMobile} tick={chartTheme.axisTick} tickCount={5} tickFormatter={(value: number) => formatCurrencyCompact(value)} tickLine={false} width={52} />
+            <ReferenceLine stroke={chartTheme.baseline.stroke} y={0} />
+            <Tooltip {...mobileTooltipProps(isMobile)} content={(props) => <ComparisonTooltip {...props} clampWidth={isMobile ? containerRef.current?.clientWidth : undefined} currentLabel={config.currentLabel} historicalLabel={config.historicalLabel} />} cursor={CHART_CURSOR} />
+            <Line activeDot={{ r: 4, fill: CHART_SURFACE, stroke: HISTORICAL_COLOR, strokeWidth: 2 }} connectNulls={false} dataKey="historical" dot={false} isAnimationActive={false} name={config.historicalLabel} stroke={HISTORICAL_COLOR} strokeWidth={chartTheme.line.strokeWidth} type="linear" />
+            {showCurrent ? (
+              <Area activeDot={{ r: 4, fill: CHART_SURFACE, stroke: CURRENT_COLOR, strokeWidth: 2 }} connectNulls={false} dataKey="current" dot={false} fill="url(#comparisonFill)" isAnimationActive={false} name={config.currentLabel} stroke={CURRENT_COLOR} strokeWidth={chartTheme.line.strokeWidth} type="linear" />
+            ) : null}
+            {showCurrent && todayPoint?.current != null ? (
+              <>
+                <ReferenceLine stroke={CHART_CURSOR.stroke} strokeDasharray={CHART_CURSOR.strokeDasharray} x={todayPoint.label} />
+                <ReferenceDot fill={CHART_SURFACE} r={4} stroke={CURRENT_COLOR} strokeWidth={1.5} x={todayPoint.label} y={todayPoint.current} />
+              </>
+            ) : null}
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
-
-      <div className="py-5 lg:px-5">
-        <div style={{ height: chartHeight }}>
-          <ResponsiveContainer height="100%" width="100%">
-            <ComposedChart data={points}>
-              {reportChartAxes({ dataKey: 'label', xAxisProps: { interval: mobileXTicks ? 0 : desktopInterval, ticks: mobileXTicks }, yAxisFormatter, yAxisWidth })}
-              <Tooltip content={<ComparisonTooltip currentLabel={config.currentLabel} historicalLabel={config.historicalLabel} />} />
-              <Area
-                connectNulls={false}
-                dataKey="current"
-                dot={currentEndDot(todayIndex)}
-                fill="#f97316"
-                fillOpacity={0.15}
-                name={config.currentLabel}
-                stroke="#f97316"
-                strokeWidth={2.5}
-                type="monotone"
-              />
-              <Line
-                connectNulls={false}
-                dataKey="historical"
-                dot={false}
-                name={config.historicalLabel}
-                stroke="#71717a"
-                strokeWidth={2.5}
-                type="monotone"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+      {!showCurrent ? <p className="mt-3 text-center text-[13px] text-text-muted">Not enough of {config.currentLabel.toLowerCase()} yet — showing {config.historicalLabel.toLowerCase()} only.</p> : null}
+      <div className="mt-5 flex items-center justify-center gap-6 text-[13px]">
+        <span className="flex items-center gap-2 text-text-3"><span aria-hidden className="inline-block h-px w-4 bg-text-faint" />{config.historicalLabel}</span>
+        {showCurrent ? <span className="flex items-center gap-2 font-medium" style={{ color: CURRENT_COLOR }}><span aria-hidden className="inline-block h-px w-4" style={{ backgroundColor: CURRENT_COLOR }} />{config.currentLabel}</span> : null}
       </div>
-
-      <div className="flex items-center justify-center gap-8 border-t border-neutral-100 p-4 text-sm">
-        <span className="flex items-center gap-2 text-neutral-500">
-          <span className="inline-block h-0.5 w-5 rounded bg-neutral-400" />
-          {config.historicalLabel}
-        </span>
-        <span className="flex items-center gap-2 font-semibold" style={{ color: '#f97316' }}>
-          <span className="inline-block h-0.5 w-5 rounded" style={{ backgroundColor: '#f97316' }} />
-          {config.currentLabel}
-        </span>
-      </div>
-    </Card>
+    </div>
   )
 }
 
-function currentEndDot(todayIndex: number) {
-  return (props: { cx?: number; cy?: number; index?: number }) => {
-    const { cx, cy, index } = props
-    if (index !== todayIndex || cx == null || cy == null) return <g key={index} />
-    return <circle key={index} cx={cx} cy={cy} fill="white" r={4} stroke="#f97316" strokeWidth={2} />
-  }
-}
-
-function ComparisonTooltip({
-  currentLabel,
-  historicalLabel,
-  label,
-  payload,
-}: {
-  currentLabel: string
-  historicalLabel: string
-  label?: string
-  payload?: Array<{ dataKey: string; value: number | null }>
-}) {
-  if (!payload?.length) return null
-  const currentEntry = payload.find((p) => p.dataKey === 'current')
-  const historicalEntry = payload.find((p) => p.dataKey === 'historical')
-  if (currentEntry?.value == null && historicalEntry?.value == null) return null
+function ComparisonTooltip({ active, clampWidth, coordinate, currentLabel, historicalLabel, label, payload }: TooltipContentProps & { clampWidth?: number; currentLabel: string; historicalLabel: string }) {
+  if (!active || !payload?.length) return null
+  const point = payload[0]?.payload as ComparisonPoint | undefined
+  if (!point || (point.current == null && point.historical == null)) return null
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-3 text-white shadow-lg">
-      <div className="mb-2 text-sm font-semibold">Total Spending by {label}</div>
-      {currentEntry?.value != null && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
-          <span className="text-neutral-300">{currentLabel}:</span>
-          <span className="ml-auto tabular-nums font-semibold">{formatCurrency(currentEntry.value)}</span>
-        </div>
-      )}
-      {historicalEntry?.value != null && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-400" />
-          <span className="text-neutral-300">{historicalLabel}:</span>
-          <span className="ml-auto tabular-nums font-semibold">{formatCurrency(historicalEntry.value)}</span>
-        </div>
-      )}
-    </div>
+    <ChartTooltipBox clampWidth={clampWidth} coordinate={coordinate}>
+      <ChartTooltipTitle>{String(label ?? point.label)}</ChartTooltipTitle>
+      {point.current != null ? <ChartTooltipRow color={CURRENT_COLOR} label={currentLabel} value={formatCurrency(point.current)} /> : null}
+      {point.historical != null ? <ChartTooltipRow color={HISTORICAL_COLOR} label={historicalLabel} value={formatCurrency(point.historical)} /> : null}
+    </ChartTooltipBox>
   )
 }

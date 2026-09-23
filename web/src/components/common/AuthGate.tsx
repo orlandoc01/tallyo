@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { SignInButton, TextLinkButton } from './Button'
+import { Button, SignInButton, TextLinkButton } from './Button'
 import { TextField } from './FormControls'
 import { SignInPanel } from './SignInPanel'
 import { getApiBaseUrl } from '../../utils/apiUrl'
@@ -71,14 +71,10 @@ export function AuthGate({
         ) : (
           <form className="space-y-3" onSubmit={submitMasterPassword}>
             <TextField autoFocus id="master-password" label="Master Password" onChange={setPassword} required type="password" value={password} />
-            {error ? <p className="text-sm text-red-700">{error}</p> : null}
-            <button
-              className="w-full rounded-xl bg-neutral-800 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSubmitting}
-              type="submit"
-            >
+            {error ? <p className="text-sm text-negative">{error}</p> : null}
+            <Button className="w-full" disabled={isSubmitting} size="lg" type="submit">
               {isSubmitting ? 'Checking...' : 'Unlock dashboard'}
-            </button>
+            </Button>
             <TextLinkButton label="Back to sign-in options" onClick={() => { setShowMasterPassword(false); setError(null) }} />
           </form>
         )

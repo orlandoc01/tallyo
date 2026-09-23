@@ -1,10 +1,14 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import clsx from 'clsx'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { BudgetSection } from '../../types/graphql'
 import { formatCurrency } from '../../utils/currency'
+import { ClickableRow } from '../common/ClickableRow'
+import { DataGridHeader } from '../common/DataGrid'
 import { Card } from '../common/FormControls'
 import { BudgetLineRow } from './BudgetLineRow'
+import { budgetTone, budgetToneClass } from './budgetMath'
+
+const BUDGET_LINE_GRID_COLUMNS = 'minmax(160px,1.4fr) minmax(140px,2fr) minmax(90px,120px) minmax(130px,190px)'
 
 export function BudgetSectionRow({
   editable,
@@ -20,41 +24,40 @@ export function BudgetSectionRow({
   onSaveLine: (categoryId: string, amount: number) => void
 }) {
   const [open, setOpen] = useState(true)
-  const isIncome = section.group.kind === 'INCOME'
-  const overBudget = !isIncome && section.budgeted > 0 && section.actual > section.budgeted
+  const tone = budgetTone(section.actual, section.budgeted, section.group.kind === 'INCOME')
+  const bodyId = `budget-section-${section.group.id}`
 
   return (
-    <Card as="section" className="dark:border-neutral-800 dark:bg-neutral-900" compact>
-      <button
-        aria-controls={`budget-section-${section.group.id}`}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3 text-left hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50"
+    <Card as="section">
+      <ClickableRow
+        ariaControls={bodyId}
+        className="flex h-12 w-full items-center justify-between gap-3 px-4 text-left transition-colors duration-150 hover:bg-raised lg:h-11"
+        expanded={open}
         onClick={() => setOpen((v) => !v)}
-        type="button"
       >
-        <div className="flex items-center gap-2">
-          {open ? (
-            <ChevronDown aria-hidden className="h-4 w-4 text-neutral-400" />
-          ) : (
-            <ChevronRight aria-hidden className="h-4 w-4 text-neutral-400" />
-          )}
-          <span aria-hidden className="text-lg">{section.group.emoji}</span>
-          <span className="font-semibold text-neutral-900 dark:text-neutral-100">{section.label}</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm tabular-nums">
-          <span className={clsx(overBudget ? 'text-rose-600' : 'text-neutral-700 dark:text-neutral-300')}>
-            {formatCurrency(section.actual)}
-          </span>
-          <span aria-hidden className="text-neutral-300">/</span>
-          <span className="font-semibold text-neutral-900 dark:text-neutral-100">{formatCurrency(section.budgeted)}</span>
-        </div>
-      </button>
+        <span className="flex min-w-0 items-center gap-2">
+          <span aria-hidden className={clsx('text-[10px] leading-none text-text-muted transition-transform duration-150', open && 'rotate-90')}>▶</span>
+          <span aria-hidden>{section.group.emoji}</span>
+          <span className="truncate text-sm font-semibold text-text-1">{section.label}</span>
+        </span>
+        <span className="shrink-0 text-sm font-medium tabular-nums text-text-muted">
+          <span className={budgetToneClass[tone]}>{formatCurrency(section.actual)}</span> / <span>{formatCurrency(section.budgeted)}</span>
+        </span>
+      </ClickableRow>
       {open ? (
-        <div id={`budget-section-${section.group.id}`}>
-          {section.lines.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-neutral-500">No categories with budgets or activity yet.</p>
-          ) : (
-            section.lines.map((line) => (
+        section.lines.length === 0 ? (
+          <p className="border-t border-border px-4 py-3 text-[13px] text-text-muted" id={bodyId}>No categories with budgets or activity yet.</p>
+        ) : (
+          <div id={bodyId} style={{ '--budget-line-cols': BUDGET_LINE_GRID_COLUMNS } as CSSProperties}>
+            <div className="hidden lg:block">
+              <DataGridHeader gridTemplateColumns="var(--budget-line-cols)" variant="list">
+                <span>Category</span>
+                <span>Progress</span>
+                <span className="text-right">Planned</span>
+                <span className="text-right">Actual</span>
+              </DataGridHeader>
+            </div>
+            {section.lines.map((line) => (
               <BudgetLineRow
                 editable={editable}
                 key={line.category.id}
@@ -63,9 +66,9 @@ export function BudgetSectionRow({
                 saving={savingCategoryId === line.category.id}
                 transactionLinkTo={transactionLinkForCategory(line.category.id)}
               />
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )
       ) : null}
     </Card>
   )

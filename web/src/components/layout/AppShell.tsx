@@ -1,8 +1,8 @@
 import clsx from 'clsx'
-import { CheckSquare, LogOut, Menu, Settings, X } from 'lucide-react'
+import { CheckSquare, ChevronLeft, LogOut, Menu, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/useAuth'
 import { usePermissions } from '../../hooks/usePermissions'
 import { ALL_NAV_ITEMS, MAX_NAVBAR_ITEMS, navItemAllowed, navItemVisible, reviewRoute } from '../../hooks/navItems'
@@ -20,6 +20,8 @@ import { TransactionSelectionProvider } from '../transactions/TransactionSelecti
 import { useTransactionSelection } from '../transactions/useTransactionSelection'
 import { NavIcon } from './NavIcon'
 import { DemoBanner } from './DemoBanner'
+import { settingsTabFromPath } from '../../hooks/settingsTabs'
+import { mobileTitle } from '../../hooks/mobileTitle'
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'app-sidebar-collapsed'
 
@@ -35,6 +37,7 @@ function loadSidebarCollapsed() {
 
 function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const { disableTransactionTracking, disableWealthTracking, logout } = useAuth()
   const { canRead, canWrite } = usePermissions()
@@ -60,11 +63,12 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
   const isReports = location.pathname === '/expenses' || location.pathname.startsWith('/expenses/')
   const isCashFlow = location.pathname === '/cash-flow'
   const showFilters = isTransactions || isReports || isCashFlow
+  const isSettingsSubpage = settingsTabFromPath(location.pathname) !== null
 
   const menuNavLinkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
-      'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-      isActive ? 'bg-brand-50 text-brand-700' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-950',
+      'flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition',
+      isActive ? 'bg-raised-nav text-text-1' : 'text-text-2 hover:bg-raised',
     )
 
   const menuItemClassName = (defaultTo: string) => isStickySection(sectionOf(defaultTo))
@@ -83,32 +87,30 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
   return (
     <>
       {/* Mobile header bar */}
-      <header className="fixed left-0 right-0 top-0 z-30 flex h-12 items-center justify-between border-b border-neutral-200 bg-white px-2 lg:hidden" data-mobile-header>
-        {mobile.headerLeading ?? (
-          <button
-            aria-label="Open menu"
-            className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
-            onClick={() => setMenuOpen(true)}
-            type="button"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-2.5 border-b border-border bg-surface px-3 lg:hidden">
+        {isSettingsSubpage ? (
+          <IconButton ariaLabel="Back to settings" className="touch-manipulation" onClick={() => navigate('/settings')}>
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.8} />
+          </IconButton>
+        ) : (
+          <IconButton ariaLabel="Open menu" className="touch-manipulation" onClick={() => setMenuOpen(true)}>
+            <Menu className="h-5 w-5" strokeWidth={1.8} />
+          </IconButton>
         )}
-        <div className="flex items-center gap-0.5">
+        <span className="flex-1 truncate text-base font-semibold tracking-[-0.2px] text-text-1">{mobileTitle(location.pathname)}</span>
+        <div className="flex items-center gap-2.5">
           {mobile.headerActions ?? (
             <>
               {isTransactions ? (
-                <div className="relative">
-                  <button
-                    aria-label={transactionSelection.isBulkMode ? 'Exit bulk select' : 'Bulk actions'}
-                    aria-pressed={transactionSelection.isBulkMode}
-                    className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', transactionSelection.isBulkMode)}
-                    onClick={() => (transactionSelection.isBulkMode ? transactionSelection.exitBulkMode() : transactionSelection.enterBulkMode())}
-                    type="button"
-                  >
-                    {transactionSelection.isBulkMode ? <X className="h-5 w-5" /> : <CheckSquare className="h-5 w-5" />}
-                  </button>
-                </div>
+                <button
+                  aria-label={transactionSelection.isBulkMode ? 'Exit bulk select' : 'Bulk actions'}
+                  aria-pressed={transactionSelection.isBulkMode}
+                  className={mobileHeaderActionClass('w-9 touch-manipulation', transactionSelection.isBulkMode)}
+                  onClick={() => (transactionSelection.isBulkMode ? transactionSelection.exitBulkMode() : transactionSelection.enterBulkMode())}
+                  type="button"
+                >
+                  {transactionSelection.isBulkMode ? <X className="h-4 w-4" /> : <CheckSquare className="h-4 w-4" />}
+                </button>
               ) : null}
               {showFilters ? (
                 <MobileFilterButton active={mobile.filterOpen} highlighted={mobile.filtersActive} onClick={mobile.filterOpen ? mobile.closeFilter : mobile.openFilter} />
@@ -121,15 +123,16 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
       {/* Mobile hamburger panel — slides from left */}
       {menuOpen ? (
         <>
-          <div aria-hidden className="fixed inset-x-0 bottom-0 top-12 z-40 bg-black/30 lg:hidden" onClick={closeMenu} />
-          <div className="fixed bottom-0 left-0 top-0 z-50 flex w-64 flex-col bg-white shadow-xl lg:hidden">
-            <div className="flex h-12 shrink-0 items-center justify-end border-b border-neutral-200 px-4">
-              <IconButton ariaLabel="Close menu" onClick={closeMenu}>
-                <X className="h-5 w-5" />
+          <div aria-hidden className="fixed inset-0 z-40 bg-overlay lg:hidden" onClick={closeMenu} />
+          <div className="fixed inset-y-0 left-0 z-50 flex w-[250px] flex-col border-r border-border bg-surface px-2 py-3 lg:hidden">
+            <div className="flex h-10 shrink-0 items-center justify-between px-2.5">
+              <span className="text-[17px] font-bold tracking-[-0.3px] text-text-1">tallyo</span>
+              <IconButton ariaLabel="Close menu" onClick={closeMenu} size="sm">
+                <X className="h-4 w-4" />
               </IconButton>
             </div>
 
-            <nav aria-label="Menu navigation" className="flex-1 space-y-1 p-4">
+            <nav aria-label="Menu navigation" className="mt-2 flex flex-1 flex-col gap-0.5">
               {menuItems.map((item) => {
                 const Icon = item.icon
                 return (
@@ -145,20 +148,19 @@ function MobileHeader({ hasReviewItems }: { hasReviewItems: boolean }) {
               })}
             </nav>
 
-            <div className="shrink-0 space-y-1 border-t border-neutral-200 p-4">
-              <NavLink className={menuNavLinkClass} onClick={closeMenu} to="/settings">
-                <Settings aria-hidden className="h-5 w-5 shrink-0" />
-                Settings
-              </NavLink>
-              <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
-                onClick={handleSignOut}
-                type="button"
-              >
-                <LogOut aria-hidden className="h-5 w-5 shrink-0" />
-                Sign out
-              </button>
-            </div>
+            <div className="mx-0.5 my-1.5 border-t border-border" />
+            <NavLink className={menuNavLinkClass} onClick={closeMenu} to="/settings">
+              <Settings aria-hidden className="h-4 w-4 shrink-0" strokeWidth={1.6} />
+              Settings
+            </NavLink>
+            <button
+              className={clsx('w-full', menuNavLinkClass({ isActive: false }))}
+              onClick={handleSignOut}
+              type="button"
+            >
+              <LogOut aria-hidden className="h-4 w-4 shrink-0" strokeWidth={1.6} />
+              Sign out
+            </button>
           </div>
         </>
       ) : null}
@@ -212,7 +214,7 @@ function AppShellInner({ collapsed, onCollapsedChange }: { collapsed: boolean; o
   return (
     <>
       <a
-        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
         href="#main-content"
       >
         Skip to main content
@@ -223,7 +225,7 @@ function AppShellInner({ collapsed, onCollapsedChange }: { collapsed: boolean; o
         <div className="min-w-0 flex-1">
           <MobileHeader hasReviewItems={hasReviewItems} />
 
-          <main className="mx-auto max-w-[1600px] p-4 pb-28 pt-16 lg:p-6 lg:pb-6 lg:pt-6" id="main-content">
+          <main className="mx-auto w-full max-w-[1600px] px-3 pb-[calc(102px+env(safe-area-inset-bottom,0px))] pt-[68px] lg:px-6 lg:pb-10 lg:pt-4" id="main-content">
             <DemoBanner />
             <Outlet />
           </main>
@@ -285,7 +287,7 @@ function MobileBottomNav({
   return createPortal(
     <nav
       aria-label="Mobile navigation"
-      className="mobile-bottom-nav z-30 flex border-t border-neutral-200 bg-white lg:hidden"
+      className="mobile-bottom-nav z-30 flex min-h-[78px] border-t border-border bg-surface px-2 pt-1.5 lg:hidden"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -295,7 +297,7 @@ function MobileBottomNav({
         width: '100vw',
         maxWidth: 'none',
         margin: 0,
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
       }}
     >
       {navItems.map((item) => {
@@ -304,15 +306,17 @@ function MobileBottomNav({
           <NavLink
             className={({ isActive }) =>
               clsx(
-                'flex flex-1 flex-col items-center gap-0.5 py-1.5 text-xs font-semibold transition',
-                isActive || (isStickySection(sectionOf(item.to)) && sectionOf(location.pathname) === sectionOf(item.to)) ? 'text-brand-600' : 'text-neutral-500',
+                'flex flex-1 flex-col items-center gap-1 text-[11px] font-medium transition',
+                isActive || (isStickySection(sectionOf(item.to)) && sectionOf(location.pathname) === sectionOf(item.to)) ? 'text-text-1 [&>span]:bg-raised-nav' : 'text-text-muted',
               )
             }
             end={item.end}
             key={item.id}
             {...(item.id === 'review' ? { to: reviewRoute(disableTransactionTracking, canWriteTransactions, canWriteAccounts, canReviewBalances, canReviewAssets) } : stickyNavProps(item.to))}
           >
-            <NavIcon Icon={Icon} iconClassName="h-6 w-6" needsReview={item.id === 'review' && hasReviewItems} />
+            <span className="flex h-[30px] w-[52px] items-center justify-center rounded-lg">
+              <NavIcon Icon={Icon} iconClassName="h-5 w-5" needsReview={item.id === 'review' && hasReviewItems} />
+            </span>
             {item.label}
           </NavLink>
         )

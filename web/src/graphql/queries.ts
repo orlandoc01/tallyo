@@ -429,6 +429,7 @@ export const NET_WORTH_QUERY = gql`
             ...AssetFields
           }
           totalQuantity
+          percentOfClassifier
           valueUSD
           holdings @include(if: $includeHoldings) {
             valueUSD

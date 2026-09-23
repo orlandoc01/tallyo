@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { CombinedError } from 'urql'
@@ -18,18 +18,16 @@ vi.mock('../components/institutions/AccountDetailModal', () => ({
   ),
 }))
 vi.mock('../components/wealth/NetWorthChart', () => ({
-  NetWorthChart: ({ focusedDate, onFocusDate, onRangeChange }: { focusedDate?: string; onFocusDate: (date: string | null) => void; onRangeChange: (range: 'ONE_MONTH') => void }) => (
+  NetWorthChart: ({ focusedDate, onFocusDate }: { focusedDate?: string; onFocusDate: (date: string | null) => void }) => (
     <div>
-      <button onClick={() => onRangeChange('ONE_MONTH')} type="button">Chart</button>
       <button onClick={() => onFocusDate(focusedDate ? null : '2026-06-01')} type="button">{focusedDate ? `Focused ${focusedDate}` : 'Focus point'}</button>
     </div>
   ),
 }))
-vi.mock('../components/wealth/AssetsDonut', () => ({ AssetsDonut: ({ totalAssets }: { totalAssets: number }) => <div><span>Donut</span><span data-testid="donut-total">{totalAssets}</span></div> }))
 vi.mock('../components/wealth/AccountSidebar', () => ({
-  AccountSidebar: ({ amountsHidden, canReadHoldings = true, heading, onAccountClick, onAccountGroupClick }: { amountsHidden?: boolean; canReadHoldings?: boolean; heading?: string; onAccountClick?: (account: { id: string; name: string }) => void; onAccountGroupClick?: (groupId: 'DEPOSITS' | 'INVESTMENTS', accountIds: string[]) => void }) => (
+  AccountSidebar: ({ amountsHidden, canReadHoldings = true, variant, onAccountClick, onAccountGroupClick }: { amountsHidden?: boolean; canReadHoldings?: boolean; variant: string; onAccountClick?: (account: { id: string; name: string }) => void; onAccountGroupClick?: (groupId: 'DEPOSITS' | 'INVESTMENTS', accountIds: string[]) => void }) => (
     <div data-account-sidebar>
-      {heading ?? 'Net Worth'} {amountsHidden ? 'hidden' : 'shown'}
+      Sidebar {variant} {amountsHidden ? 'hidden' : 'shown'}
       {canReadHoldings ? (
         <>
           <button onClick={() => onAccountGroupClick?.('INVESTMENTS', ['acct-invest'])} type="button">Investments group</button>
@@ -38,16 +36,6 @@ vi.mock('../components/wealth/AccountSidebar', () => ({
           <button onClick={() => onAccountClick?.({ id: 'acct-savings', name: 'Savings' })} type="button">Savings account</button>
         </>
       ) : null}
-    </div>
-  ),
-}))
-vi.mock('../components/wealth/AssetClassTable', () => ({
-  AssetClassTable: ({ amountsHidden, onAssetClick }: { amountsHidden?: boolean; onAssetClick?: (holding: { asset: { id: string; assetType?: string }; holdings: { account: { id: string } }[] }) => void }) => (
-    <div>
-      Detailed {amountsHidden ? 'hidden' : 'shown'}
-      <button type="button">Expand Cash details</button>
-      <button onClick={() => onAssetClick?.({ asset: { id: 'asset-usd', assetType: 'CURRENCY' }, holdings: [] })} type="button">Edit US Dollar</button>
-      <button onClick={() => onAssetClick?.({ asset: { id: 'asset-home', assetType: 'REAL_ESTATE' }, holdings: [{ account: { id: 'acct-home' } }] })} type="button">Open Primary Home</button>
     </div>
   ),
 }))
@@ -121,6 +109,25 @@ const report = {
         },
       ],
     },
+    {
+      classifier: 'REAL_ESTATE' as const,
+      label: 'Real Estate',
+      valueUSD: 400,
+      percentOfAssets: 6.67,
+      assetCount: 1,
+      holdings: [
+        {
+          asset: { id: 'asset-home', assetType: 'REAL_ESTATE' as const, identifier: 'HOME', name: 'Primary Home', classifier: 'REAL_ESTATE' as const, trackingTicker: null, trackingMultiplier: 1, priceConnectivity: 'HEALTHY' as const, investmentConnectivity: 'HEALTHY' as const, adapterSources: [] },
+          totalQuantity: 1,
+          valueUSD: 400,
+          percentOfClassifier: 100,
+          holdings: [{
+            valueUSD: 400,
+            account: { id: 'acct-home', name: 'Primary Home', type: 'PROPERTY' as const, subtype: null, owner: { id: 'owner', name: 'Alex' }, hidden: false, closed: false, manual: false, createdAt: '', updatedAt: '' },
+          }],
+        },
+      ],
+    },
   ],
   liabilityBreakdown: [],
 }
@@ -156,10 +163,9 @@ describe('NetWorthPage', () => {
 
   it('shows loading state', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: true, report: undefined } as unknown as ReturnType<typeof useNetWorth>)
-    renderPage()
-    const loadingDiv = screen.getByText('Loading net worth...')
-    expect(loadingDiv).toBeInTheDocument()
-    expect(loadingDiv).toHaveClass('lg:min-h-screen')
+    const { container } = renderPage()
+    expect(screen.getByRole('status')).toHaveTextContent('Loading net worth')
+    expect(container.lastElementChild).toHaveClass('lg:min-h-screen')
   })
 
   it('shows error state', () => {
@@ -177,11 +183,12 @@ describe('NetWorthPage', () => {
   it('renders report totals', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage()
-    expect(screen.getByText('Household Wealth')).toBeInTheDocument()
-    expect(screen.getAllByText('Chart')).toHaveLength(2)
-    expect(screen.getAllByText('Donut')).toHaveLength(2)
-    expect(screen.getByText('Accounts shown')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Filters$/i })).toBeInTheDocument()
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
+    expect(screen.getByText('Focus point')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Assets by class' })).toBeInTheDocument()
+    expect(screen.getByText('Sidebar desktop shown')).toBeInTheDocument()
+    expect(screen.getByText('Sidebar mobile shown')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument()
   })
 
   it('does not force a mobile viewport-height layout', () => {
@@ -198,11 +205,34 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Owner/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Owner' }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Alex' }))
 
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ ownerIds: ['owner'] }))
+    expect(screen.getByRole('button', { name: 'Owner Alex' })).toHaveClass('border-brand-600')
+    expect(screen.getByRole('button', { name: 'Filters, 1 active' })).toBeInTheDocument()
+  })
+
+  it('changes the range from the date chip and the mobile sheet', async () => {
+    mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?account_ids=acct-cash'])
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filters, 1 active' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Date' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Past month 1M' }))
+
+    expect(screen.queryByRole('radio', { name: 'Past month 1M' })).not.toBeInTheDocument()
+    expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ accountIds: ['acct-cash'] }))
+    expect(mockedUseHistoricalNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ range: 'ONE_MONTH', filters: expect.objectContaining({ accountIds: ['acct-cash'] }) }))
+    expect(screen.getByTestId('location-search').textContent).toBe('?account_ids=acct-cash&range=ONE_MONTH')
+    expect(screen.getByRole('button', { name: 'Date Past month' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open net worth filters, 1 active' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Filters' })).getByRole('button', { name: /^Date/ }))
+    await userEvent.click(screen.getByRole('radio', { name: 'All time' }))
+    expect(screen.getByTestId('location-search').textContent).toBe('?account_ids=acct-cash&range=ALL')
+    expect(screen.queryByRole('radio', { name: 'All time' })).not.toBeInTheDocument()
   })
 
   it('registers mobile header actions with the filters menu', async () => {
@@ -212,13 +242,17 @@ describe('NetWorthPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open net worth filters' }))
     const dialog = screen.getByRole('dialog', { name: 'Filters' })
     expect(dialog).toHaveClass('fixed')
-    expect(dialog).toHaveStyle({ top: '48px' })
-    expect(dialog.firstElementChild).toHaveClass('absolute', 'right-0', 'top-0')
-    expect(dialog.firstElementChild).toHaveClass('w-[min(20rem,100vw)]')
+    expect(dialog.firstElementChild).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
+    expect(dialog.firstElementChild).toHaveClass('rounded-t-2xl')
+    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Owner/i }))
     await userEvent.click(screen.getByRole('checkbox', { name: 'Alex' }))
 
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ ownerIds: ['owner'] }))
+    expect(screen.getAllByText('1')[0]).toHaveClass('bg-brand-600')
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Clear filters' }))
+    expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.not.objectContaining({ ownerIds: expect.any(Array) }))
   })
 
   it('masks amounts across the page while leaving percentages visible', async () => {
@@ -226,20 +260,20 @@ describe('NetWorthPage', () => {
     mockHistorical(gainingSeries)
     renderPage(['/net-worth?range=ONE_MONTH&account_ids=acct-cash'])
 
-    expect(screen.getByText('$1,000.00')).toBeInTheDocument()
-    // Hide amounts button appears in both mobile header and desktop toolbar (dual-view in
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
+    // Hide amounts button appears in both mobile header and desktop card (dual-view in
     // JSDOM). Click the desktop one ([1]): it sits inside the page's clear-account-filters-
     // on-outside-click region, so this also guards against the toggle wiping account_ids.
     await userEvent.click(screen.getAllByRole('button', { name: 'Hide amounts' })[1])
 
     expect(screen.getAllByRole('button', { name: 'Show amounts' }).length).toBeGreaterThan(0)
     expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH&account_ids=acct-cash&hide_amounts=true')
-    expect(screen.queryByText('$1,000.00')).not.toBeInTheDocument()
-    expect(screen.getAllByText('....').length).toBeGreaterThan(0)
-    expect(screen.getAllByText((_, element) => element?.textContent?.includes('+25.0% over selected range') ?? false).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Net Worth hidden')).toHaveLength(1)
-    expect(screen.getByText('Accounts hidden')).toBeInTheDocument()
-    expect(screen.getAllByText('Detailed hidden')).toHaveLength(2)
+    expect(screen.queryByText('$1,000')).not.toBeInTheDocument()
+    expect(screen.getAllByText(/•/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/\(••\.•%\)/)).toHaveTextContent('past month')
+    expect(screen.getByText('Sidebar desktop hidden')).toBeInTheDocument()
+    expect(screen.getByText('Sidebar mobile hidden')).toBeInTheDocument()
+    expect(screen.getAllByText('100.0%').length).toBeGreaterThan(0)
   })
 
   it('loads the amount visibility toggle from the URL', async () => {
@@ -248,7 +282,7 @@ describe('NetWorthPage', () => {
     renderPage(['/net-worth?hide_amounts=true'])
 
     expect(screen.getAllByRole('button', { name: 'Show amounts' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('....').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/•/).length).toBeGreaterThan(0)
 
     await user.click(screen.getAllByRole('button', { name: 'Show amounts' })[0])
 
@@ -260,12 +294,13 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?owner=owner&account_ids=acct-cash'])
 
-    expect(screen.getByRole('button', { name: /Filters: 2 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filters, 2 active' })).toBeInTheDocument()
     expect(mockedUseNetWorth).toHaveBeenCalledWith({ ownerIds: ['owner'] }, false)
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ ownerIds: ['owner'], accountIds: ['acct-cash'] }))
 
-    await userEvent.click(screen.getByRole('button', { name: /Filters: 2 selected/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Clear all/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Filters, 2 active' }))
+    expect(screen.getByRole('button', { name: 'Account 1 selected' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
 
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.not.objectContaining({ ownerIds: expect.any(Array), accountIds: expect.any(Array) }))
   })
@@ -276,10 +311,10 @@ describe('NetWorthPage', () => {
 
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith({ ownerIds: ['owner'] })
     expect(mockedUseHistoricalNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ filters: { ownerIds: ['owner'] } }))
-    expect(screen.getByText('Household Wealth')).toBeInTheDocument()
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /Filters: 1 selected/i }))
-    expect(screen.getByRole('button', { name: /Owner/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Filters, 1 active' }))
+    expect(screen.getByRole('button', { name: 'Owner Alex' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Account type/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Account/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Investments group' })).not.toBeInTheDocument()
@@ -296,7 +331,7 @@ describe('NetWorthPage', () => {
     })
     renderPage(['/net-worth?range=ONE_MONTH&owner=sam&account_ids=checking'])
 
-    expect(screen.getByText('Household Wealth')).toBeInTheDocument()
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
     expect(mockedUseNetWorth).toHaveBeenCalledWith(expect.objectContaining({ ownerIds: ['sam'], accountIds: ['checking'] }))
     await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH'))
   })
@@ -333,13 +368,15 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage()
 
-    await userEvent.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Account type/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Account type' }))
+    expect(screen.queryByRole('checkbox', { name: 'Deposits' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: 'Investments' }))
 
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ accountIds: ['acct-invest'] }))
     expect(screen.getByTestId('location-search').textContent).toBe('?account_ids=acct-invest')
-    expect(screen.getByRole('button', { name: /Filters: 1 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filters, 1 active' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Account type Investments' })).toBeInTheDocument()
   })
 
   it('unfocuses sidebar account groups by removing their account IDs', async () => {
@@ -376,7 +413,7 @@ describe('NetWorthPage', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Investments group' })[0])
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ accountIds: ['acct-invest'] }))
 
-    await userEvent.click(screen.getByText('Household Wealth'))
+    await userEvent.click(screen.getAllByText('Net Worth')[0])
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.not.objectContaining({ accountIds: expect.any(Array) }))
   })
 
@@ -384,30 +421,18 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?account_ids=acct-cash'])
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Expand Cash details' })[1])
+    await userEvent.click(screen.getAllByRole('button', { name: /Cash & Equivalents/ })[1])
 
+    expect(screen.getAllByText('US Dollar').length).toBeGreaterThan(0)
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ accountIds: ['acct-cash'] }))
-  })
-
-  it('keeps account filters when changing the historical chart range', async () => {
-    mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
-    renderPage(['/net-worth?account_ids=acct-cash'])
-
-    await userEvent.click(screen.getAllByRole('button', { name: 'Chart' })[0])
-
-    expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({ accountIds: ['acct-cash'] }))
-    expect(mockedUseHistoricalNetWorth).toHaveBeenLastCalledWith(expect.objectContaining({
-      range: 'ONE_MONTH',
-      filters: expect.objectContaining({ accountIds: ['acct-cash'] }),
-    }))
-    expect(screen.getByTestId('location-search').textContent).toBe('?account_ids=acct-cash&range=ONE_MONTH')
   })
 
   it('registers asset edit modals in the net worth URL from detailed rows', async () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?range=ONE_MONTH'])
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Edit US Dollar' })[1])
+    await userEvent.click(screen.getAllByRole('button', { name: /Cash & Equivalents/ })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /^Edit US Dollar/ })[1])
 
     expect(screen.getByTestId('location-pathname').textContent).toBe('/net-worth/assets/asset-usd/info')
     expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH')
@@ -424,7 +449,8 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?range=ONE_MONTH'])
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Open Primary Home' })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /Real Estate/ })[0])
+    await userEvent.click(screen.getAllByRole('button', { name: /^Edit Primary Home/ })[0])
 
     expect(screen.getByTestId('location-pathname').textContent).toBe('/net-worth/accounts/acct-home/valuation')
     expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH')
@@ -445,22 +471,22 @@ describe('NetWorthPage', () => {
       report: input.asOfDate ? { ...report, asOfDate: input.asOfDate, currentAssetsUSD: 900 } : report,
     }) as unknown as ReturnType<typeof useNetWorth>)
     renderPage()
-    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+    expect(screen.getByText('$1.2K')).toBeInTheDocument()
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Focus point' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Focus point' }))
 
     expect(screen.getByTestId('location-search')).toHaveTextContent('?focus_date=2026-06-01')
     expect(mockedUseNetWorth).toHaveBeenCalledWith(expect.objectContaining({ asOfDate: '2026-06-01' }), false)
     expect(mockedUseNetWorth).toHaveBeenLastCalledWith(expect.not.objectContaining({ asOfDate: expect.anything() }))
-    expect(screen.getAllByText('Breakdown as of')).toHaveLength(2)
-    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('900')
-    expect(screen.getByText('No asset snapshot yet')).toBeInTheDocument()
+    expect(screen.getByText('Breakdown as of')).toBeInTheDocument()
+    expect(screen.getByText('$900.00')).toBeInTheDocument()
+    expect(screen.getByText('Focused · click chart to clear')).toBeInTheDocument()
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Focused 2026-06-01' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Focused 2026-06-01' }))
 
     expect(screen.getByTestId('location-search')).toHaveTextContent('')
     expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
-    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+    expect(screen.getByText('$1.2K')).toBeInTheDocument()
   })
 
   it.each([
@@ -471,8 +497,8 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockImplementation((input) => (input.asOfDate ? focused : { fetching: false, report }) as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?focus_date=2026-06-01'])
 
-    expect(screen.getAllByText('Loading breakdown as of')).toHaveLength(2)
-    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+    expect(screen.getByText('Loading breakdown as of')).toBeInTheDocument()
+    expect(screen.getByText('$1.2K')).toBeInTheDocument()
   })
 
   it('offers a retry when the focused report fails and keeps the live breakdown', async () => {
@@ -482,10 +508,10 @@ describe('NetWorthPage', () => {
       : { fetching: false, report }) as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?focus_date=2026-06-01'])
 
-    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Could not load the breakdown as of 2026-06-01')
-    expect(screen.getAllByTestId('donut-total')[0]).toHaveTextContent('1200')
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load the breakdown as of 2026-06-01')
+    expect(screen.getByText('$1.2K')).toBeInTheDocument()
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Retry' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(refetch).toHaveBeenCalledWith({ requestPolicy: 'network-only' })
   })
@@ -494,7 +520,7 @@ describe('NetWorthPage', () => {
     mockedUseNetWorth.mockImplementation((input) => ({ fetching: false, report: input.asOfDate ? { ...report, asOfDate: input.asOfDate } : report }) as unknown as ReturnType<typeof useNetWorth>)
     renderPage(['/net-worth?focus_date=2028-02-29'])
 
-    expect(screen.getAllByText('Breakdown as of')).toHaveLength(2)
+    expect(screen.getByText('Breakdown as of')).toBeInTheDocument()
   })
 
   it('loads a focused date from the URL and clears it from the breakdown banner', async () => {
@@ -502,9 +528,9 @@ describe('NetWorthPage', () => {
     renderPage(['/net-worth?focus_date=2026-06-01&owner=owner'])
 
     expect(mockedUseNetWorth).toHaveBeenCalledWith({ ownerIds: ['owner'], asOfDate: '2026-06-01' }, false)
-    expect(screen.getAllByText('2026-06-01')).toHaveLength(2)
+    expect(screen.getAllByText('2026-06-01').length).toBeGreaterThan(0)
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Show current' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Show current' }))
 
     expect(screen.getByTestId('location-search')).toHaveTextContent('?owner=owner')
     expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
@@ -518,7 +544,7 @@ describe('NetWorthPage', () => {
     expect(screen.queryByText('Breakdown as of')).not.toBeInTheDocument()
   })
 
-  it('renders negative trends and snapshot dates', () => {
+  it('renders negative trends over the selected range', () => {
     mockedUseNetWorth.mockReturnValue({
       fetching: false,
       report: { ...report, asOfDate: '2026-06-04' },
@@ -527,8 +553,8 @@ describe('NetWorthPage', () => {
 
     renderPage()
 
-    expect(screen.getByText('As of 2026-06-04')).toBeInTheDocument()
-    expect(screen.getAllByText((_, element) => element?.textContent?.includes('-20.0% over selected range') ?? false).length).toBeGreaterThan(0)
+    expect(screen.getByText('-$250.00 (20.0%)')).toHaveClass('text-negative')
+    expect(screen.getByText('-$250.00 (20.0%)')).toHaveTextContent('year to date')
   })
 })
 

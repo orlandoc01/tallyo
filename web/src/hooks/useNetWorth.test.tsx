@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { delay, graphql, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { print } from 'graphql'
+import { NET_WORTH_QUERY } from '../graphql/queries'
 import { accounts, accountSnapshots } from '../mocks/fixtures'
 import { server } from '../mocks/server'
 import { mockQuery } from '../test/msw'
@@ -92,5 +94,12 @@ describe('useNetWorth', () => {
 
     await waitFor(() => expect(result.current.fetching).toBe(false))
     expect(includeHoldings).toBe(false)
+  })
+})
+
+describe('NET_WORTH_QUERY', () => {
+  it('requests every field the allocation rows read from a holding rollup', () => {
+    const selection = print(NET_WORTH_QUERY)
+    for (const field of ['totalQuantity', 'percentOfClassifier', 'valueUSD']) expect(selection).toContain(field)
   })
 })

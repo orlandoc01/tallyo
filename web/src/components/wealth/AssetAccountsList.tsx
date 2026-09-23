@@ -21,7 +21,7 @@ export function AssetAccountsList({ assetId, amountsHidden }: { assetId: string;
 
   return (
     <section className="space-y-2" aria-label="Accounts">
-      <h3 className="text-sm font-semibold text-neutral-700">Accounts</h3>
+      <h3 className="text-sm font-semibold text-text-2">Accounts</h3>
       <QueryGate
         data={data}
         empty={holdings.length === 0}
@@ -36,10 +36,10 @@ export function AssetAccountsList({ assetId, amountsHidden }: { assetId: string;
           {holdings.map((holding) => {
             const label = accountMaskedName(holding.account)
             return (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 px-3 py-2 text-sm" key={holding.account.id}>
-                <span className="min-w-0 truncate font-medium text-neutral-800">{label}</span>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm" key={holding.account.id}>
+                <span className="min-w-0 truncate font-medium text-text-1">{label}</span>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="font-semibold text-neutral-950">{displayAmount(amountsHidden, formatSignedCurrency(holding.valueUSD))}</span>
+                  <span className="font-semibold text-text-1">{displayAmount(amountsHidden, formatSignedCurrency(holding.valueUSD))}</span>
                   {canOpenValuation ? (
                     <ArrowUpRightLink label={`Open ${label} valuation page`} to={`/accounts/${holding.account.id}/valuation`} />
                   ) : null}

@@ -1,64 +1,27 @@
-import { useState } from 'react'
-import { OneLevelGroup, OneLevelGroupRow } from '../common/OneLevelGroup'
+import clsx from 'clsx'
+import { ChevronRight, LayoutGrid } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ClickableRow } from '../common/ClickableRow'
+import { Card, SearchInput } from '../common/FormControls'
 import { displayAmount } from './amountDisplay'
-import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
-import { accountBalanceUSD, accountNetContributionUSD } from '../../utils/accounts'
+import { accountInstitution, accountRowAmount, accountSyncStatus, filterSidebarGroups, sidebarGroups, type SidebarGroup } from './accountSidebarGroups'
+import { formatCurrencyAbbrev } from '../../utils/currency'
+import { institutionColor } from '../../utils/colors'
 import type { Account, ClassifierBreakdown, LiabilityBreakdown } from '../../types/graphql'
-import { formatAccountType } from '../../utils/accountSubtypes'
-import { accountMatchesAccountGroup, ASSET_ACCOUNT_GROUPS, type AccountGroupId } from '../../utils/accountGroups'
-import { formatRelativeTime } from '../../utils/dates'
+import type { AccountGroupId } from '../../utils/accountGroups'
 
-interface AccountGroup {
-  id: string
-  label: string
-  accounts: Account[]
-  total: number
-  isLiability?: boolean
-  accountGroupId?: AccountGroupId
-}
-
-function uniqueAssetAccounts(breakdown: ClassifierBreakdown[]): Account[] {
-  const accounts = new Map<string, Account>()
-  for (const group of breakdown) {
-    for (const rollup of group.holdings) {
-      for (const holding of rollup.holdings ?? []) {
-        accounts.set(holding.account.id, holding.account)
-      }
-    }
-  }
-  return [...accounts.values()].sort((a, b) => (accountNetContributionUSD(b) ?? 0) - (accountNetContributionUSD(a) ?? 0))
-}
-
-// Non-expandable fallback when the caller lacks read:holdings: one bar per
-// classifier showing its aggregate value, with no per-account rows.
-function classifierGroups(breakdown: ClassifierBreakdown[]): AccountGroup[] {
-  return breakdown.map((group) => ({ id: group.classifier, label: group.label, accounts: [], total: group.valueUSD }))
-}
-
-function assetGroups(accounts: Account[]): AccountGroup[] {
-  return ASSET_ACCOUNT_GROUPS
-    .map(({ id, label }) => {
-      const groupAccounts = accounts.filter((account) => accountMatchesAccountGroup(account, id))
-      return {
-        id,
-        label,
-        accounts: groupAccounts,
-        total: groupAccounts.reduce((sum, account) => sum + (accountNetContributionUSD(account) ?? accountBalanceUSD(account) ?? 0), 0),
-        accountGroupId: id,
-      }
-    })
-    .filter((group) => group.accounts.length > 0)
-    .sort((a, b) => b.total - a.total)
-}
-
-function liabilityGroups(liabilityBreakdown: LiabilityBreakdown[]): AccountGroup[] {
-  return liabilityBreakdown.map((item) => ({
-    id: item.category,
-    label: item.label,
-    accounts: item.balances.map((balance) => balance.account),
-    total: -item.valueUSD,
-    isLiability: true,
-  }))
+interface AccountSidebarProps {
+  netWorth: number
+  breakdown: ClassifierBreakdown[]
+  liabilityBreakdown: LiabilityBreakdown[]
+  onAccountClick?: (account: Account) => void
+  onAccountGroupClick?: (accountGroupId: AccountGroupId | null, accountIds: string[]) => void
+  onClearAccountFilters?: () => void
+  amountsHidden?: boolean
+  selectedAccountGroupIds?: AccountGroupId[]
+  selectedAccountIds?: string[]
+  canReadHoldings?: boolean
+  variant?: 'desktop' | 'mobile'
 }
 
 export function AccountSidebar({
@@ -67,100 +30,176 @@ export function AccountSidebar({
   liabilityBreakdown,
   onAccountClick,
   onAccountGroupClick,
+  onClearAccountFilters,
   amountsHidden = false,
-  className,
-  heading = 'Net Worth',
-  showSummary = true,
   selectedAccountGroupIds = [],
   selectedAccountIds = [],
   canReadHoldings = true,
-}: {
-  netWorth: number
-  breakdown: ClassifierBreakdown[]
-  liabilityBreakdown: LiabilityBreakdown[]
-  onAccountClick?: (account: Account) => void
-  onAccountGroupClick?: (accountGroupId: AccountGroupId | null, accountIds: string[]) => void
-  amountsHidden?: boolean
-  className?: string
-  heading?: string
-  showSummary?: boolean
-  selectedAccountGroupIds?: AccountGroupId[]
-  selectedAccountIds?: string[]
-  canReadHoldings?: boolean
-}) {
-  const groups: AccountGroup[] = [
-    ...(canReadHoldings ? assetGroups(uniqueAssetAccounts(breakdown)) : classifierGroups(breakdown)),
-    ...liabilityGroups(liabilityBreakdown),
-  ]
+  variant = 'desktop',
+}: AccountSidebarProps) {
+  const [search, setSearch] = useState('')
   const [open, setOpen] = useState<Record<string, boolean>>({})
+  const allGroups = sidebarGroups(breakdown, liabilityBreakdown, canReadHoldings)
+  const groups = filterSidebarGroups(allGroups, search)
+  const searching = search.trim() !== ''
+  const accountCount = allGroups.reduce((sum, group) => sum + group.accounts.length, 0)
+  const mobile = variant === 'mobile'
+
+  const rows = groups.map((group) => {
+    const groupAccountIds = group.accounts.map((account) => account.id)
+    const expanded = searching || (open[group.id] ?? !mobile)
+    const selected = group.accountGroupId ? selectedAccountGroupIds.includes(group.accountGroupId) : groupAccountIds.length > 0 && groupAccountIds.every((accountId) => selectedAccountIds.includes(accountId))
+    return (
+      <GroupRow
+        amountsHidden={amountsHidden}
+        expanded={expanded}
+        group={group}
+        key={group.id}
+        mobile={mobile}
+        selected={selected}
+        onClick={onAccountGroupClick && groupAccountIds.length > 0 ? () => onAccountGroupClick(group.accountGroupId ?? null, groupAccountIds) : undefined}
+        onToggle={group.accounts.length > 0 && !searching ? () => setOpen((current) => ({ ...current, [group.id]: !expanded })) : undefined}
+      >
+        {expanded ? group.accounts.map((account) => (
+          <AccountRow
+            account={account}
+            amountsHidden={amountsHidden}
+            isLiability={group.isLiability}
+            key={account.id}
+            mobile={mobile}
+            selected={selectedAccountIds.includes(account.id)}
+            onClick={onAccountClick ? () => onAccountClick(account) : undefined}
+          />
+        )) : null}
+      </GroupRow>
+    )
+  })
+  const empty = groups.length === 0 ? <p className="px-4 py-3 text-[13px] text-text-muted">{searching ? 'No accounts match.' : 'No visible accounts with balances.'}</p> : null
+
+  if (mobile) {
+    return (
+      <Card className="pb-2 pt-4 lg:hidden" data-account-sidebar>
+        <div className="flex items-baseline justify-between px-4">
+          <h2 className="text-[17px] font-semibold tracking-[-0.2px] text-text-1">Accounts</h2>
+          <span className="text-xs text-text-muted">{accountCount} accounts</span>
+        </div>
+        {canReadHoldings ? <SearchInput ariaLabel="Search accounts" className="mx-4 mb-1 mt-3" onChange={setSearch} placeholder="Search accounts" value={search} /> : null}
+        {rows}
+        {empty}
+      </Card>
+    )
+  }
 
   return (
-    <aside className={className ?? 'hidden w-80 shrink-0 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-none lg:block'} data-account-sidebar>
-      <p className="text-sm font-semibold text-neutral-500">{heading}</p>
-      {showSummary ? <p className="mt-2 text-3xl font-bold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, formatCurrency(netWorth))}</p> : null}
-      <div className="mt-4 space-y-2">
-        {groups.map((group) => {
-          const expanded = open[group.id] ?? false
-          const canExpand = group.accounts.length > 0
-          const groupAccountIds = group.accounts.map((account) => account.id)
-          const selected = group.accountGroupId ? selectedAccountGroupIds.includes(group.accountGroupId) : groupAccountIds.length > 0 && groupAccountIds.every((accountId) => selectedAccountIds.includes(accountId))
-          return (
-            <OneLevelGroup
-              expanded={expanded}
-              expandable={canExpand}
-              expandButtonLabel={`${expanded ? 'Collapse' : 'Expand'} ${group.label} accounts`}
-              header={(
-                <>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{group.label}</span>
-                    {canExpand ? <span className="block text-xs text-neutral-500 dark:text-neutral-400">{group.accounts.length} accounts</span> : null}
-                  </span>
-                  <span className="shrink-0 text-sm font-semibold text-neutral-950 dark:text-neutral-100">
-                    {displayAmount(amountsHidden, group.isLiability ? formatSignedCurrency(group.total) : formatCurrency(group.total))}
-                  </span>
-                </>
-              )}
-              headerActive={selected}
-              headerPressed={selected}
-              key={group.id}
-              onHeaderClick={onAccountGroupClick && groupAccountIds.length > 0 ? () => onAccountGroupClick(group.accountGroupId ?? null, groupAccountIds) : undefined}
-              onToggle={() => setOpen((current) => ({ ...current, [group.id]: !expanded }))}
-            >
-              {group.accounts.map((account) => {
-                const accountKind = account.subtype || formatAccountType(account.type)
-                const institution = account.connection?.name || (account.manual ? 'Manual' : accountKind)
-                const amount = group.isLiability
-                  ? formatSignedCurrency(-(accountBalanceUSD(account) ?? 0))
-                  : formatCurrency(accountNetContributionUSD(account) ?? accountBalanceUSD(account) ?? 0)
-                const selectedAccount = selectedAccountIds.includes(account.id)
-                return (
-                  <OneLevelGroupRow
-                    ariaLabel={`Open details for ${account.name}`}
-                    key={account.id}
-                    onClick={onAccountClick ? () => onAccountClick(account) : undefined}
-                    pressed={selectedAccount}
-                    selected={selectedAccount}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{account.name}</p>
-                        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{institution}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-neutral-950 dark:text-neutral-100">{displayAmount(amountsHidden, amount)}</p>
-                        {account.lastSyncedAt ? <p className="text-[11px] text-neutral-500">{formatRelativeTime(account.lastSyncedAt)}</p> : null}
-                      </div>
-                    </div>
-                  </OneLevelGroupRow>
-                )
-              })}
-            </OneLevelGroup>
-          )
-        })}
-        {groups.length === 0 ? (
-          <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">No visible accounts with balances.</div>
-        ) : null}
-      </div>
-    </aside>
+    <Card as="aside" className="sticky top-4 hidden max-h-[calc(100vh-32px)] py-3 lg:block" data-account-sidebar overflow="auto">
+      {canReadHoldings ? <div className="px-4 pb-3"><SearchInput ariaLabel="Search accounts" onChange={setSearch} placeholder="Search accounts" value={search} /></div> : null}
+      <button
+        aria-pressed={selectedAccountIds.length === 0}
+        className={clsx('mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium text-text-1', selectedAccountIds.length === 0 ? 'bg-raised-nav' : 'hover:bg-raised')}
+        onClick={onClearAccountFilters}
+        type="button"
+      >
+        <LayoutGrid aria-hidden className="h-4 w-4 text-text-2" />
+        <span className="flex-1 text-left">Net Worth</span>
+        <span>{displayAmount(amountsHidden, formatCurrencyAbbrev(netWorth, 1))}</span>
+      </button>
+      <div className="my-2 border-t border-border" />
+      {rows}
+      {empty}
+    </Card>
   )
+}
+
+function GroupRow({ amountsHidden, children, expanded, group, mobile, selected, onClick, onToggle }: {
+  amountsHidden: boolean
+  children: ReactNode
+  expanded: boolean
+  group: SidebarGroup
+  mobile: boolean
+  selected: boolean
+  onClick?: () => void
+  onToggle?: () => void
+}) {
+  const Icon = group.icon
+  const value = displayAmount(amountsHidden, formatCurrencyAbbrev(group.total))
+  const toggleLabel = `${expanded ? 'Collapse' : 'Expand'} ${group.label} accounts`
+  const label = (
+    <>
+      <span className="min-w-0 flex-1 truncate text-left text-sm font-medium text-text-1">{group.label}</span>
+      <span className="text-sm font-medium text-text-1">{value}</span>
+    </>
+  )
+  const body = onClick
+    ? <button aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2.5" onClick={onClick} type="button">{label}</button>
+    : <span className="flex min-w-0 flex-1 items-center gap-2.5">{label}</span>
+
+  if (mobile) {
+    return (
+      <div>
+        <div className={clsx('flex h-12 items-center gap-2.5 px-4', selected && 'bg-raised-nav')}>
+          {onToggle ? (
+            <button aria-label={toggleLabel} className="flex h-4 w-4 shrink-0 items-center justify-center" onClick={onToggle} type="button">
+              <ChevronRight aria-hidden className={clsx('h-2.5 w-2.5 text-text-muted transition-transform', expanded && 'rotate-90')} />
+            </button>
+          ) : (
+            <span aria-hidden className="flex h-4 w-4 shrink-0 items-center justify-center">
+              {expanded ? <ChevronRight className="h-2.5 w-2.5 rotate-90 text-text-muted" /> : null}
+            </span>
+          )}
+          <Icon aria-hidden className="h-4 w-4 shrink-0 text-text-2" />
+          {body}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className={clsx('group mx-2 flex items-center gap-2.5 rounded-md px-3 py-2.5', selected ? 'bg-raised-nav' : 'hover:bg-raised')}>
+        {onToggle ? (
+          <button aria-label={toggleLabel} className="relative h-4 w-4 shrink-0" onClick={onToggle} type="button">
+            <Icon aria-hidden className="absolute inset-0 h-4 w-4 text-text-2 transition-opacity duration-[120ms] group-hover:opacity-0" />
+            <ChevronRight aria-hidden className={clsx('absolute inset-0 m-auto h-2.5 w-2.5 text-text-muted opacity-0 transition-[opacity,transform] duration-[120ms] group-hover:opacity-100', expanded && 'rotate-90')} />
+          </button>
+        ) : expanded ? (
+          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 rotate-90 p-[3px] text-text-muted" />
+        ) : <Icon aria-hidden className="h-4 w-4 shrink-0 text-text-2" />}
+        {body}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function AccountRow({ account, amountsHidden, isLiability, mobile, selected, onClick }: {
+  account: Account
+  amountsHidden: boolean
+  isLiability: boolean
+  mobile: boolean
+  selected: boolean
+  onClick?: () => void
+}) {
+  const sync = accountSyncStatus(account)
+  const className = clsx(
+    'flex items-center gap-2.5 text-left',
+    mobile ? 'h-[50px] w-full bg-surface-2 pl-10 pr-4' : 'ml-6 mr-2 w-[calc(100%-32px)] rounded-md px-3 py-1.5',
+    selected ? 'bg-raised-nav' : onClick && 'hover:bg-raised',
+  )
+  const content = (
+    <>
+      <span aria-hidden className={clsx('flex shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white', mobile ? 'h-6 w-6' : 'h-[22px] w-[22px]')} style={{ backgroundColor: institutionColor(accountInstitution(account)) }}>
+        {account.name.charAt(0).toUpperCase()}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-text-1">{account.name}</span>
+        <span className="block truncate text-[11px] text-text-muted">{accountInstitution(account)}</span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-[13px] font-medium text-text-1">{displayAmount(amountsHidden, accountRowAmount(account, isLiability))}</span>
+        {sync ? <span className={clsx('block text-[11px]', sync.stale ? 'text-warning' : 'text-text-muted')}>{sync.text}</span> : null}
+      </span>
+    </>
+  )
+  return <ClickableRow ariaLabel={`Open details for ${account.name}`} className={className} onClick={onClick} pressed={selected}>{content}</ClickableRow>
 }

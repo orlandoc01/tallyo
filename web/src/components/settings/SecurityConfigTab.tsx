@@ -2,7 +2,7 @@ import { useAuth } from '../../auth/useAuth'
 
 import type { Configuration } from '../../types/graphql'
 import { EmptyState } from '../common/EmptyState'
-import { SectionLabel } from '../common/FormControls'
+import { SectionLabel, TextField } from '../common/FormControls'
 import { ConfigCard, ConfigStatus, pickDirtyFields, TextInput, ToggleInput } from './ConfigFormControls'
 import { nullIfBlank, splitCSV } from './configParsing'
 import { useConfigurationForm } from './useConfigFormState'
@@ -89,17 +89,16 @@ export function SecurityConfigTab() {
   const oauthActive = state.googleEnabled || state.emailEnabled || state.passKeyEnabled
 
   return (
-    <section className="space-y-5">
-      <p className="max-w-2xl text-sm text-neutral-500">Secret fields are obfuscated. Changes apply immediately; no server restart is needed.</p>
-
+    <section className="space-y-3">
       <ConfigStatus configuration={configuration} error={error} fetching={fetching} mutationError={mutationResult.error} />
 
       {!fetching && !error && configuration ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-[repeat(auto-fit,minmax(300px,1fr))]">
           <ConfigCard dirty={sectionDirtyFields.authorization.size > 0} title="Authorization" disabled={!canWriteSettings || mutationResult.fetching || (state.masterPasswordEnabled && !state.masterPassword.trim())} onSubmit={() => save({ authorization: authorizationInput })}>
             <ToggleInput dirty={sectionDirtyFields.authorization.has('disableAllAuth')} label="Disable all auth" checked={state.disableAllAuth} onChange={(disableAllAuth) => setState((s) => ({ ...s, disableAllAuth }))} />
-            <div className={`space-y-4${state.disableAllAuth ? ' pointer-events-none select-none opacity-40' : ''}`}>
-            <SectionLabel as="h4" tone="muted">Master Password</SectionLabel>
+            <div className={`space-y-3.5${state.disableAllAuth ? ' pointer-events-none select-none opacity-40' : ''}`}>
+            <hr className="border-border" />
+            <SectionLabel as="h4">Master Password</SectionLabel>
             <ToggleInput
               dirty={sectionDirtyFields.authorization.has('masterPasswordEnabled') || sectionDirtyFields.authorization.has('masterPassword')}
               label="Master password"
@@ -107,19 +106,20 @@ export function SecurityConfigTab() {
               checked={state.masterPasswordEnabled}
               onChange={(masterPasswordEnabled) => setState((s) => ({ ...s, masterPasswordEnabled, masterPassword: masterPasswordEnabled ? s.masterPassword : '' }))}
             />
-            <input
-              aria-label="Master password value"
-              className={`w-full rounded-xl border px-3 py-2 font-mono text-sm transition-colors ${state.masterPasswordEnabled ? 'border-neutral-200 text-neutral-950' : 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-400'}`}
+            <TextField
               disabled={!state.masterPasswordEnabled}
-              onChange={(e) => setState((s) => ({ ...s, masterPassword: e.target.value }))}
+              hideLabel
+              label="Master password value"
+              mono
+              onChange={(masterPassword) => setState((s) => ({ ...s, masterPassword }))}
               placeholder={state.masterPasswordEnabled ? 'Enter new password' : '—'}
               type="password"
               value={state.masterPassword}
             />
-            <hr className="border-neutral-100" />
-            <div className="flex items-center gap-2">
-              <SectionLabel as="h4" tone="muted">OAuth</SectionLabel>
-              {!oauthActive ? <span className="text-xs text-neutral-400">(must enable Email, Google, or Passkey Sign on)</span> : null}
+            <hr className="border-border" />
+            <div className="flex flex-wrap items-center gap-2">
+              <SectionLabel as="h4">OAuth</SectionLabel>
+              {!oauthActive ? <span className="text-xs text-text-faint">(must enable Email, Google, or Passkey Sign on)</span> : null}
             </div>
             <TextInput disabled={oauthActive === false} dirty={sectionDirtyFields.authorization.has('oauthIssuerUrl')} label="Issuer URL" value={state.oauthIssuerUrl} onChange={(oauthIssuerUrl) => setState((s) => ({ ...s, oauthIssuerUrl }))} />
             <TextInput disabled={oauthActive === false} dirty={sectionDirtyFields.authorization.has('frontendRedirectUris')} label="Frontend redirect URIs" value={state.frontendRedirectUris} onChange={(frontendRedirectUris) => setState((s) => ({ ...s, frontendRedirectUris }))} />
@@ -129,22 +129,19 @@ export function SecurityConfigTab() {
             </div>
           </ConfigCard>
           <ConfigCard dirty={sectionDirtyFields.security.size > 0} title="Trusted Proxies" disabled={!canWriteSettings || mutationResult.fetching} onSubmit={() => save({ security: { trustedProxyCidrs: splitCSV(state.trustedProxyCidrs) } })}>
-            <p className="text-sm leading-6 text-neutral-500">Reverse-proxy CIDRs trusted for X-Forwarded-For and X-Real-IP rate-limit IPs. Leave empty when directly exposed.</p>
+            <p className="-mt-1.5 text-xs text-text-muted">Reverse-proxy CIDRs trusted for X-Forwarded-For and X-Real-IP rate-limit IPs. Leave empty when directly exposed.</p>
             <TextInput dirty={sectionDirtyFields.security.has('trustedProxyCidrs')} label="Trusted proxy CIDRs" placeholder="Optional" value={state.trustedProxyCidrs} onChange={(trustedProxyCidrs) => setState((s) => ({ ...s, trustedProxyCidrs }))} />
           </ConfigCard>
-          <ConfigCard dirty={sectionDirtyFields.passKey.size > 0} title="Passkeys" disabled={!canWriteSettings || mutationResult.fetching} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ passKeyAuthn: { enabled: state.passKeyEnabled, webauthnRpId: nullIfBlank(state.webauthnRpId), webauthnRpName: state.webauthnRpName, webauthnRpOrigins: splitCSV(state.webauthnRpOrigins) } })}>
-            <ToggleInput dirty={sectionDirtyFields.passKey.has('passKeyEnabled')} label="Enabled" checked={state.passKeyEnabled} onChange={(passKeyEnabled) => setState((s) => ({ ...s, passKeyEnabled }))} />
+          <ConfigCard dirty={sectionDirtyFields.passKey.size > 0} title="Passkeys" disabled={!canWriteSettings || mutationResult.fetching} enabled={{ label: 'Enabled', dirty: sectionDirtyFields.passKey.has('passKeyEnabled'), checked: state.passKeyEnabled, onChange: (passKeyEnabled) => setState((s) => ({ ...s, passKeyEnabled })) }} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ passKeyAuthn: { enabled: state.passKeyEnabled, webauthnRpId: nullIfBlank(state.webauthnRpId), webauthnRpName: state.webauthnRpName, webauthnRpOrigins: splitCSV(state.webauthnRpOrigins) } })}>
             <TextInput disabled={!state.passKeyEnabled} dirty={sectionDirtyFields.passKey.has('webauthnRpId')} label="RP ID" placeholder="Optional" value={state.webauthnRpId} onChange={(webauthnRpId) => setState((s) => ({ ...s, webauthnRpId }))} />
             <TextInput disabled={!state.passKeyEnabled} dirty={sectionDirtyFields.passKey.has('webauthnRpName')} label="RP name" value={state.webauthnRpName} onChange={(webauthnRpName) => setState((s) => ({ ...s, webauthnRpName }))} />
             <TextInput disabled={!state.passKeyEnabled} dirty={sectionDirtyFields.passKey.has('webauthnRpOrigins')} label="RP origins" placeholder="Optional" value={state.webauthnRpOrigins} onChange={(webauthnRpOrigins) => setState((s) => ({ ...s, webauthnRpOrigins }))} />
           </ConfigCard>
-          <ConfigCard dirty={sectionDirtyFields.google.size > 0} title="Google Sign-In" disabled={!canWriteSettings || mutationResult.fetching} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ googleAuthn: { enabled: state.googleEnabled, googleClientId: nullIfBlank(state.googleClientId), googleClientSecret: nullIfBlank(state.googleClientSecret) } })}>
-            <ToggleInput dirty={sectionDirtyFields.google.has('googleEnabled')} label="Enabled" checked={state.googleEnabled} onChange={(googleEnabled) => setState((s) => ({ ...s, googleEnabled }))} />
+          <ConfigCard dirty={sectionDirtyFields.google.size > 0} title="Google Sign-In" disabled={!canWriteSettings || mutationResult.fetching} enabled={{ label: 'Enabled', dirty: sectionDirtyFields.google.has('googleEnabled'), checked: state.googleEnabled, onChange: (googleEnabled) => setState((s) => ({ ...s, googleEnabled })) }} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ googleAuthn: { enabled: state.googleEnabled, googleClientId: nullIfBlank(state.googleClientId), googleClientSecret: nullIfBlank(state.googleClientSecret) } })}>
             <TextInput disabled={!state.googleEnabled} dirty={sectionDirtyFields.google.has('googleClientId')} label="Client ID" value={state.googleClientId} onChange={(googleClientId) => setState((s) => ({ ...s, googleClientId }))} />
             <TextInput disabled={!state.googleEnabled} dirty={sectionDirtyFields.google.has('googleClientSecret')} label="Client secret" value={state.googleClientSecret} onChange={(googleClientSecret) => setState((s) => ({ ...s, googleClientSecret }))} />
           </ConfigCard>
-          <ConfigCard dirty={sectionDirtyFields.email.size > 0} title="Email Sign-In" disabled={!canWriteSettings || mutationResult.fetching} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ emailCodeAuthn: { enabled: state.emailEnabled, smtpHost: nullIfBlank(state.smtpHost), smtpPort: state.smtpPort, smtpFrom: nullIfBlank(state.smtpFrom), smtpUsername: nullIfBlank(state.smtpUsername), smtpPassword: nullIfBlank(state.smtpPassword) } })}>
-            <ToggleInput dirty={sectionDirtyFields.email.has('emailEnabled')} label="Enabled" checked={state.emailEnabled} onChange={(emailEnabled) => setState((s) => ({ ...s, emailEnabled }))} />
+          <ConfigCard dirty={sectionDirtyFields.email.size > 0} title="Email Sign-In" disabled={!canWriteSettings || mutationResult.fetching} enabled={{ label: 'Enabled', dirty: sectionDirtyFields.email.has('emailEnabled'), checked: state.emailEnabled, onChange: (emailEnabled) => setState((s) => ({ ...s, emailEnabled })) }} inactive={state.disableAllAuth} inactiveReason="Auth disabled" onSubmit={() => save({ emailCodeAuthn: { enabled: state.emailEnabled, smtpHost: nullIfBlank(state.smtpHost), smtpPort: state.smtpPort, smtpFrom: nullIfBlank(state.smtpFrom), smtpUsername: nullIfBlank(state.smtpUsername), smtpPassword: nullIfBlank(state.smtpPassword) } })}>
             <TextInput disabled={!state.emailEnabled} dirty={sectionDirtyFields.email.has('smtpHost')} label="SMTP host" value={state.smtpHost} onChange={(smtpHost) => setState((s) => ({ ...s, smtpHost }))} />
             <TextInput disabled={!state.emailEnabled} dirty={sectionDirtyFields.email.has('smtpPort')} label="SMTP port" value={state.smtpPort} onChange={(smtpPort) => setState((s) => ({ ...s, smtpPort }))} />
             <TextInput disabled={!state.emailEnabled} dirty={sectionDirtyFields.email.has('smtpFrom')} label="SMTP from" value={state.smtpFrom} onChange={(smtpFrom) => setState((s) => ({ ...s, smtpFrom }))} />

@@ -131,8 +131,8 @@ describe('AssetsTab', () => {
     expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: {} } })
 
     await user.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await user.click(screen.getByRole('button', { name: /Asset type/i }))
-    await user.click(screen.getByRole('checkbox', { name: 'Security' }))
+    await user.click(screen.getByRole('button', { name: /^Asset type/i }))
+    await user.click(screen.getByRole('radio', { name: 'Security' }))
     rerender(<TestProviders router="browser" withMobileHeader><AssetsTab /></TestProviders>)
 
     expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: { assetType: 'SECURITY' } } })
@@ -146,7 +146,8 @@ describe('AssetsTab', () => {
     expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: {} } })
 
     await user.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await user.click(screen.getByRole('switch', { name: /include historical assets/i }))
+    await user.click(screen.getByRole('button', { name: /^Historical/i }))
+    await user.click(screen.getByRole('checkbox', { name: /include historical assets/i }))
 
     expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: { includeHistorical: true } } })
   })
@@ -160,6 +161,20 @@ describe('AssetsTab', () => {
     await user.click(screen.getByRole('switch', { name: /include historical assets/i }))
 
     expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: { includeHistorical: true } } })
+  })
+
+  it('selects a single asset type from the mobile sheet and closes the section', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useQuery).mockReturnValue([{ data: { assets: { items: [] } }, fetching: false, error: null }, vi.fn()] as never)
+
+    renderAssetsTabWithHeaderActions()
+    await user.click(await screen.findByRole('button', { name: /open asset filters/i }))
+    await user.click(screen.getByRole('button', { name: /^Asset type/i }))
+    await user.click(screen.getByRole('radio', { name: 'Crypto' }))
+
+    expect(vi.mocked(useQuery).mock.calls.at(-1)?.[0]).toMatchObject({ variables: { input: { assetType: 'CRYPTO' } } })
+    expect(screen.queryByRole('radio', { name: 'Crypto' })).toBeNull()
+    expect(screen.getByRole('button', { name: /^Asset type/i })).toHaveTextContent('Crypto')
   })
 
   it('passes search to query variables and the URL immediately', () => {

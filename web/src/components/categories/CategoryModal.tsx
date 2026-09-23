@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation } from 'urql'
 import { Button } from '../common/Button'
-import { SelectField, TextField } from '../common/FormControls'
+import { FormError, SelectField, TextField } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
-import { ModalCloseButton } from '../common/ModalHeader'
+import { ModalTitleRow } from '../common/ModalHeader'
 import { useSaveAction } from '../../hooks/useSaveAction'
 import type { Category, CategoryGroup } from '../../types/graphql'
 import { CREATE_CATEGORY_MUTATION, UPDATE_CATEGORY_MUTATION, DELETE_CATEGORY_MUTATION } from '../../graphql/mutations'
 import { CategoryPlaidCodes } from './CategoryPlaidCodes'
+import { UNCATEGORIZED_CATEGORY_ID } from '../../utils/categoryTint'
 
 export function CategoryModal({
   category,
@@ -69,12 +70,9 @@ export function CategoryModal({
 
   return (
     <Modal label={isEdit ? 'Edit category' : 'New category'} onClose={onClose}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{isEdit ? 'Edit category' : 'New category'}</h2>
-          <ModalCloseButton onClick={onClose} />
-        </div>
+        <ModalTitleRow onClose={onClose} title={isEdit ? 'Edit category' : 'New category'} />
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
           <div className="flex gap-3">
             <TextField className="w-24" controlClassName="text-center text-lg" id="cat-emoji" label="Emoji" maxLength={2} onChange={setEmoji} placeholder="🏷️" required value={emoji} />
             <TextField className="flex-1" id="cat-name" label="Name" onChange={setName} placeholder="e.g. Groceries" required value={name} />
@@ -82,18 +80,18 @@ export function CategoryModal({
 
           <div>
             <SelectField id="cat-group" label="Group" onChange={setGroupId} options={groups.map((g) => ({ label: `${g.emoji} ${g.name}`, value: g.id }))} value={groupId} />
-            <p className="mt-1 text-xs text-neutral-400">Kind: {kindLabel}</p>
+            <p className="mt-1 text-xs text-text-faint">Kind: {kindLabel}</p>
           </div>
 
           {isEdit ? <CategoryPlaidCodes category={category} emoji={emoji} groupId={groupId} groups={groups} name={name} onError={setError} /> : null}
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <FormError>{error}</FormError> : null}
 
           <div className="flex items-center justify-between gap-2">
             {isEdit ? (
               confirmDelete ? (
-                <div className="flex-1 space-y-2 rounded-xl bg-red-50 p-3">
-                  <p className="text-sm text-red-700">
+                <div className="flex-1 space-y-2 rounded-md bg-negative/10 p-3">
+                  <p className="text-[13px] text-negative">
                     This will permanently delete this category. Any auto-categorization rules for this category will also be deleted.
                   </p>
                   <div className="flex gap-2">
@@ -106,7 +104,7 @@ export function CategoryModal({
                   </div>
                 </div>
               ) : (
-                <Button disabled={category.id === '0'} onClick={() => setConfirmDelete(true)} title={category.id === '0' ? 'Cannot delete the uncategorized category' : undefined} type="button" variant="danger">
+                <Button disabled={category.id === UNCATEGORIZED_CATEGORY_ID} onClick={() => setConfirmDelete(true)} title={category.id === UNCATEGORIZED_CATEGORY_ID ? 'Cannot delete the uncategorized category' : undefined} type="button" variant="danger">
                   Delete
                 </Button>
               )

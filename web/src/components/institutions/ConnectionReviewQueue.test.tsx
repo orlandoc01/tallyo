@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createProvidersWrapper } from '../../test/renderWithProviders'
 import { ConnectionReviewQueue } from './ConnectionReviewQueue'
 
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+
+vi.mock('../../hooks/useIsMobile', () => ({
+  useIsMobile: () => mockViewport.isMobile,
+}))
+
 const mocks = vi.hoisted(() => ({
   reexecuteQuery: vi.fn(),
   updateConnection: vi.fn(),
@@ -40,6 +46,7 @@ const RouterWrapper = createProvidersWrapper()
 
 describe('ConnectionReviewQueue', () => {
   beforeEach(() => {
+    mockViewport.isMobile = false
     mocks.reexecuteQuery.mockReset()
     mocks.updateConnection.mockReset().mockResolvedValue({
       data: { updateConnection: { connection: reviewConnection() } },
@@ -115,7 +122,25 @@ describe('ConnectionReviewQueue', () => {
     expect(mocks.navigate).toHaveBeenCalledWith('/accounts/sfin-acct-1/info')
   })
 
-  it('starts plaid update flow from the reused tile actions', () => {
+  it('stacks the actions under the name on mobile and shows the health message', () => {
+    mockViewport.isMobile = true
+    mocks.useConnections.mockReturnValue({
+      items: [reviewConnection()],
+      fetching: false,
+      error: null,
+      refetch: mocks.reexecuteQuery,
+    })
+
+    render(<ConnectionReviewQueue />, { wrapper: RouterWrapper })
+
+    const message = screen.getByText('Plaid needs this institution to be reconnected.')
+    expect(message).toHaveAttribute('title', 'Plaid needs this institution to be reconnected.')
+    expect(screen.getByText('Chase').compareDocumentPosition(screen.getByRole('button', { name: 'Update login' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    fireEvent.click(screen.getByRole('button', { name: 'Update login' }))
+    expect(mocks.startUpdateLink).toHaveBeenCalledWith('item-1')
+  })
+
+  it('starts plaid update flow from the row actions', () => {
     mocks.useConnections.mockReturnValue({
       items: [{ __typename: 'Connection', id: 'conn-1', name: 'Chase', owner: { id: 'owner-1', name: 'Casey' }, isActive: true, provider: { __typename: 'PlaidItem', id: 'item-1', healthState: 'LINK_UPDATE_REQUIRED', credential: { label: 'Primary', clientId: 'client-1' }, accounts: [], createdAt: '2026-05-01T00:00:00Z' } }],
       fetching: false,
@@ -125,13 +150,12 @@ describe('ConnectionReviewQueue', () => {
 
     render(<ConnectionReviewQueue />, { wrapper: RouterWrapper })
 
-    fireEvent.click(screen.getByRole('button', { name: /Open actions for Chase/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Update login' }))
 
     expect(mocks.startUpdateLink).toHaveBeenCalledWith('item-1')
   })
 
-  it('disconnects review connections from the reused tile actions', async () => {
+  it('disconnects review connections from the row actions', async () => {
     mocks.updateConnection.mockResolvedValueOnce({
       data: { updateConnection: { connection: reviewConnection({ isActive: false }) } },
       error: null,
@@ -145,7 +169,6 @@ describe('ConnectionReviewQueue', () => {
 
     render(<ConnectionReviewQueue />, { wrapper: RouterWrapper })
 
-    fireEvent.click(screen.getByRole('button', { name: /Open actions for Chase/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
 
     await waitFor(() => expect(mocks.updateConnection).toHaveBeenCalledWith({ input: { connectionId: 'conn-1', isActive: false } }))
@@ -163,7 +186,6 @@ describe('ConnectionReviewQueue', () => {
 
     render(<ConnectionReviewQueue />, { wrapper: RouterWrapper })
 
-    fireEvent.click(screen.getByRole('button', { name: /Open actions for Chase/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
 

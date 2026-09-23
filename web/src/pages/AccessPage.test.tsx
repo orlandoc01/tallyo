@@ -18,7 +18,7 @@ describe('AccessPage', () => {
 
   it('renders the user list', async () => {
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     expect(screen.getByText('alice@example.com')).toBeInTheDocument()
     expect(screen.getByText('admin@example.com')).toBeInTheDocument()
@@ -27,7 +27,7 @@ describe('AccessPage', () => {
   it('shows all role options in selects', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getByText('Writer'))
     const select = screen.getByRole('combobox')
@@ -41,7 +41,7 @@ describe('AccessPage', () => {
   it('shows RoleSelect when clicking a badge with canWrite', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
 
@@ -52,7 +52,7 @@ describe('AccessPage', () => {
 
   it('shows RoleBadge for all users', async () => {
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     expect(screen.getByText('Writer')).toBeInTheDocument()
     expect(screen.getByText('Admin')).toBeInTheDocument()
@@ -66,7 +66,7 @@ describe('AccessPage', () => {
     })
 
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.getByText('Writer')).toBeInTheDocument()
@@ -76,7 +76,7 @@ describe('AccessPage', () => {
   it('calls updateUser mutation on role change', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getByText('Writer'))
     const select = screen.getByRole('combobox')
@@ -92,7 +92,7 @@ describe('AccessPage', () => {
 
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getByText('Writer'))
     const select = screen.getByRole('combobox')
@@ -106,7 +106,7 @@ describe('AccessPage', () => {
   it('shows invite form with role select', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getByText('+ Add user'))
 
@@ -122,7 +122,7 @@ describe('AccessPage', () => {
   it('adds a user via invite form', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getByText('+ Add user'))
 
@@ -137,7 +137,7 @@ describe('AccessPage', () => {
   it('generates an invite link on demand', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     await user.click(screen.getAllByRole('button', { name: /invite link/i })[0])
 
@@ -150,7 +150,7 @@ describe('AccessPage', () => {
   it('removes a user', async () => {
     const user = userEvent.setup()
     render(<AccessPage />, { wrapper: GraphqlTestProvider })
-    await screen.findByRole('columnheader', { name: 'Email' })
+    await screen.findByText('alice@example.com')
 
     const removeButtons = screen.getAllByText('Remove')
     await user.click(removeButtons[0])

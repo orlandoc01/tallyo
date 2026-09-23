@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [disableWealthTracking, setDisableWealthTracking] = useState(false)
   const [hideOwners, setHideOwners] = useState(false)
   const [setupComplete, setSetupComplete] = useState(true)
+  const [authConfigLoaded, setAuthConfigLoaded] = useState(false)
   const [showIdleWarning, setShowIdleWarning] = useState(false)
   const client = useMemo(() => createGraphqlClient(), [])
 
@@ -103,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setGoogleAuthEnabled(false)
       setAuthConfigScopes([])
       setDisableAllAuth(false)
-    })
+    }).finally(() => setAuthConfigLoaded(true))
   }, [refreshAuthConfig])
 
   const refreshGeneralConfiguration = useCallback(async () => {
@@ -180,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       disableWealthTracking,
       hideOwners,
       setupComplete,
+      authConfigLoaded,
       login() {
         void beginOAuthLogin()
       },
@@ -198,17 +200,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       logout,
     }),
-    [isAuthenticated, isLoading, scopes, masterPasswordStatus, emailAuthEnabled, googleAuthEnabled, webauthnEnabled, authConfigScopes, disableAllAuth, disableTransactionTracking, disableWealthTracking, hideOwners, setupComplete, refreshGeneralConfiguration],
+    [isAuthenticated, isLoading, scopes, masterPasswordStatus, emailAuthEnabled, googleAuthEnabled, webauthnEnabled, authConfigScopes, disableAllAuth, disableTransactionTracking, disableWealthTracking, hideOwners, setupComplete, authConfigLoaded, refreshGeneralConfiguration],
   )
 
   return (
     <AuthContext.Provider value={value}>
       <Provider value={client}>{children}</Provider>
       {showIdleWarning ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 p-4">
-          <section aria-modal="true" className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" role="dialog">
-            <h2 className="text-lg font-bold text-neutral-950">Still there?</h2>
-            <p className="mt-2 text-sm leading-6 text-neutral-600">You will be signed out in about a minute because of inactivity.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <section aria-modal="true" className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl" role="dialog">
+            <h2 className="text-lg font-bold text-text-1">Still there?</h2>
+            <p className="mt-2 text-sm leading-6 text-text-2">You will be signed out in about a minute because of inactivity.</p>
             <DialogButtonRow
               onPrimary={() => { resetIdleTimer(); setShowIdleWarning(false) }}
               onSecondary={logout}

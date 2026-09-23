@@ -26,13 +26,13 @@ export function TransactionTagsSection({
   const selectedTags = transaction.tags ?? []
 
   return (
-    <div className="space-y-2 border-t border-neutral-100 pt-4">
-      <div className="text-sm font-medium text-neutral-700">Tags</div>
+    <div className="space-y-2">
+      <div className="text-[13px] text-text-muted">Tags</div>
       <div className="flex flex-wrap gap-2">
         {selectedTags.map((tag) => (
           <TagChip key={tag.id} tag={tag} onRemove={() => onSetTagIds(selectedTags.filter((item) => item.id !== tag.id).map((item) => item.id))} />
         ))}
-        <button ref={tagButtonRef} type="button" className="rounded-full border border-neutral-200 px-3 py-1 text-xs font-semibold" onClick={() => setIsTagOpen((open) => !open)}>+ Tags</button>
+        <button ref={tagButtonRef} type="button" className="inline-flex h-[22px] items-center rounded border border-dashed border-border-emph px-2 text-xs text-text-2 hover:bg-raised" onClick={() => setIsTagOpen((open) => !open)}>+ Tags</button>
       </div>
       {isTagOpen ? (
         <div className="relative" ref={tagPickerRef}>

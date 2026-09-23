@@ -70,7 +70,7 @@ export function EmailChallengePage() {
   if (!loginSessionId) {
     return (
       <AuthPageShell>
-        <p className="text-neutral-600">{error || 'Loading...'}</p>
+        <p className="text-text-2">{error || 'Loading...'}</p>
       </AuthPageShell>
     )
   }
@@ -79,10 +79,10 @@ export function EmailChallengePage() {
     <AuthPageShell>
       <div className="mb-8">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Tallyo</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-neutral-950">
+        <h1 className="mt-3 text-2xl font-bold tracking-tight text-text-1">
           {step === 'email' ? 'Sign in with email' : 'Check your email'}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-neutral-500">
+        <p className="mt-2 text-sm leading-6 text-text-3">
           {step === 'email'
             ? 'Enter your email address to receive a sign-in code.'
             : otpSent
@@ -109,7 +109,7 @@ export function EmailChallengePage() {
         <div className="space-y-4">
           <TextField autoFocus controlClassName="text-center text-2xl tracking-[0.4em]" id="code" inputMode="numeric" label="Sign-in code" maxLength={6} onChange={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" required type="text" value={code} />
           <button
-            className="w-full rounded-xl bg-neutral-800 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-brand-500 px-4 py-3 font-semibold text-white shadow-sm transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={isSubmitting || code.length !== 6}
             onClick={handleVerifyCode}
             type="button"

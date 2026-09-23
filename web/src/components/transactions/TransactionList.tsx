@@ -1,16 +1,17 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import clsx from 'clsx'
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useMutation } from 'urql'
+import { Button } from '../common/Button'
 import { Card } from '../common/FormControls'
-import { Modal } from '../common/Modal'
 import { UPDATE_TRANSACTION_MUTATION } from '../../graphql/mutations'
 import type { Category, Transaction, TransactionSort } from '../../types/graphql'
-import { formatDisplayDate } from '../../utils/dates'
-import { formatSignedCurrency } from '../../utils/currency'
 import { groupTransactionsByDate } from '../../hooks/useTransactions'
+import { formatSignedCurrency } from '../../utils/currency'
+import { formatDisplayDate } from '../../utils/dates'
 import { usePermissions } from '../../hooks/usePermissions'
+import { TransactionDetailsOverlay } from './TransactionDetailsOverlay'
 import { TransactionDetailsPane } from './TransactionDetailsPane'
-import { MobileTransactionRow, TransactionRow } from './TransactionRow'
-import { MobileDateGroup } from './MobileTransactionList'
+import { MobileTransactionRow, TransactionRow, type TransactionRowProps } from './TransactionRow'
 import { TransactionSortSelect } from './transactionRowGroups'
 import { type TransactionRowContext, dayTotal, renderTransactionRows } from './transactionRows'
 
@@ -24,6 +25,7 @@ export function TransactionList({
   onCategoryUpdated,
   onDetailsClose,
   onDetailsOpen,
+  onShowMerchant,
   onSortChange,
   selectedIds,
   selectedTransactionId,
@@ -41,6 +43,7 @@ export function TransactionList({
   onCategoryUpdated?: () => void
   onDetailsClose?: () => void
   onDetailsOpen?: (transaction: Transaction) => void
+  onShowMerchant?: (merchant: string) => void
   onSortChange?: (sort: TransactionSort) => void
   reexecuteQuery?: (opts?: { requestPolicy?: 'network-only' | 'cache-and-network' | 'cache-first' }) => void
   selectedIds?: Set<string>
@@ -53,6 +56,7 @@ export function TransactionList({
   const [, updateTransaction] = useMutation(UPDATE_TRANSACTION_MUTATION)
   const { canWrite } = usePermissions()
   const canWriteTransactions = canWrite('transactions')
+  const detailsTitleId = useId()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set())
@@ -72,40 +76,27 @@ export function TransactionList({
   const selectedTransaction = displayedTransactions.find((t) => t.id === activeSelectedId)
 
   function openDetails(transaction: Transaction) {
-    if (onDetailsOpen) {
-      onDetailsOpen(transaction)
-    } else {
-      setSelectedId(transaction.id)
-    }
+    if (onDetailsOpen) onDetailsOpen(transaction)
+    else setSelectedId(transaction.id)
   }
 
   function closeDetails() {
-    if (onDetailsClose) {
-      onDetailsClose()
-    } else {
-      setSelectedId(null)
-    }
+    if (onDetailsClose) onDetailsClose()
+    else setSelectedId(null)
   }
 
   function updateRenderedTransaction(transaction: Transaction) {
-    setUpdatedTransactions((items) => {
-      const nextItems = new Map(items)
-      nextItems.set(transaction.id, transaction)
-      return nextItems
-    })
+    setUpdatedTransactions((items) => new Map(items).set(transaction.id, transaction))
   }
 
   async function changeCategory(transaction: Transaction, category: Category) {
     setUpdatingCategoryIds((ids) => new Set(ids).add(transaction.id))
-
     const result = await updateTransaction({ input: { id: transaction.id, updates: { categoryId: category.id } } })
-
     setUpdatingCategoryIds((ids) => {
       const nextIds = new Set(ids)
       nextIds.delete(transaction.id)
       return nextIds
     })
-
     if (result.error) return
     const updatedTransaction = result.data?.updateTransaction?.transaction
     if (updatedTransaction) updateRenderedTransaction(updatedTransaction)
@@ -117,7 +108,7 @@ export function TransactionList({
   useEffect(() => {
     if (!loadMore || !hasNextPage) return
     const el = sentinelRef.current
-    if (!el) return
+    if (!el || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(
       (entries) => { if (entries[0].isIntersecting) loadMore() },
       { rootMargin: '200px' },
@@ -136,64 +127,58 @@ export function TransactionList({
     updatingCategoryIds,
   }
 
-  const showPane = !!(selectedTransaction && categories)
-
-  const paneKey = selectedTransaction?.id
-  const detailsPaneProps = showPane
-    ? {
-        categories,
-        onClose: closeDetails,
-        onDelete: (id: string) => {
-          setDeletedIds((ids) => new Set(ids).add(id))
-          closeDetails()
-        },
-        onUpdate: updateRenderedTransaction,
-        transaction: selectedTransaction,
-      }
-    : null
+  const showHeader = showTitle || Boolean(headerActions) || Boolean(onSortChange)
+  const detailsPane = selectedTransaction && categories ? (
+    <TransactionDetailsPane
+      categories={categories}
+      key={selectedTransaction.id}
+      onClose={closeDetails}
+      onDelete={(id: string) => {
+        setDeletedIds((ids) => new Set(ids).add(id))
+        closeDetails()
+      }}
+      onShowMerchant={onShowMerchant ? (merchant) => { onShowMerchant(merchant); closeDetails() } : undefined}
+      onUpdate={updateRenderedTransaction}
+      titleId={detailsTitleId}
+      transaction={selectedTransaction}
+    />
+  ) : null
+  const detailsLabel = `Details for ${selectedTransaction?.merchantName || selectedTransaction?.originalName || 'transaction'}`
 
   return (
     <div>
       <Card>
-        {/* Desktop table view */}
         <div className="hidden lg:block">
-          <div className="flex items-center justify-end gap-4 border-b border-neutral-100 p-5">
-            {showTitle ? <h2 className="mr-auto text-xl font-bold">Transactions</h2> : null}
-            <div className="flex items-center gap-3">
-              {headerActions}
-              {onSortChange ? (
-                <label className="flex items-center gap-2 text-sm text-neutral-500">
-                  Sort
-                  <TransactionSortSelect onSortChange={onSortChange} sort={sort} />
-                </label>
-              ) : null}
+          {showHeader ? (
+            <div className="flex items-center justify-end gap-4 border-b border-border px-5 py-3">
+              {showTitle ? <h2 className="mr-auto text-base font-semibold tracking-[-0.2px] text-text-1">Transactions</h2> : null}
+              <div className="flex items-center gap-3">
+                {headerActions}
+                {onSortChange ? (
+                  <label className="flex items-center gap-2 text-xs text-text-muted">
+                    Sort
+                    <TransactionSortSelect onSortChange={onSortChange} sort={sort} />
+                  </label>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            {isEmpty ? (
-              emptyState ? <div className="p-5">{emptyState}</div> : null
-            ) : (
-              <table className="w-full min-w-[760px] border-collapse">
-                <tbody>
-                    {isAmountSort
-                      ? renderTransactionRows(displayedTransactions, rowContext, TransactionRow, true)
-                      : Object.entries(groups).map(([date, dateTransactions]) => (
-                          <DateGroup ctx={rowContext} date={date} key={date} transactions={dateTransactions} />
-                        ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          ) : null}
+          {isEmpty
+            ? emptyState ? <div className="p-5">{emptyState}</div> : null
+            : isAmountSort
+              ? renderTransactionRows(displayedTransactions, rowContext, TransactionRow, true)
+              : Object.entries(groups).map(([date, dateTransactions]) => (
+                  <TransactionDateGroup ctx={rowContext} date={date} key={date} Row={TransactionRow} transactions={dateTransactions} />
+                ))}
         </div>
 
-        {/* Mobile list view */}
         <div className="lg:hidden">
-          {onSortChange ? (
-            <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3">
-              {showTitle ? <h2 className="text-lg font-bold">Transactions</h2> : null}
+          {showHeader ? (
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+              {showTitle ? <h2 className="text-[15px] font-semibold text-text-1">Transactions</h2> : null}
               <div className="flex items-center gap-2">
                 {headerActions}
-                <TransactionSortSelect ariaLabel="Sort" onSortChange={onSortChange} sort={sort} />
+                {onSortChange ? <TransactionSortSelect ariaLabel="Sort" onSortChange={onSortChange} sort={sort} /> : null}
               </div>
             </div>
           ) : null}
@@ -202,42 +187,39 @@ export function TransactionList({
             : isAmountSort
               ? renderTransactionRows(displayedTransactions, rowContext, MobileTransactionRow, true)
               : Object.entries(groups).map(([date, dateTransactions]) => (
-                  <MobileDateGroup ctx={rowContext} date={date} key={date} transactions={dateTransactions} />
+                  <TransactionDateGroup ctx={rowContext} date={date} key={date} mobile Row={MobileTransactionRow} transactions={dateTransactions} />
                 ))}
         </div>
 
-        <div ref={sentinelRef} className="h-1" />
-        {hasNextPage ? (
-          <div className="flex justify-center py-3 text-sm text-neutral-400">Loading more…</div>
+        <div ref={sentinelRef} className="h-px" />
+        {hasNextPage && loadMore ? (
+          <Button className="w-full" onClick={loadMore} size="lg" variant="ghost">Load more</Button>
         ) : null}
       </Card>
 
-      {detailsPaneProps ? (
-        <Modal label={`Details for ${selectedTransaction?.merchantName || selectedTransaction?.originalName || 'transaction'}`} onClose={closeDetails} scrollable size="lg">
-          <TransactionDetailsPane key={paneKey} {...detailsPaneProps} />
-        </Modal>
+      {detailsPane ? (
+        <TransactionDetailsOverlay label={detailsLabel} onClose={closeDetails} titleId={detailsTitleId}>
+          {detailsPane}
+        </TransactionDetailsOverlay>
       ) : null}
     </div>
   )
 }
 
-function DateGroup({
-  ctx,
-  date,
-  transactions,
-}: {
+function TransactionDateGroup({ ctx, date, mobile = false, Row, transactions }: {
   ctx: TransactionRowContext
   date: string
+  mobile?: boolean
+  Row: ComponentType<TransactionRowProps>
   transactions: Transaction[]
 }) {
   return (
-    <Fragment>
-      <tr className="bg-neutral-100 text-sm font-semibold text-neutral-500">
-        {ctx.isBulkMode ? <td className="w-10 px-2 py-0" /> : null}
-        <td className="px-4 py-2" colSpan={4}>{formatDisplayDate(date)}</td>
-        <td className="px-4 py-2 text-right tabular-nums">{formatSignedCurrency(dayTotal(transactions))}</td>
-      </tr>
-      {renderTransactionRows(transactions, ctx, TransactionRow)}
-    </Fragment>
+    <>
+      <div className={clsx('flex items-center justify-between border-b border-border bg-surface-2 text-xs font-medium text-text-muted', mobile ? 'px-4 py-[7px]' : 'px-5 py-2')} data-date-group>
+        <span>{formatDisplayDate(date)}</span>
+        <span className="tabular-nums">{formatSignedCurrency(dayTotal(transactions))}</span>
+      </div>
+      {renderTransactionRows(transactions, ctx, Row)}
+    </>
   )
 }

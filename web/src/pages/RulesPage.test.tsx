@@ -135,11 +135,11 @@ describe('RulesPage', () => {
     await renderAndWait()
 
     await user.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await user.click(screen.getByRole('button', { name: /Patterns filter/i }))
+    await user.click(screen.getByRole('button', { name: /^Patterns/i }))
     await user.type(screen.getByLabelText(/Merchant pattern/i), 'Tar')
-    await user.click(screen.getByRole('button', { name: /Account filter/i }))
+    await user.click(screen.getByRole('button', { name: /^Account/i }))
     await user.click(screen.getByLabelText('Checking (...9625)'))
-    await user.click(screen.getByRole('button', { name: /Amount filter/i }))
+    await user.click(screen.getByRole('button', { name: /^Amount/i }))
     await user.type(screen.getByLabelText(/Amount min/i), '10')
     await user.type(screen.getByLabelText(/Amount max/i), '100')
 
@@ -156,15 +156,15 @@ describe('RulesPage', () => {
     await renderAndWait()
 
     await user.click(screen.getByRole('button', { name: /^Filters$/i }))
-    await user.click(screen.getByRole('button', { name: /Patterns filter/i }))
+    await user.click(screen.getByRole('button', { name: /^Patterns/i }))
     await user.type(screen.getByLabelText(/Merchant pattern/i), 'Amazon')
-    await user.click(screen.getByRole('button', { name: /Amount filter/i }))
+    await user.click(screen.getByRole('button', { name: /^Amount/i }))
     await user.type(screen.getByLabelText(/Amount min/i), '1')
 
     expect(await screen.findByText('No matching rules')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Filters: 2 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Filters, 2 active/i })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Clear all/i }))
+    await user.click(screen.getByRole('button', { name: /Clear filters/i }))
 
     await screen.findAllByText(/target/i)
     expect(screen.getByRole('button', { name: /^Filters$/i })).toBeInTheDocument()
@@ -301,7 +301,7 @@ describe('RulesPage', () => {
     const user = userEvent.setup()
     await renderAndWait()
 
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    await user.click(screen.getByRole('button', { name: /^add rule$/i }))
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Create rule' })).toBeInTheDocument()
@@ -347,7 +347,7 @@ describe('RulesPage', () => {
     )
 
     await renderAndWait()
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    await user.click(screen.getByRole('button', { name: /^add rule$/i }))
 
     const dialog = screen.getByRole('dialog')
     await user.type(within(dialog).getByLabelText(/merchant pattern/i), 'Venmo')
@@ -386,7 +386,7 @@ describe('RulesPage', () => {
     )
 
     await renderAndWait()
-    await user.click(screen.getByRole('button', { name: /^add$/i }))
+    await user.click(screen.getByRole('button', { name: /^add rule$/i }))
 
     const dialog = screen.getByRole('dialog')
     await user.type(within(dialog).getByLabelText(/merchant pattern/i), 'Coffee')
@@ -402,7 +402,6 @@ describe('RulesPage', () => {
     await screen.findAllByText(/target/i)
 
     const createButton = within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: /create rule/i })
-    expect(createButton).toHaveClass('h-10', 'w-10', 'rounded-xl')
 
     await user.click(createButton)
 
@@ -442,11 +441,33 @@ describe('RulesPage', () => {
     await screen.findAllByText(/target/i)
 
     const actions = screen.getByTestId('mobile-header-actions')
-    const filterButton = within(actions).getByRole('button', { name: /open rule filters/i })
-    expect(filterButton).toHaveClass('rounded-xl', 'p-2.5')
+    await user.click(within(actions).getByRole('button', { name: /open rule filters/i }))
 
-    await user.click(filterButton)
+    const sheet = screen.getByRole('dialog', { name: 'Filters' })
+    await user.click(within(sheet).getByRole('button', { name: /^Patterns/i }))
+    expect(within(sheet).getByLabelText(/Merchant pattern/i)).toBeInTheDocument()
+  })
 
-    expect(within(actions).getByText('Filters')).toBeInTheDocument()
+  it('applies account and amount filters from the mobile sheet', async () => {
+    const user = userEvent.setup()
+    let latestVariables: { input?: Record<string, unknown> } | undefined
+    server.use(
+      graphql.link('/query').query<Record<string, unknown>, { input?: Record<string, unknown> }>('Rules', ({ variables }) => {
+        latestVariables = variables
+        return HttpResponse.json({ data: { rules: { __typename: 'RuleList', items: rules } } })
+      }),
+    )
+    renderRulesPage(true)
+    await screen.findAllByText(/target/i)
+
+    await user.click(within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: /open rule filters/i }))
+    const sheet = screen.getByRole('dialog', { name: 'Filters' })
+    await user.click(within(sheet).getByRole('button', { name: /^Account/i }))
+    await user.click(within(sheet).getByLabelText('Checking (...9625)'))
+    await user.click(within(sheet).getByRole('button', { name: /^Amount/i }))
+    await user.type(within(sheet).getByLabelText(/Amount min/i), '25')
+
+    await waitFor(() => expect(latestVariables?.input).toMatchObject({ accountIds: ['acct-1'], amountMin: 25 }))
+    expect(within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: /open rule filters, 2 active/i })).toBeInTheDocument()
   })
 })

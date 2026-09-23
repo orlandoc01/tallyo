@@ -1,4 +1,7 @@
 import type { Config } from 'tailwindcss'
+import colors from 'tailwindcss/colors'
+
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -6,6 +9,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        neutral: colors.stone,
         brand: {
           50:  'rgb(var(--brand-50)  / <alpha-value>)',
           100: 'rgb(var(--brand-100) / <alpha-value>)',
@@ -18,10 +22,40 @@ export default {
           800: 'rgb(var(--brand-800) / <alpha-value>)',
           900: 'rgb(var(--brand-900) / <alpha-value>)',
         },
-        paper: 'rgb(var(--paper) / <alpha-value>)',
+        paper: token('bg'),
+        bg: token('bg'),
+        'bg-deep': token('bg-deep'),
+        surface: token('surface'),
+        'surface-2': token('surface-2'),
+        raised: token('raised'),
+        'raised-nav': token('raised-nav'),
+        hover: token('hover'),
+        border: token('border'),
+        'border-strong': token('border-strong'),
+        'border-emph': token('border-emph'),
+        handle: token('handle'),
+        text: {
+          1: token('text-1'),
+          2: token('text-2'),
+          3: token('text-3'),
+          muted: token('text-muted'),
+          faint: token('text-faint'),
+        },
+        positive: token('positive'),
+        negative: token('negative'),
+        warning: token('warning'),
+        'chart-line': token('chart-line'),
+        accent: token('accent-text'),
+        'accent-hover': token('accent-hover'),
+      },
+      backgroundColor: {
+        overlay: 'var(--overlay)',
       },
       boxShadow: {
-        card: '0 1px 2px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.06)',
+        dropdown: '0 8px 24px rgba(0,0,0,.45)',
+        modal: '0 8px 32px rgba(0,0,0,.5)',
+        sheet: '0 -8px 32px rgba(0,0,0,.5)',
+        tooltip: '0 4px 12px rgba(0,0,0,.4)',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

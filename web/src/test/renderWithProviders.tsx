@@ -35,6 +35,7 @@ const defaultAuthContext: AuthContextValue = {
   disableWealthTracking: false,
   hideOwners: false,
   setupComplete: true,
+  authConfigLoaded: true,
   login: () => {},
   loginWithPasskey: async () => {},
   loginWithMasterPassword: () => {},

@@ -1,20 +1,31 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation } from 'urql'
 import { DELETE_TAG_MUTATION } from '../../graphql/mutations'
 import { useTags } from '../../hooks/useEntityQueries'
 import { usePermissions } from '../../hooks/usePermissions'
 import type { Tag } from '../../types/graphql'
 import { Button } from '../common/Button'
-import { Card, FormError } from '../common/FormControls'
+import { DataGridHeader, DataGridRow, dataGridTextCell } from '../common/DataGrid'
+import { Card } from '../common/FormControls'
+import { QueryGate } from '../common/QueryGate'
+import { useMobileHeaderActions } from '../layout/useMobileHeader'
 import { CreateTagModal } from '../transactions/CreateTagModal'
+import { SettingsTitleRow } from './SettingsTitleRow'
+
+const TAG_GRID_COLUMNS = 'minmax(0,1fr) 140px 128px'
 
 export function TagsTab() {
-  const { tags, fetching, error, refetch } = useTags()
+  const { tags, data, fetching, error, refetch } = useTags()
   const { canWrite } = usePermissions()
   const canWriteTags = canWrite('tags')
   const [, deleteTag] = useMutation(DELETE_TAG_MUTATION)
   const [editing, setEditing] = useState<Tag | null>(null)
   const [creating, setCreating] = useState(false)
+
+  const mobileHeaderActions = useMemo(() => (
+    canWriteTags ? <Button aria-label="New tag" onClick={() => setCreating(true)}>+ New</Button> : null
+  ), [canWriteTags])
+  useMobileHeaderActions(mobileHeaderActions)
 
   async function remove(tag: Tag) {
     if (!canWriteTags) return
@@ -25,34 +36,33 @@ export function TagsTab() {
 
   return (
     <>
-      {canWriteTags ? (
-        <div className="mb-3 flex justify-end">
-          <Button onClick={() => setCreating(true)} type="button">New tag</Button>
-        </div>
-      ) : null}
-      <Card as="section" padded>
-        {fetching ? <div className="text-sm text-neutral-500">Loading tags...</div> : null}
-        {error ? <FormError>{error.message}</FormError> : null}
-        <div className="divide-y divide-neutral-100">
+      <SettingsTitleRow action={canWriteTags ? <Button onClick={() => setCreating(true)}>New tag</Button> : null} title="Tags" />
+      <QueryGate data={data} empty={tags.length === 0} emptyDescription="Create a tag to label transactions." emptyTitle="No tags yet" error={error} fetching={fetching} onRetry={() => refetch({ requestPolicy: 'network-only' })}>
+        <Card as="section">
+          <div className="pt-2.5">
+            <DataGridHeader gridTemplateColumns={TAG_GRID_COLUMNS}>
+              <span>Tag</span>
+              <span>Usage</span>
+              <span />
+            </DataGridHeader>
+          </div>
           {tags.map((tag) => (
-            <div key={tag.id} className="flex items-center justify-between gap-3 py-3">
-              <div className="flex items-center gap-3">
-                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                <div>
-                  <div className="font-semibold">{tag.name}</div>
-                  <div className="text-xs text-neutral-500">{tag.transactionCount ?? 0} transactions</div>
-                </div>
-              </div>
+            <DataGridRow gridTemplateColumns={TAG_GRID_COLUMNS} key={tag.id}>
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
+                <span className={`${dataGridTextCell} font-medium text-text-1`}>{tag.name}</span>
+              </span>
+              <span className="text-[13px] text-text-muted">{tag.transactionCount ?? 0} transactions</span>
               {canWriteTags ? (
-                <div className="flex gap-2">
-                  <Button onClick={() => setEditing(tag)} size="sm" type="button" variant="secondary">Edit</Button>
-                  <Button onClick={() => remove(tag)} size="sm" type="button" variant="danger">Delete</Button>
-                </div>
-              ) : null}
-            </div>
+                <span className="flex justify-end gap-2">
+                  <Button onClick={() => setEditing(tag)} size="sm" variant="secondary">Edit</Button>
+                  <Button onClick={() => remove(tag)} size="sm" variant="danger">Delete</Button>
+                </span>
+              ) : <span />}
+            </DataGridRow>
           ))}
-        </div>
-      </Card>
+        </Card>
+      </QueryGate>
       {creating && canWriteTags ? <CreateTagModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); refetch({ requestPolicy: 'network-only' }) }} /> : null}
       {editing && canWriteTags ? <CreateTagModal tag={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refetch({ requestPolicy: 'network-only' }) }} /> : null}
     </>

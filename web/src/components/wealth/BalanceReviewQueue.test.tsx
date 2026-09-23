@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BalanceReviewQueue } from './BalanceReviewQueue'
 import type { BalanceSnapshotReview } from '../../types/graphql'
 
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+
+vi.mock('../../hooks/useIsMobile', () => ({
+  useIsMobile: () => mockViewport.isMobile,
+}))
+
 const mocks = vi.hoisted(() => ({
   reexecuteQuery: vi.fn(),
   resolveReview: vi.fn(),
@@ -48,6 +54,7 @@ const review: BalanceSnapshotReview = {
 
 describe('BalanceReviewQueue', () => {
   beforeEach(() => {
+    mockViewport.isMobile = false
     mocks.reexecuteQuery.mockClear()
     mocks.resolveReview.mockReset().mockResolvedValue({ data: { resolveBalanceReview: { success: true } }, error: null })
     mocks.useQuery.mockReset()
@@ -58,7 +65,7 @@ describe('BalanceReviewQueue', () => {
 
     render(<BalanceReviewQueue />)
 
-    expect(screen.getByText('No flagged balance snapshots to review.')).toBeTruthy()
+    expect(screen.getByText('No flagged balance snapshots')).toBeTruthy()
   })
 
   it('shows a retryable error state', () => {
@@ -82,6 +89,19 @@ describe('BalanceReviewQueue', () => {
 
     expect(mocks.resolveReview).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Approve Changes' })).toBeNull()
+  })
+
+  it('shows only the account and provider balance on mobile', () => {
+    mockViewport.isMobile = true
+    mocks.useQuery.mockReturnValue([{ data: { balanceSnapshotReviews: { items: [review] } }, fetching: false, error: null }, mocks.reexecuteQuery])
+
+    render(<BalanceReviewQueue />)
+
+    expect(screen.getByText('$72M')).toBeInTheDocument()
+    expect(screen.queryByText('$110.1K')).not.toBeInTheDocument()
+    expect(screen.queryByText('Carry-forward')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Brokerage/i }))
+    expect(screen.getByText('$110,108.92')).toBeInTheDocument()
   })
 
   it('approves a balance review', async () => {

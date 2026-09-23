@@ -1,7 +1,7 @@
 import type { Account, Asset, NetWorthInput, NetWorthPoint, NetWorthReport } from '../types/graphql'
 import { accountIdsForAccountGroupIds, ASSET_ACCOUNT_GROUPS, type AccountGroupId } from './accountGroups'
 
-interface NetWorthChange {
+export interface NetWorthChange {
   changeUSD: number
   changePct: number
 }
@@ -24,6 +24,19 @@ export function netWorthChangeOverRange(currentNetWorthUSD: number, series?: Net
   const changeUSD = currentNetWorthUSD - start
   const changePct = start === 0 ? 0 : (changeUSD / Math.abs(start)) * 100
   return { changeUSD, changePct }
+}
+
+export function changeOverRange(series: Array<{ label: string; date: string; valueUSD: number }>): Map<string, NetWorthChange> {
+  const sorted = [...series].sort((left, right) => left.date.localeCompare(right.date))
+  const bounds = new Map<string, { first: number; last: number }>()
+  for (const point of sorted) {
+    const current = bounds.get(point.label)
+    bounds.set(point.label, { first: current?.first ?? point.valueUSD, last: point.valueUSD })
+  }
+  return new Map([...bounds].map(([label, { first, last }]) => {
+    const changeUSD = last - first
+    return [label, { changeUSD, changePct: first === 0 ? 0 : (changeUSD / Math.abs(first)) * 100 }]
+  }))
 }
 
 export function netWorthInputFromFilters(ownerIds: string[], accountIds: string[]): NetWorthInput {

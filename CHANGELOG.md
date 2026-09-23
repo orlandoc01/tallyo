@@ -4,6 +4,11 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-22
+
+### Changed
+- **UI revamp.** Every page of the web app is redesigned on a new design system: semantic color tokens with matching light and dark palettes (Settings › General › Appearance: Light, Dark, or System), shared primitives (buttons, cards, tabs, chips, grids, charts), and dedicated desktop and mobile layouts for Net Worth, Transactions, Cash Flow, Expenses, Portfolio, Budgets, Review, Recurring, Accounts, Settings, and the setup wizard. No API or database changes.
+
 ## [0.3.0] - 2026-09-20
 
 The server is rewritten in Rust (axum, async-graphql, sqlx, rmcp). The web app, the GraphQL API, the 26 MCP tools, the configuration UI, and the SQLite database are unchanged. You get one static binary and a smaller image.
@@ -93,7 +98,8 @@ Parity with 0.2.x was verified against a copy of a production database, the full
 
 First public release.
 
-[Unreleased]: https://github.com/orlandoc01/tallyo/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/orlandoc01/tallyo/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/orlandoc01/tallyo/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/orlandoc01/tallyo/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/orlandoc01/tallyo/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/orlandoc01/tallyo/compare/v0.1.1...v0.2.0

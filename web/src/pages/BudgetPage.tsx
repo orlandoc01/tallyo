@@ -1,19 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Copy } from 'lucide-react'
 import { addYears, format, subMonths } from 'date-fns'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { BudgetPeriodNav } from '../components/budgets/BudgetPeriodNav'
+import { BudgetAddModal } from '../components/budgets/BudgetAddModal'
+import { BudgetEmptyMonth } from '../components/budgets/BudgetEmptyMonth'
+import { AddBudgetButton, BudgetHeader, type BudgetView } from '../components/budgets/BudgetHeader'
 import { BudgetSectionList } from '../components/budgets/BudgetSectionList'
-import { BudgetSetupWizard, EmptyMonthOptions, FirstBudgetIntro } from '../components/budgets/BudgetSetupWizard'
+import { BudgetSetupWizard, FirstBudgetIntro } from '../components/budgets/BudgetSetupWizard'
 import { BudgetTotals } from '../components/budgets/BudgetTotals'
 import { BudgetYearView } from '../components/budgets/BudgetYearView'
-import { actualsByCategory, useBudgetSetup } from '../components/budgets/useBudgetSetup'
-import { ErrorState } from '../components/common/ErrorState'
+import { actualsByCategory, budgetedByCategory, useBudgetSetup } from '../components/budgets/useBudgetSetup'
 import { FormError } from '../components/common/FormControls'
-import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import { PageHeader } from '../components/common/PageHeader'
-import { PageToolbarButton } from '../components/common/PageToolbar'
-import { SegmentedControl } from '../components/common/SegmentedControl'
+import { QueryGate } from '../components/common/QueryGate'
 import { useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { useBudgetMutations, useBudgetReport, useBudgetReportHistory } from '../hooks/useBudgets'
 import { useCategoryGroups } from '../hooks/useEntityQueries'
@@ -21,13 +18,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { useSaveAction } from '../hooks/useSaveAction'
 import { currentBudgetPath, getCurrentPeriod, periodFromMonthKey, shiftPeriod } from '../utils/dates'
 
-type BudgetView = 'MONTH' | 'YEAR'
 type BudgetMode = 'first-budget' | 'empty-month' | 'setup' | 'month' | 'year'
-
-const budgetViewOptions: Array<{ value: BudgetView; label: string }> = [
-  { value: 'MONTH', label: 'Monthly' },
-  { value: 'YEAR', label: 'Yearly' },
-]
 
 export function BudgetPage() {
   const navigate = useNavigate()
@@ -53,27 +44,32 @@ export function BudgetPage() {
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const { error: pageError, save } = useSaveAction()
   const [setupMode, setSetupMode] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [localBudgetMonths, setLocalBudgetMonths] = useState<Set<string>>(() => new Set())
 
   const budgetGroups = useMemo(() => categoryGroups.filter((g) => g.kind !== 'TRANSFER'), [categoryGroups])
   const budgetCategories = useMemo(() => budgetGroups.flatMap((group) => group.categories), [budgetGroups])
   const hasBudgetHistory = (history?.items.length ?? 0) > 0
   const hasBudgetForMonth = Boolean(history?.items.some((item) => item.month === monthKey) || localBudgetMonths.has(monthKey))
-  const lastBudgetMonth = useMemo(() => {
-    if (!history?.items.length) return previousMonth
-    return [...history.items].sort((a, b) => b.month.localeCompare(a.month))[0].month
-  }, [history, previousMonth])
+  const availableMonths = useMemo(() => [...(history?.items ?? [])].map((item) => item.month).sort((a, b) => b.localeCompare(a)), [history])
+  const lastBudgetMonth = availableMonths[0] ?? previousMonth
   const [copyFromMonth, setCopyFromMonth] = useState('')
   const budgetMode: BudgetMode = setupMode ? 'setup'
     : canWriteBudgets && history && !hasBudgetHistory ? 'first-budget'
     : canWriteBudgets && view === 'MONTH' && history && hasBudgetHistory && !hasBudgetForMonth ? 'empty-month'
     : view === 'YEAR' ? 'year' : 'month'
   const isOnboarding = budgetMode !== 'month' && budgetMode !== 'year'
+  const showHeader = budgetMode !== 'first-budget' && budgetMode !== 'setup'
   const showCopyLastMonth = Boolean(canWriteBudgets && history && budgetMode === 'month' && !hasBudgetForMonth)
+  const showAddBudget = canWriteBudgets && showHeader && view === 'MONTH'
   const selectedCopyFromMonth = copyFromMonth || lastBudgetMonth
-  const { report: previousReport } = useBudgetReport({ month: previousMonth }, !isOnboarding)
+  const unbudgetedCategories = useMemo(() => {
+    const planned = budgetedByCategory(report)
+    return budgetCategories.filter((category) => !(planned.get(category.id) ?? 0))
+  }, [budgetCategories, report])
+  const { report: previousReport, fetching: previousFetching } = useBudgetReport({ month: previousMonth }, !isOnboarding)
   const previousActuals = useMemo(() => actualsByCategory(previousReport), [previousReport])
-  const setup = useBudgetSetup({ active: setupMode, monthKey, categories: budgetCategories, previousActuals })
+  const setup = useBudgetSetup({ active: setupMode, monthKey, categories: budgetCategories, previousActuals, ready: !previousFetching })
   const lastMonthKey = useRef(monthKey)
   const lastYear = useRef(year)
 
@@ -85,10 +81,10 @@ export function BudgetPage() {
     navigate(nextView === 'YEAR' ? `/budgets/${lastYear.current}` : `/budgets/${lastMonthKey.current}`)
   }, [navigate, view])
 
-  const mobileHeaderActions = useMemo(() => {
-    if (!hasBudgetHistory) return null
-    return <BudgetViewToggle compact onChange={handleChangeView} view={view} />
-  }, [handleChangeView, hasBudgetHistory, view])
+  const addDisabled = unbudgetedCategories.length === 0
+  const mobileHeaderActions = useMemo(() => (
+    showAddBudget ? <AddBudgetButton disabled={addDisabled} onClick={() => setAddOpen(true)} /> : null
+  ), [addDisabled, showAddBudget])
 
   useMobileHeaderActions(mobileHeaderActions)
 
@@ -116,6 +112,13 @@ export function BudgetPage() {
         reexecuteQuery({ requestPolicy: 'network-only' })
       },
     )
+  }
+
+  function handleBudgetAdded() {
+    setLocalBudgetMonths((current) => new Set(current).add(monthKey))
+    setAddOpen(false)
+    reexecuteHistory({ requestPolicy: 'network-only' })
+    reexecuteQuery({ requestPolicy: 'network-only' })
   }
 
   async function handleContinueSetup() {
@@ -146,91 +149,103 @@ export function BudgetPage() {
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6">
-      <PageHeader
-        actions={hasBudgetHistory || showCopyLastMonth ? (
-          <>
-          {hasBudgetHistory ? <BudgetViewToggle onChange={handleChangeView} view={view} /> : null}
-          {showCopyLastMonth ? (
-            <PageToolbarButton
-              disabled={copyBudgetsState.fetching}
-              onClick={handleCopyLastMonth}
-            >
-              <Copy aria-hidden className="h-4 w-4" />
-              Copy last month
-            </PageToolbarButton>
-          ) : null}
-          </>
-        ) : undefined}
-        title="Budgets"
-      />
-
-      {budgetMode !== 'first-budget' && budgetMode !== 'setup' ? (
-        <BudgetPeriodNav
+    <div className="space-y-3">
+      <h1 className="sr-only">Budgets</h1>
+      {showHeader ? (
+        <BudgetHeader
+          addDisabled={addDisabled}
+          canWrite={showAddBudget}
+          copying={copyBudgetsState.fetching}
           label={view === 'YEAR' ? year : period.label}
+          onAddBudget={() => setAddOpen(true)}
+          onChangeView={handleChangeView}
+          onCopyMonth={handleCopyLastMonth}
           onShift={handleShiftMonth}
+          showCopy={showCopyLastMonth}
           unit={view === 'YEAR' ? 'year' : 'month'}
+          view={view}
         />
       ) : null}
 
       {pageError ? <FormError>{pageError}</FormError> : null}
+      {addOpen ? <BudgetAddModal categories={unbudgetedCategories} month={monthKey} onClose={() => setAddOpen(false)} onSaved={handleBudgetAdded} /> : null}
 
-      {historyFetching && !history ? <LoadingSpinner label="Checking budget history" /> : null}
-      {historyError ? <ErrorState message="Could not load budget history." onRetry={() => reexecuteHistory({ requestPolicy: 'network-only' })} /> : null}
-
-      {budgetMode === 'first-budget' ? (
-        <FirstBudgetIntro onStart={() => setSetupMode(true)} />
-      ) : budgetMode === 'empty-month' ? (
-        <EmptyMonthOptions
-          availableMonths={[...(history?.items ?? [])].sort((a, b) => b.month.localeCompare(a.month)).map((i) => i.month)}
-          copying={copyBudgetsState.fetching}
-          copyFromMonth={selectedCopyFromMonth}
-          onCopy={handleCopyFromMonth}
-          onCopyFromMonthChange={setCopyFromMonth}
-          onSetup={() => setSetupMode(true)}
-        />
-      ) : budgetMode === 'setup' ? (
-        <BudgetSetupWizard
-          categories={budgetCategories}
-          drafts={setup.drafts}
-          included={setup.included}
-          isFirstBudget={!hasBudgetHistory}
-          lastMonthActuals={previousActuals}
-          onAddCategory={setup.addCategory}
-          onChangeAmount={setup.changeAmount}
-          onContinue={handleContinueSetup}
-          onRemoveCategory={setup.removeCategory}
-          saving={setup.saving}
-        />
-      ) : null}
-
-      {budgetMode === 'month' && report ? <BudgetTotals report={report} /> : null}
-
-      {budgetMode === 'month' && fetching && !report ? <LoadingSpinner label="Loading budget" /> : null}
-      {budgetMode === 'month' && error ? <ErrorState message="Could not load budget." onRetry={() => reexecuteQuery({ requestPolicy: 'network-only' })} /> : null}
-
-      {budgetMode === 'year' && yearHistoryFetching && !yearHistory ? <LoadingSpinner label="Loading budget history" /> : null}
-      {budgetMode === 'year' && yearHistoryError ? <ErrorState message="Could not load budget history." onRetry={() => reexecuteYearHistory({ requestPolicy: 'network-only' })} /> : null}
-      {budgetMode === 'year' && yearHistory ? (
-        <BudgetYearView categoryGroups={budgetGroups} history={yearHistory.items} year={year} />
-      ) : null}
-
-      {budgetMode === 'month' && report ? (
-        <BudgetSectionList
-          categoryGroups={budgetGroups}
-          editable={canWriteBudgets}
-          monthKey={monthKey}
-          onSaveLine={handleSaveLine}
-          report={report}
-          savingCategoryId={setBudgetState.fetching ? savingCategoryId : null}
-        />
-      ) : null}
+      <QueryGate
+        data={history ?? undefined}
+        empty={false}
+        emptyTitle="No budgets yet"
+        error={historyError}
+        errorPrefix="Could not load budget history"
+        fetching={historyFetching}
+        loadingLabel="Checking budget history"
+        onRetry={() => reexecuteHistory({ requestPolicy: 'network-only' })}
+      >
+        {budgetMode === 'first-budget' ? (
+          <FirstBudgetIntro onStart={() => setSetupMode(true)} />
+        ) : budgetMode === 'empty-month' ? (
+          <BudgetEmptyMonth
+            availableMonths={availableMonths}
+            copying={copyBudgetsState.fetching}
+            copyFromMonth={selectedCopyFromMonth}
+            monthLabel={period.label}
+            onCopy={handleCopyFromMonth}
+            onCopyFromMonthChange={setCopyFromMonth}
+            onSetup={() => setSetupMode(true)}
+          />
+        ) : budgetMode === 'setup' ? (
+          <BudgetSetupWizard
+            categories={budgetCategories}
+            drafts={setup.drafts}
+            included={setup.included}
+            isFirstBudget={!hasBudgetHistory}
+            lastMonthActuals={previousActuals}
+            onAddCategory={setup.addCategory}
+            onCancel={() => setSetupMode(false)}
+            onChangeAmount={setup.changeAmount}
+            onContinue={handleContinueSetup}
+            onRemoveCategory={setup.removeCategory}
+            saving={setup.saving}
+          />
+        ) : budgetMode === 'year' ? (
+          <QueryGate
+            data={yearHistory ?? undefined}
+            empty={false}
+            emptyTitle="No budgets yet"
+            error={yearHistoryError}
+            errorPrefix="Could not load budget history"
+            fetching={yearHistoryFetching}
+            loadingLabel="Loading budget history"
+            onRetry={() => reexecuteYearHistory({ requestPolicy: 'network-only' })}
+          >
+            {yearHistory ? <BudgetYearView categoryGroups={budgetGroups} history={yearHistory.items} year={year} /> : null}
+          </QueryGate>
+        ) : (
+          <QueryGate
+            data={report ?? undefined}
+            empty={false}
+            emptyTitle="No budget"
+            error={error}
+            errorPrefix="Could not load budget"
+            fetching={fetching}
+            loadingLabel="Loading budget"
+            onRetry={() => reexecuteQuery({ requestPolicy: 'network-only' })}
+          >
+            {report ? (
+              <>
+                <BudgetTotals report={report} />
+                <BudgetSectionList
+                  categoryGroups={budgetGroups}
+                  editable={canWriteBudgets}
+                  monthKey={monthKey}
+                  onSaveLine={handleSaveLine}
+                  report={report}
+                  savingCategoryId={setBudgetState.fetching ? savingCategoryId : null}
+                />
+              </>
+            ) : null}
+          </QueryGate>
+        )}
+      </QueryGate>
     </div>
-  )
-}
-
-function BudgetViewToggle({ compact = false, onChange, view }: { compact?: boolean; onChange: (view: BudgetView) => void; view: BudgetView }) {
-  return (
-    <SegmentedControl ariaLabel="Budget view" options={budgetViewOptions} size={compact ? 'sm' : 'md'} value={view} onChange={onChange} />
   )
 }

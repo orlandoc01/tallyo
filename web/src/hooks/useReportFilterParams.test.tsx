@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
+import { useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createProvidersWrapper } from '../test/renderWithProviders'
 import { useCashFlowFilterParams } from './useCashFlowFilterParams'
@@ -15,6 +16,26 @@ describe('report filter params', () => {
 
     expect(defaultResult.current.breakdownView).toBe('bar')
     expect(pieResult.current.breakdownView).toBe('pie')
+  })
+
+  it('round-trips account ids and the hidden flag through the URL', () => {
+    const { result } = renderHook(() => {
+      const params = useSpendingFilterParams('breakdown')
+      const location = useLocation()
+      return { ...params, locationSearch: location.search }
+    }, { wrapper: createProvidersWrapper({ initialEntries: ['/expenses/breakdown?account_ids=acct-1,acct-2&is_hidden=1'] }) })
+
+    expect(result.current.accountIds).toEqual(['acct-1', 'acct-2'])
+    expect(result.current.showHidden).toBe(true)
+    expect(result.current.filter).toMatchObject({ accountIds: ['acct-1', 'acct-2'], isHidden: undefined })
+    expect(result.current.transactionFilter).toMatchObject({ accountIds: ['acct-1', 'acct-2'], isHidden: undefined })
+
+    act(() => {
+      result.current.setMany({ accountIds: [], showHidden: undefined })
+    })
+
+    expect(result.current.locationSearch).toBe('')
+    expect(result.current.filter.isHidden).toBe(false)
   })
 
   it('applies the last three yearly periods when spending trends granularity changes', () => {

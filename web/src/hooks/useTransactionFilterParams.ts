@@ -2,16 +2,8 @@ import { useCallback, useMemo } from 'react'
 import type { TransactionsFilter, TransactionSort } from '../types/graphql'
 import { localDateRangeFromDateTimeRange, localDateRangeToUtcDateTimeRange } from '../utils/dates'
 import { boolParam, clearParamUpdates, optionalListParam, numberParam, paramUpdate, paramUpdates, readParams, stringParam, type ParamCodec } from './urlParams'
+import { SORT_PARAM } from './sortParam'
 import { useSearchParamWriters } from './useSearchParamWriters'
-
-const DEFAULT_SORT: TransactionSort = { field: 'DATE', direction: 'DESC' }
-
-const SORT_VALUES: Record<string, TransactionSort> = {
-  'DATE:DESC': { field: 'DATE', direction: 'DESC' },
-  'DATE:ASC': { field: 'DATE', direction: 'ASC' },
-  'AMOUNT:DESC': { field: 'AMOUNT', direction: 'DESC' },
-  'AMOUNT:ASC': { field: 'AMOUNT', direction: 'ASC' },
-}
 
 const TRANSACTION_FILTER_PARAMS = {
   ownerIds: optionalListParam('owner_ids'),
@@ -33,24 +25,12 @@ const TRANSACTION_FILTER_PARAMS = {
 const TEXT_FILTER_FIELDS = new Set<keyof typeof TRANSACTION_FILTER_PARAMS>(['merchantPrefix', 'originalPrefix'])
 const NON_TEXT_FILTER_FIELDS = (Object.keys(TRANSACTION_FILTER_PARAMS) as Array<keyof typeof TRANSACTION_FILTER_PARAMS>).filter((field) => !TEXT_FILTER_FIELDS.has(field))
 
-function serializeSort(sort: TransactionSort): string {
-  return `${sort.field}:${sort.direction}`
-}
-
-function deserializeSort(raw: string): TransactionSort {
-  return SORT_VALUES[raw] ?? DEFAULT_SORT
-}
-
 export function useTransactionFilterParams() {
   const { searchParams, pushParams, replaceParams } = useSearchParamWriters()
 
   const filter = useMemo(() => transactionFilterFromParams(searchParams), [searchParams])
 
-  const sort = useMemo<TransactionSort>(() => {
-    const raw = searchParams.get('sort')
-    if (!raw) return DEFAULT_SORT
-    return deserializeSort(raw)
-  }, [searchParams])
+  const sort = useMemo<TransactionSort>(() => SORT_PARAM.read(searchParams), [searchParams])
 
   const setFilter = useCallback(
     (updater: TransactionsFilter | ((prev: TransactionsFilter) => TransactionsFilter), mode: 'push' | 'replace' = 'push') => {
@@ -94,15 +74,6 @@ export function didNonTextFilterChange(previous: TransactionsFilter, next: Trans
 export function activeTransactionFilterCount(filter: TransactionsFilter, search: string) {
   return (search ? 1 : 0)
     + (Object.keys(TRANSACTION_FILTER_PARAMS) as Array<keyof typeof TRANSACTION_FILTER_PARAMS>).reduce((total, field) => total + transactionFilterCount(filter, field), 0)
-}
-
-const SORT_PARAM: ParamCodec<TransactionSort> = {
-  key: 'sort',
-  read: (params) => deserializeSort(params.get('sort') ?? ''),
-  write(params, sort) {
-    if (sort.field === DEFAULT_SORT.field && sort.direction === DEFAULT_SORT.direction) params.delete('sort')
-    else params.set('sort', serializeSort(sort))
-  },
 }
 
 function transactionFilterFromParams(searchParams: URLSearchParams): TransactionsFilter {

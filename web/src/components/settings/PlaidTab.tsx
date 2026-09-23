@@ -1,5 +1,3 @@
-import clsx from 'clsx'
-import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery } from 'urql'
@@ -12,11 +10,16 @@ import { EmptyState } from '../common/EmptyState'
 import { Card, FormError, TextField } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
 import { QueryGate } from '../common/QueryGate'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { CollapsibleRowToggle } from './CollapsibleRowToggle'
+import { ListCardHeader } from './ListCardHeader'
 
 type FormMode = 'create' | 'edit'
 
-const ENVIRONMENTS: PlaidEnvironment[] = ['SANDBOX', 'PRODUCTION']
+const ENVIRONMENT_OPTIONS = [
+  { value: 'SANDBOX', label: 'sandbox' },
+  { value: 'PRODUCTION', label: 'production' },
+] as const satisfies ReadonlyArray<{ value: PlaidEnvironment; label: string }>
 
 function getCredentialTitle(credential: PlaidCredential) {
   if (credential.label?.trim()) return credential.label.trim()
@@ -40,20 +43,7 @@ export function PlaidTab() {
   const error = credentialResult.error || connectionResult.error
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-950">Credentials</h2>
-          <p className="mt-1 max-w-2xl text-sm text-neutral-500">Store client credentials for linking accounts. Secrets are write-only and never displayed.</p>
-        </div>
-        {canWrite('settings') ? (
-          <Button className="gap-2" onClick={() => setModal({ mode: 'create' })} type="button">
-            <Plus className="h-4 w-4" />
-            Store Credentials
-          </Button>
-        ) : null}
-      </div>
-
+    <section className="space-y-3">
       <QueryGate
         data={credentialResult.data && connectionResult.data}
         empty={credentials.length === 0}
@@ -62,30 +52,33 @@ export function PlaidTab() {
         error={error}
         fetching={loading}
       >
-        <Card compact>
+        <Card>
+          <ListCardHeader
+            actions={canWrite('settings') ? <Button onClick={() => setModal({ mode: 'create' })}>+ Store credentials</Button> : null}
+            description="Store client credentials for linking accounts. Secrets are write-only and never displayed."
+            title="Credentials"
+          />
           {credentials.map((credential) => {
             const rowItems = connections.filter((connection) => connection.provider?.__typename === 'PlaidItem' && connection.provider.credential.id === credential.id)
             const open = expanded === credential.id
             const title = getCredentialTitle(credential)
             return (
-              <div className="border-b border-neutral-100 last:border-b-0" key={credential.id}>
-                <div className="flex items-center gap-3 p-4">
+              <div className="border-t border-border" key={credential.id}>
+                <div className="flex h-12 items-center gap-2 px-4">
                   <CollapsibleRowToggle open={open} title={title} onToggle={() => setExpanded(open ? null : credential.id)} />
-                  <button className="min-w-0 flex-1 text-left" disabled={!canWrite('settings')} onClick={() => setModal({ mode: 'edit', credential })} type="button">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate font-semibold text-neutral-950">{title}</span>
-                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-500">{credential.environment.toLowerCase()}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-neutral-500">{rowItems.length} item{rowItems.length === 1 ? '' : 's'}</p>
+                  <button className="flex min-w-0 flex-1 items-center gap-2 text-left" disabled={!canWrite('settings')} onClick={() => setModal({ mode: 'edit', credential })} type="button">
+                    <span className="truncate text-sm font-medium text-text-1">{title}</span>
+                    <span className="rounded border border-border-strong bg-raised px-1.5 text-[11px] leading-[18px] text-text-2">{credential.environment.toLowerCase()}</span>
                   </button>
+                  <span className="shrink-0 text-xs text-text-muted">{rowItems.length} item{rowItems.length === 1 ? '' : 's'}</span>
                 </div>
                 {open ? (
-                  <div className="space-y-2 border-t border-neutral-100 bg-neutral-50 px-12 py-3">
-                    {rowItems.length === 0 ? <p className="text-sm text-neutral-500">No Plaid items use this credential.</p> : null}
+                  <div className="border-t border-border bg-surface-2 py-1 pl-12 pr-4">
+                    {rowItems.length === 0 ? <p className="py-2 text-[13px] text-text-muted">No Plaid items use this credential.</p> : null}
                     {rowItems.map((connection) => (
-                      <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2" key={connection.id}>
-                        <p className="font-mono text-sm text-neutral-800">{connection.provider?.__typename === 'PlaidItem' ? connection.provider.id : connection.id}</p>
-                        <p className="text-sm text-neutral-500">{connection.name || 'Unknown institution'}</p>
+                      <div className="flex h-10 items-center justify-between gap-3" key={connection.id}>
+                        <p className="truncate text-[13px] text-text-2">{connection.name || 'Unknown institution'}</p>
+                        <p className="shrink-0 font-mono text-xs text-text-muted">{connection.provider?.__typename === 'PlaidItem' ? connection.provider.id : connection.id}</p>
                       </div>
                     ))}
                   </div>
@@ -150,27 +143,21 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
     <Modal label={mode === 'create' ? 'Store Plaid credentials' : 'Edit Plaid credential'} onClose={onClose}>
       <form className="space-y-5" onSubmit={submit}>
         <div>
-          <h3 className="text-lg font-semibold text-neutral-950">{mode === 'create' ? 'Store Credentials' : 'Rotate Credential'}</h3>
-          <p className="mt-1 text-sm text-neutral-500">{mode === 'create' ? 'Save a Plaid client ID and secret.' : 'Update the secret or environment. The client ID cannot be changed.'}</p>
+          <h3 className="text-base font-semibold tracking-[-0.2px] text-text-1">{mode === 'create' ? 'Store Credentials' : 'Rotate Credential'}</h3>
+          <p className="mt-1 text-[13px] text-text-muted">{mode === 'create' ? 'Save a Plaid client ID and secret.' : 'Update the secret or environment. The client ID cannot be changed.'}</p>
         </div>
-        <p className="text-xs text-neutral-500"><span aria-hidden="true" className="text-red-500">*</span> Required</p>
+        <p className="text-xs text-text-muted"><span aria-hidden="true" className="text-negative">*</span> Required</p>
 
-        <TextField aria-invalid={!clientId.trim()} disabled={mode === 'edit'} label="Client ID" labelSuffix={<span aria-hidden="true" className="text-red-500"> *</span>} onChange={setClientId} required value={clientId} />
-        <TextField aria-invalid={!secret.trim()} label="Client secret" labelSuffix={<span aria-hidden="true" className="text-red-500"> *</span>} onChange={setSecret} required type="password" value={secret} />
+        <TextField aria-invalid={!clientId.trim()} disabled={mode === 'edit'} label="Client ID" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={setClientId} required value={clientId} />
+        <TextField aria-invalid={!secret.trim()} label="Client secret" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={setSecret} required type="password" value={secret} />
 
         {mode === 'create' ? (
           <TextField label="Label" onChange={setLabel} placeholder="Primary" value={label} />
         ) : null}
 
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-neutral-700">Environment</span>
-          <div className="grid grid-cols-2 gap-2 rounded-full bg-neutral-100 p-1">
-            {ENVIRONMENTS.map((env) => (
-              <button className={clsx('rounded-full px-3 py-2 text-sm font-semibold transition', environment === env ? 'bg-white text-neutral-950 shadow-sm' : 'text-neutral-500 hover:text-neutral-800')} key={env} onClick={() => setEnvironment(env)} type="button">
-                {env.toLowerCase()}
-              </button>
-            ))}
-          </div>
+        <div className="space-y-1">
+          <span className="block text-xs text-text-muted">Environment</span>
+          <SegmentedControl ariaLabel="Environment" onChange={setEnvironment} options={ENVIRONMENT_OPTIONS} value={environment} />
         </div>
 
         {error ? <FormError>{error.message}</FormError> : null}
@@ -187,3 +174,4 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
     </Modal>
   )
 }
+

@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useMobileHeader } from '../components/layout/useMobileHeader'
 import { clearMasterPassword, clearTokens, setMasterPassword } from '../auth/tokenStore'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { SettingsPage } from './SettingsPage'
@@ -12,9 +12,11 @@ vi.mock('../hooks/useIsMobile', () => ({
   useIsMobile: () => mockViewport.isMobile,
 }))
 
+const mockPermissions = vi.hoisted(() => ({ canReadUsers: true }))
+
 vi.mock('../hooks/usePermissions', () => ({
   usePermissions: () => ({
-    canRead: () => true,
+    canRead: (resource: string) => resource !== 'users' || mockPermissions.canReadUsers,
     canWrite: (resource: string) => resource === 'owners',
     hasScope: () => true,
   }),
@@ -30,11 +32,11 @@ vi.mock('../auth/useAuth', () => ({
 }))
 
 vi.mock('./AccessPage', () => ({
-  AccessPage: () => <div>Users content</div>,
+  AccessPage: ({ headerActions }: { headerActions?: ReactNode }) => <div><h2>Users</h2>{headerActions}Users content</div>,
 }))
 
 vi.mock('../components/settings/SecurityTab', () => ({
-  SecurityTab: () => <div>Passkeys content</div>,
+  SecurityTab: () => <div><h2>Passkeys</h2>Passkeys content</div>,
 }))
 
 vi.mock('../components/settings/LayoutSection', () => ({
@@ -51,21 +53,16 @@ vi.mock('../components/settings/ConnectionsTab', () => ({
 
 afterEach(() => {
   mockViewport.isMobile = false
+  mockPermissions.canReadUsers = true
   clearMasterPassword()
   clearTokens()
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
-function MobileHeaderLeadingProbe() {
-  const { headerLeading } = useMobileHeader()
-  return <div data-testid="mobile-header-leading">{headerLeading}</div>
-}
-
 function renderSettings(path = '/settings/general') {
   return renderWithProviders(<SettingsPage />, {
     initialEntries: [path],
-    probes: <MobileHeaderLeadingProbe />,
     withGraphql: true,
     withMobileHeader: true,
   })
@@ -143,6 +140,18 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('Passkeys content')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Users' })).toBeInTheDocument()
     expect(screen.getByText('Users content')).toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { level: 2, name: 'Users' }).parentElement!).getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+  })
+
+  it('keeps Sign out reachable when neither passkeys nor users render', () => {
+    setMasterPassword('test-master-password')
+    mockPermissions.canReadUsers = false
+
+    renderSettings('/settings/access')
+
+    expect(screen.queryByText('Passkeys content')).not.toBeInTheDocument()
+    expect(screen.queryByText('Users content')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
   it('renders Security, Categories, Rules, and Assets as the last settings sections', () => {
@@ -181,15 +190,10 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Connections tab content')).toBeInTheDocument()
   })
 
-  it('uses a mobile header back button on settings details', async () => {
-    const user = userEvent.setup()
+  it('renders a settings tab directly on mobile', () => {
     mockViewport.isMobile = true
     renderSettings('/settings/assets')
 
     expect(screen.getByText('Assets tab content')).toBeInTheDocument()
-
-    await user.click(within(screen.getByTestId('mobile-header-leading')).getByRole('button', { name: /back to settings/i }))
-
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
   })
 })

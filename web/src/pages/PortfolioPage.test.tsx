@@ -31,11 +31,11 @@ describe('PortfolioPage', () => {
     window.history.pushState({}, '', '/portfolio')
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Allocation' })).toBeInTheDocument()
-    expect(await screen.findByText('Stock')).toBeInTheDocument()
+    expect(await screen.findByText('Total analyzed')).toBeInTheDocument()
+    expect((await screen.findAllByText('Stock')).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getAllByRole('radio', { name: 'Sectors' })[0])
-    expect(await screen.findByText('Technology')).toBeInTheDocument()
+    expect((await screen.findAllByText('Technology')).length).toBeGreaterThan(0)
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=sectors'))
   })
 
@@ -43,27 +43,27 @@ describe('PortfolioPage', () => {
     window.history.pushState({}, '', '/portfolio?view=sectors&hide_amounts=true')
     renderPage(['/portfolio?view=sectors&hide_amounts=true'])
 
-    await screen.findByText('Technology')
+    await screen.findAllByText('Technology')
 
     fireEvent.click(screen.getByRole('button', { name: /^Filters$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Owner/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Owner' }))
     const ownerCheckbox = screen.getByRole('checkbox', { name: 'alex' })
-    expect(ownerCheckbox).toHaveClass('absolute')
     fireEvent.click(ownerCheckbox)
-    expect(ownerCheckbox.parentElement).toHaveClass('bg-brand-50')
-    fireEvent.click(screen.getByRole('button', { name: /Account type/i }))
+    await waitFor(() => expect(ownerCheckbox).toBeChecked())
+    fireEvent.click(screen.getByRole('button', { name: 'Account type' }))
     const accountTypeCheckbox = screen.getByRole('checkbox', { name: 'Tax Advantaged' })
     fireEvent.click(accountTypeCheckbox)
-    expect(accountTypeCheckbox.parentElement).toHaveClass('bg-brand-50')
-    fireEvent.click(screen.getByRole('button', { name: /^Account All$/i }))
+    await waitFor(() => expect(accountTypeCheckbox).toBeChecked())
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }))
     const accountCheckbox = screen.getByRole('checkbox', { name: 'Brokerage (...3011)' })
     fireEvent.click(accountCheckbox)
-    expect(accountCheckbox.parentElement).toHaveClass('bg-brand-50')
+    await waitFor(() => expect(accountCheckbox).toBeChecked())
     fireEvent.click(screen.getByRole('switch', { name: 'Include unclassified' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /Filters: 4 selected/i })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Filters, 4 active' })).toBeInTheDocument())
+    expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=sectors&hide_amounts=true&owners=owner-1&accountTypes=TAX_ADVANTAGED&accounts=acct-11&includeUnclassified=1')
 
-    fireEvent.click(screen.getByRole('button', { name: /Clear all/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
     await waitFor(() => expect(screen.getByRole('button', { name: /^Filters$/i })).toBeInTheDocument())
     expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=sectors&hide_amounts=true')
   })
@@ -71,9 +71,9 @@ describe('PortfolioPage', () => {
   it('loads the analysis view from the URL query parameter', async () => {
     renderPage(['/portfolio?view=category'])
 
-    expect(await screen.findByText('US Equity: Large Blend')).toBeInTheDocument()
-    for (const select of screen.getAllByRole('combobox', { name: 'Analysis view' })) {
-      expect(select).toHaveValue('MORNINGSTAR_CATEGORY')
+    expect((await screen.findAllByText('US Equity: Large Blend')).length).toBeGreaterThan(0)
+    for (const radio of screen.getAllByRole('radio', { name: 'Category' })) {
+      expect(radio).toHaveAttribute('aria-checked', 'true')
     }
   })
 
@@ -89,18 +89,18 @@ describe('PortfolioPage', () => {
     )
     renderPage(['/portfolio?view=composition&owners=sam&accounts=checking'])
 
-    expect(await screen.findByRole('heading', { name: 'Allocation' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=composition'))
+    expect((await screen.findAllByText('Stock')).length).toBeGreaterThan(0)
     expect(inputs).toContainEqual(expect.objectContaining({ ownerIds: ['sam'], accountIds: ['checking'] }))
     expect(inputs).toContainEqual(expect.not.objectContaining({ ownerIds: expect.any(Array), accountIds: expect.any(Array) }))
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=composition'))
   })
 
   it('opens the asset editor from an expanded portfolio holding', async () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByText('Stock'))
-    await user.click(screen.getByRole('button', { name: /Edit Vanguard Total Stock Market ETF/i }))
+    await user.click((await screen.findAllByRole('button', { name: /^Stock/ }))[0])
+    await user.click(screen.getAllByRole('button', { name: /Edit Vanguard Total Stock Market ETF/i })[0])
 
     expect(screen.getByRole('dialog', { name: /Edit Vanguard Total Stock Market ETF/i })).toBeInTheDocument()
     expect(screen.getByLabelText('Identifier (ticker/symbol)')).toHaveValue('VTI')
@@ -118,8 +118,8 @@ describe('PortfolioPage', () => {
 
     renderPage()
 
-    await user.click(await screen.findByText('Stock'))
-    await user.click(screen.getByRole('button', { name: /Edit Vanguard Total Stock Market ETF/i }))
+    await user.click((await screen.findAllByRole('button', { name: /^Stock/ }))[0])
+    await user.click(screen.getAllByRole('button', { name: /Edit Vanguard Total Stock Market ETF/i })[0])
 
     expect(screen.getByRole('dialog', { name: /Edit Vanguard Total Stock Market ETF/i })).toBeInTheDocument()
     expect(screen.queryByText('Accounts')).not.toBeInTheDocument()
@@ -130,15 +130,15 @@ describe('PortfolioPage', () => {
     const user = userEvent.setup()
     renderPage(['/portfolio?view=composition'])
 
-    await screen.findByRole('heading', { name: 'Allocation' })
-    expect(screen.queryByText('....')).not.toBeInTheDocument()
+    await screen.findByText('Total analyzed')
+    expect(screen.queryByText(/•/)).not.toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: 'Hide amounts' })[0])
 
     expect(screen.getAllByRole('button', { name: 'Show amounts' }).length).toBeGreaterThan(0)
     expect(screen.getByTestId('location')).toHaveTextContent('/portfolio?view=composition&hide_amounts=true')
-    expect(screen.getAllByText('....').length).toBeGreaterThan(0)
-    expect(screen.getByText('70.0%')).toBeInTheDocument()
+    expect(screen.getAllByText(/•/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('70.0%').length).toBeGreaterThan(0)
 
     await user.click(screen.getAllByRole('button', { name: 'Show amounts' })[0])
 
@@ -151,15 +151,14 @@ describe('PortfolioPage', () => {
 
     const filterButton = await screen.findByRole('button', { name: 'Open filters' })
 
-    expect(filterButton).toHaveClass('rounded-xl', 'p-2.5')
+    expect(filterButton).toHaveClass('rounded-md', 'border-border-strong')
 
     await user.click(filterButton)
 
     const dialog = screen.getByRole('dialog', { name: 'Filters' })
     expect(dialog).toHaveClass('fixed')
-    expect(dialog).toHaveStyle({ top: '48px' })
-    expect(dialog.firstElementChild).toHaveClass('absolute', 'right-0', 'top-0')
-    expect(dialog.firstElementChild).toHaveClass('w-[min(20rem,100vw)]')
+    expect(dialog.firstElementChild).toHaveClass('fixed', 'inset-x-0', 'bottom-0')
+    expect(dialog.firstElementChild).toHaveClass('rounded-t-2xl')
     expect(screen.getByText('Include unclassified')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /Owner/i }))

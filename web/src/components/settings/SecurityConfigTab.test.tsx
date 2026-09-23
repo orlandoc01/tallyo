@@ -137,6 +137,20 @@ describe('SecurityConfigTab', () => {
     expect(within(googleForm).queryByRole('button', { name: 'save' })).toBeNull()
   })
 
+  it('disables the sign-in Enabled switches while all auth is disabled', () => {
+    mockPermissions(true)
+    mockConfiguration({ configuration })
+    render(<SecurityConfigTab />)
+
+    const enabledSwitches = () => ['Passkeys', 'Google Sign-In', 'Email Sign-In'].map((title) => within(sectionForm(title)).getByRole('switch', { name: 'Enabled' }))
+    enabledSwitches().forEach((toggle) => expect(toggle).toBeEnabled())
+
+    fireEvent.click(within(sectionForm('Authorization')).getByRole('switch', { name: 'Disable all auth' }))
+
+    enabledSwitches().forEach((toggle) => expect(toggle).toBeDisabled())
+    expect(screen.getAllByText('Auth disabled')).toHaveLength(3)
+  })
+
   it('saves authorization without a restart prompt', async () => {
     mockPermissions(true)
     const reexecuteQuery = vi.fn()

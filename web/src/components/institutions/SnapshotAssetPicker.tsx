@@ -47,12 +47,12 @@ export function SnapshotAssetPicker({
   return (
     <div className="space-y-2">
       {adding ? (
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-neutral-100 px-3 py-2 text-sm">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-border px-3 py-2 text-sm">
           <div className="relative min-w-0">
             <button
               aria-expanded={open}
               aria-label="Select holding asset"
-              className="w-full rounded-xl border border-neutral-200 px-2 py-1.5 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full rounded-xl border border-border px-2 py-1.5 text-left text-sm font-medium text-text-2 hover:bg-hover focus:outline-none focus:ring-2 focus:ring-brand-500"
               onClick={() => setOpen((current) => !current)}
               type="button"
             >
@@ -61,7 +61,7 @@ export function SnapshotAssetPicker({
             {open ? (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-                <div className="absolute left-0 z-20 mt-2 w-80 rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl">
+                <div className="absolute left-0 z-20 mt-2 w-80 rounded-2xl border border-border bg-surface p-4 shadow-xl">
                   <div className="space-y-3">
                     <Link
                       className="block rounded-xl border border-brand-100 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100"
@@ -70,10 +70,10 @@ export function SnapshotAssetPicker({
                       Create New
                     </Link>
                     <TextField hideLabel label="Search assets" onChange={setSearch} placeholder="Search assets..." type="search" value={search} />
-                    {fetching ? <p className="text-sm text-neutral-500">Loading assets...</p> : null}
-                    {errorMessage ? <p className="text-sm text-red-600">Could not load assets: {errorMessage}</p> : null}
+                    {fetching ? <p className="text-sm text-text-3">Loading assets...</p> : null}
+                    {errorMessage ? <p className="text-sm text-negative">Could not load assets: {errorMessage}</p> : null}
                     {!fetching && !errorMessage && options.length === 0 ? (
-                      <p className="text-sm text-neutral-500">No available assets match this search.</p>
+                      <p className="text-sm text-text-3">No available assets match this search.</p>
                     ) : null}
                     {options.length > 0 ? (
                       <FilterCheckboxList options={options} selectedIds={[]} selectionMode="single" onChange={handleChange} />
@@ -83,23 +83,23 @@ export function SnapshotAssetPicker({
               </>
             ) : null}
           </div>
-          <label className="w-28 text-right text-xs font-medium text-neutral-600 sm:w-32">
+          <label className="w-28 text-right text-xs font-medium text-text-2 sm:w-32">
             <span className="sr-only">Quantity</span>
             <input
               aria-label="Quantity for new holding"
-              className="w-full rounded-xl border border-neutral-200 px-2 py-1.5 text-right text-sm tabular-nums disabled:bg-neutral-50 disabled:text-neutral-500"
+              className="w-full rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-2 py-1.5 text-right text-sm tabular-nums disabled:bg-raised disabled:text-text-3"
               disabled
               readOnly
               type="number"
               value="0"
             />
-            <div className="mt-1 text-xs font-normal tabular-nums text-neutral-500">$0.00</div>
+            <div className="mt-1 text-xs font-normal tabular-nums text-text-3">$0.00</div>
           </label>
         </div>
       ) : null}
       <button
         aria-expanded={adding}
-        className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 sm:w-auto"
+        className="w-full rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-2 hover:bg-hover sm:w-auto"
         onClick={handleAddClick}
         type="button"
       >

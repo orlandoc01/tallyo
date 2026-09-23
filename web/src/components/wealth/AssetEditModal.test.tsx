@@ -186,7 +186,7 @@ describe('AssetEditModal', () => {
     }, refetch])
     renderModal(securityAsset, { tabSearch: '?hide_amounts=true' })
     expect(screen.getByText('Brokerage')).toBeInTheDocument()
-    expect(screen.getByText('....')).toBeInTheDocument()
+    expect(screen.getByText(/•/)).toBeInTheDocument()
   })
 
   it('renders asset account rows without valuation links when wealth is unavailable', () => {

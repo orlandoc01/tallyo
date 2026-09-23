@@ -3,29 +3,32 @@ import { useBudgetMutations } from '../../hooks/useBudgets'
 import type { BudgetReport, Category } from '../../types/graphql'
 
 export function actualsByCategory(report: BudgetReport | null) {
-  const actuals = new Map<string, number>()
-  for (const section of report?.sections ?? []) {
-    for (const line of section.lines) {
-      actuals.set(line.category.id, line.actual)
-    }
-  }
-  return actuals
+  return lineValuesByCategory(report, 'actual')
 }
 
-// Draft state for the budget setup wizard: per-category amount drafts prefilled
-// from last month's actuals, the set of included categories, and the save-all
-// action. `active` gates initialization so drafts are (re)built once per month
-// when the wizard opens.
+export function budgetedByCategory(report: BudgetReport | null) {
+  return lineValuesByCategory(report, 'budgeted')
+}
+
+function lineValuesByCategory(report: BudgetReport | null, field: 'actual' | 'budgeted') {
+  return new Map((report?.sections ?? []).flatMap((section) => section.lines.map((line) => [line.category.id, line[field]] as const)))
+}
+
+// Drafts are built once per month when the wizard opens, and only once the
+// previous month's report has settled (`ready`) so they never prefill from an
+// empty actuals map.
 export function useBudgetSetup({
   active,
   monthKey,
   categories,
   previousActuals,
+  ready,
 }: {
   active: boolean
   monthKey: string
   categories: Category[]
   previousActuals: Map<string, number>
+  ready: boolean
 }) {
   const { setBudget, setBudgetState } = useBudgetMutations()
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -33,7 +36,7 @@ export function useBudgetSetup({
   const [initializedFor, setInitializedFor] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!active || initializedFor === monthKey || categories.length === 0) return
+    if (!active || !ready || initializedFor === monthKey || categories.length === 0) return
     const nextDrafts: Record<string, string> = {}
     const nextIncluded = new Set<string>()
     let hasPrefill = false
@@ -51,7 +54,7 @@ export function useBudgetSetup({
     setDrafts(nextDrafts)
     setIncluded(nextIncluded)
     setInitializedFor(monthKey)
-  }, [active, categories, initializedFor, monthKey, previousActuals])
+  }, [active, categories, initializedFor, monthKey, previousActuals, ready])
 
   function addCategory(categoryId: string) {
     setIncluded((current) => new Set(current).add(categoryId))

@@ -80,7 +80,7 @@ export function CategoryDropdown({
         onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); onClose() }}
       />
       <div
-        className="fixed z-50 w-64 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-2 shadow-card"
+        className="fixed z-50 w-64 overflow-y-auto rounded-lg border border-border-strong bg-raised p-2 shadow-dropdown"
         onClick={(event) => event.stopPropagation()}
         ref={ref}
         style={position}

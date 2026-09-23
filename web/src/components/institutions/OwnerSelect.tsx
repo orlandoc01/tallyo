@@ -80,7 +80,7 @@ export function OwnerSelect({
           <input
             aria-label="Owner name"
             autoFocus
-            className="flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+            className="flex-1 rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-3 py-2 text-sm outline-none focus:border-brand-500"
             disabled={isSubmitting}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -97,7 +97,7 @@ export function OwnerSelect({
             {isSubmitting ? 'Adding…' : 'Add'}
           </button>
           <button
-            className="rounded-xl border border-neutral-200 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+            className="rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-2 hover:bg-hover"
             disabled={isSubmitting}
             onClick={handleCancel}
             type="button"
@@ -105,14 +105,14 @@ export function OwnerSelect({
             Cancel
           </button>
         </div>
-        {createError ? <p className="text-xs text-red-600">{createError}</p> : null}
+        {createError ? <p className="text-xs text-negative">{createError}</p> : null}
       </div>
     )
   }
 
   return (
     <select
-      className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+      className="mt-1.5 h-9 w-full rounded-md border border-border-strong bg-surface px-2.5 text-[13px] text-text-1 outline-none focus:border-brand-600 lg:h-8 dark:bg-bg"
       onChange={(e) => handleSelectChange(e.target.value)}
       value={value}
     >

@@ -11,10 +11,10 @@ export function BulkDeleteTransactionsModal({ error, selectedCount, submitting, 
     <Modal label="Delete selected transactions" onClose={onClose}>
       <div className="space-y-5">
         <div>
-          <h2 className="text-lg font-bold text-neutral-950">Delete selected transactions?</h2>
-          <p className="mt-1 text-sm text-neutral-500">This will delete {selectedCount} selected transactions.</p>
+          <h2 className="text-lg font-bold text-text-1">Delete selected transactions?</h2>
+          <p className="mt-1 text-sm text-text-3">This will delete {selectedCount} selected transactions.</p>
         </div>
-        {error ? <p className="text-sm font-medium text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm font-medium text-negative">{error}</p> : null}
         <ModalActions busy={submitting} busyLabel="Deleting..." cancelDisabled={submitting} disabled={selectedCount === 0 || submitting} onCancel={onClose} onSubmit={onConfirm} submitLabel="Delete" submitType="button" submitVariant="danger-solid" />
       </div>
     </Modal>

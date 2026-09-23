@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation } from 'urql'
 import { FormError, SelectField, TextAreaField, TextField } from '../common/FormControls'
+import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { Modal, ModalActions, ModalFooter } from '../common/Modal'
 import { ModalCloseButton } from '../common/ModalHeader'
 import { useSaveAction } from '../../hooks/useSaveAction'
@@ -8,7 +9,6 @@ import { CREATE_TRANSACTION_MUTATION } from '../../graphql/mutations'
 import type { Account, Category, CreateTransactionInput, CreateTransactionPayload, Transaction } from '../../types/graphql'
 import { accountDisplayLabel } from '../../utils/accounts'
 import { toDateInputValue } from '../../utils/dates'
-import { ToggleRow } from './ToggleRow'
 
 export function CreateTransactionModal({
   accounts,
@@ -62,8 +62,8 @@ export function CreateTransactionModal({
       <form className="space-y-5" noValidate onSubmit={handleSubmit}>
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-neutral-950">Create transaction</h2>
-            <p className="text-sm text-neutral-500">Manual transactions receive a server-generated ID.</p>
+            <h2 className="text-xl font-bold text-text-1">Create transaction</h2>
+            <p className="text-sm text-text-3">Manual transactions receive a server-generated ID.</p>
           </div>
           <ModalCloseButton label="Close create transaction" onClick={onClose} />
         </div>
@@ -85,16 +85,16 @@ export function CreateTransactionModal({
           />
         </div>
 
-        <p className="text-xs text-neutral-500">Use positive amounts for spending and negative amounts for refunds or credits.</p>
+        <p className="text-xs text-text-3">Use positive amounts for spending and negative amounts for refunds or credits.</p>
 
-        <div className="space-y-2 border-t border-neutral-100 pt-4">
-          <ToggleRow label="Hidden" onChange={setIsHidden} value={isHidden} />
-          <ToggleRow label="Recurring" onChange={setIsRecurring} value={isRecurring} />
+        <div className="space-y-2 border-t border-border pt-4">
+          <ToggleSettingRow checked={isHidden} onChange={setIsHidden} title="Hidden" />
+          <ToggleSettingRow checked={isRecurring} onChange={setIsRecurring} title="Recurring" />
         </div>
 
         <TextAreaField label="Notes" onChange={setNotes} rows={3} value={notes} />
 
-        {visibleAccounts.length === 0 ? <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">Add an account before creating transactions.</div> : null}
+        {visibleAccounts.length === 0 ? <div className="rounded-xl bg-warning/[0.12] px-3 py-2 text-sm text-warning">Add an account before creating transactions.</div> : null}
 
         <ModalFooter>
           <ModalActions busy={saving} busyLabel="Creating..." disabled={saving || visibleAccounts.length === 0} onCancel={onClose} submitLabel="Create transaction" />

@@ -1,5 +1,4 @@
-import clsx from 'clsx'
-import { Plus, RefreshCcw, Trash2 } from 'lucide-react'
+import { RefreshCcw, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useMutation, useQuery } from 'urql'
 import { DELETE_SIMPLE_FIN_ACCESS_TOKEN_MUTATION, RESET_SIMPLE_FIN_SYNC_MUTATION } from '../../graphql/mutations'
@@ -7,12 +6,14 @@ import { CONNECTIONS_QUERY } from '../../graphql/queries'
 import { usePermissions } from '../../hooks/usePermissions'
 import { useSimpleFinAccessTokens } from '../../hooks/useEntityQueries'
 import type { Connection, CreateSimpleFinAccessTokenPayload, SimpleFinAccessToken } from '../../types/graphql'
-import { Button } from '../common/Button'
+import { formatScheduleTime } from '../../utils/dates'
+import { Button, IconButton } from '../common/Button'
 import { EmptyState } from '../common/EmptyState'
 import { Card, FormSuccess } from '../common/FormControls'
 import { QueryGate } from '../common/QueryGate'
 import { ConnectionModal } from '../institutions/ConnectionModal'
 import { CollapsibleRowToggle } from './CollapsibleRowToggle'
+import { ListCardHeader } from './ListCardHeader'
 
 export function SimpleFinTab() {
   const { canRead, canWrite } = usePermissions()
@@ -62,20 +63,7 @@ export function SimpleFinTab() {
   }
 
   return (
-    <section className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-950">Access Tokens</h2>
-          <p className="mt-1 max-w-2xl text-sm text-neutral-500">Claim setup tokens from SimpleFIN Bridge. Access URLs are stored write-only and never displayed.</p>
-        </div>
-        {canWrite('accounts') ? (
-          <Button className="gap-2" onClick={() => setShowCreateModal(true)} type="button">
-            <Plus className="h-4 w-4" />
-            Create Access Token
-          </Button>
-        ) : null}
-      </div>
-
+    <section className="space-y-3">
       {message ? <FormSuccess>{message}</FormSuccess> : null}
       <QueryGate
         empty={tokens.length === 0}
@@ -84,41 +72,48 @@ export function SimpleFinTab() {
         error={combinedError}
         fetching={loading}
       >
-        <Card compact>
+        <Card>
+          <ListCardHeader
+            actions={canWrite('accounts') ? <Button onClick={() => setShowCreateModal(true)}>+ Create access token</Button> : null}
+            description="Claim setup tokens from SimpleFIN Bridge. Access URLs are stored write-only and never displayed."
+            title="Access Tokens"
+          />
           {tokens.map((token) => {
             const open = expanded === token.id
             const title = token.label?.trim() || `SimpleFIN token ${token.id}`
             return (
-              <div className="border-b border-neutral-100 last:border-b-0" key={token.id}>
-                <div className="flex items-center gap-3 p-4">
+              <div className="border-t border-border" key={token.id}>
+                <div className="flex min-h-12 items-center gap-2 px-4 py-1.5">
                   <CollapsibleRowToggle open={open} title={title} onToggle={() => setExpanded(open ? null : token.id)} />
                   <div className="min-w-0 flex-1">
-                    <span className="truncate font-semibold text-neutral-950">{title}</span>
-                    <p className="mt-1 text-sm text-neutral-500">{token.connections.length} connection{token.connections.length === 1 ? '' : 's'} for {token.owner.name}</p>
-                    <p className="text-xs text-neutral-500">Next sync: {formatScheduleTime(token.nextSyncAt)}</p>
+                    <p className="truncate text-sm font-medium text-text-1">{title}</p>
+                    <p className="truncate text-xs text-text-muted">{token.connections.length} connection{token.connections.length === 1 ? '' : 's'} for {token.owner.name} · Next sync: {formatScheduleTime(token.nextSyncAt)}</p>
                   </div>
                   {canWrite('accounts') ? (
-                    <div className="flex shrink-0 gap-1">
-                      <button className="rounded-xl p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800" onClick={() => void handleReset(token)} title="Reset sync" type="button">
-                        <RefreshCcw className="h-4 w-4" />
-                      </button>
-                      <button className={clsx('rounded-xl p-2 hover:bg-red-50', confirmDeleteID === token.id ? 'text-red-700' : 'text-neutral-500 hover:text-red-600')} onClick={() => void handleDelete(token)} title={confirmDeleteID === token.id ? 'Confirm delete' : 'Delete'} type="button">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    <div className="flex shrink-0 gap-1.5">
+                      <IconButton ariaLabel="Reset sync" onClick={() => void handleReset(token)} size="sm">
+                        <RefreshCcw className="h-3.5 w-3.5" />
+                      </IconButton>
+                      <Button onClick={() => void handleDelete(token)} size="sm" variant="danger">
+                        <Trash2 aria-hidden className="h-3.5 w-3.5" />
+                        {confirmDeleteID === token.id ? 'Confirm delete' : 'Delete'}
+                      </Button>
                     </div>
                   ) : null}
                 </div>
                 {open ? (
-                  <div className="space-y-2 border-t border-neutral-100 bg-neutral-50 px-12 py-3">
-                    {token.connections.length === 0 ? <p className="text-sm text-neutral-500">No SimpleFIN connections use this token.</p> : null}
+                  <div className="border-t border-border bg-surface-2 py-1 pl-12 pr-4">
+                    {token.connections.length === 0 ? <p className="py-2 text-[13px] text-text-muted">No SimpleFIN connections use this token.</p> : null}
                     {token.connections.map((simpleFinConnection) => {
                       const connection = connections.find((item) => item.provider?.__typename === 'SimpleFinConnection' && item.provider.id === simpleFinConnection.id)
                       const name = connection?.name || simpleFinConnection.orgDomain || simpleFinConnection.id
                       return (
-                        <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2" key={simpleFinConnection.id}>
-                          <p className="font-semibold text-neutral-800">{name}</p>
-                          <p className="text-sm text-neutral-500">{connection?.owner.name || token.owner.name}</p>
-                          <p className="text-xs text-neutral-500">{simpleFinConnection.accounts.length} account{simpleFinConnection.accounts.length === 1 ? '' : 's'}{simpleFinConnection.orgUrl ? ` · ${simpleFinConnection.orgUrl}` : ''}</p>
+                        <div className="flex min-h-10 items-center justify-between gap-3 py-1" key={simpleFinConnection.id}>
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-medium text-text-1">{name}</p>
+                            <p className="truncate text-xs text-text-muted">{connection?.owner.name || token.owner.name}</p>
+                          </div>
+                          <p className="shrink-0 text-xs text-text-muted">{simpleFinConnection.accounts.length} account{simpleFinConnection.accounts.length === 1 ? '' : 's'}{simpleFinConnection.orgUrl ? ` · ${simpleFinConnection.orgUrl}` : ''}</p>
                         </div>
                       )
                     })}
@@ -143,8 +138,4 @@ export function SimpleFinTab() {
       ) : null}
     </section>
   )
-}
-
-function formatScheduleTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : 'not scheduled'
 }

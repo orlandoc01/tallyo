@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { FormError } from '../../components/common/FormControls'
+import { Button } from '../../components/common/Button'
 import { OBFUSCATED_SECRET } from './setupState'
 import { useSetup } from './useSetup'
-import { SetupActions, SetupHeading, SetupTextField, primaryButtonClass, secondaryButtonClass } from './SetupLayout'
+import { SetupActions, SetupFieldGrid, SetupHeading, SetupMessage, SetupTextField } from './SetupLayout'
 
 export function PasswordSetupStep() {
   const navigate = useNavigate()
@@ -32,22 +32,20 @@ export function PasswordSetupStep() {
   return (
     <div>
       <SetupHeading
-        eyebrow="Password setup"
-        title={<>{masterPasswordStatus === 'ENV_VAR_OVERRIDE' ? <span title="Currently set by ENV VAR, which overrides whatever you set here"><AlertCircle className="h-6 w-6 shrink-0 text-amber-500" /></span> : null}Set the master password</>}
-        titleClassName="mt-3 flex items-center gap-2 text-3xl font-black tracking-tight text-neutral-900"
+        subtitle="Used alongside OAuth providers and sent as the API key for single-password sign-in."
+        title={<>{masterPasswordStatus === 'ENV_VAR_OVERRIDE' ? <span title="Currently set by ENV VAR, which overrides whatever you set here"><AlertCircle aria-hidden className="h-3.5 w-3.5 text-warning" /></span> : null}Master password</>}
       />
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">This password can be used alongside OAuth providers and is sent as the API key for single-password sign-in.</p>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+      <SetupFieldGrid className="mt-4 max-w-[640px]">
         <SetupTextField label="Master password" onChange={setPassword} type="password" value={password} />
         <SetupTextField label="Confirm master password" onChange={setConfirmPassword} type="password" value={confirmPassword} />
-      </div>
+      </SetupFieldGrid>
 
-      {error ? <FormError className="mt-5 font-semibold">{error}</FormError> : null}
+      {error ? <SetupMessage tone="negative">{error}</SetupMessage> : null}
 
       <SetupActions>
-        <button className={secondaryButtonClass} onClick={() => navigate('/setup/security')} type="button">Back</button>
-        <button className={primaryButtonClass} onClick={continueSetup} type="button">Continue</button>
+        <Button onClick={() => navigate('/setup/security')} variant="secondary">Back</Button>
+        <Button onClick={continueSetup}>Continue</Button>
       </SetupActions>
     </div>
   )

@@ -1,5 +1,5 @@
-const HIDDEN_AMOUNT = '....'
+import { maskAmount } from '../../utils/currency'
 
 export function displayAmount(amountsHidden: boolean, formattedAmount: string): string {
-  return amountsHidden ? HIDDEN_AMOUNT : formattedAmount
+  return amountsHidden ? maskAmount(formattedAmount) : formattedAmount
 }

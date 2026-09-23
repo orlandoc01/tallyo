@@ -1,24 +1,23 @@
-/* eslint-disable max-lines -- pre-existing overage; decompose before growing (fallow audit target) */
-import type { ReactElement, ReactNode } from 'react'
-import { useMemo, useState } from 'react'
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip } from 'recharts'
-import type { Granularity } from '../../types/graphql'
+import clsx from 'clsx'
+import { useMemo, useRef, useState } from 'react'
+import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts'
 import type { CategorySpending, SpendingPeriod } from '../../types/domain'
-import { chartMarkOpacity, chartOpacityForFocus, spendingChartColor } from '../../utils/chartStyles'
-import { formatCurrency, formatCurrencyCompact } from '../../utils/currency'
 import { useIsMobile } from '../../hooks/useIsMobile'
-import { Card } from '../common/FormControls'
-import { SegmentedControl } from '../common/SegmentedControl'
+import { chartTheme, mobileTooltipProps, spendingChartColor } from '../../utils/chartStyles'
+import { formatCurrency, formatCurrencyCompact } from '../../utils/currency'
 import { type GroupBy, aggregateByGroup, topNWithEverythingElse } from '../../utils/spending'
-import { reportChartAxes } from './chartAxes'
-import { GranularitySelector } from './DateRangeSelector'
+import { Button } from '../common/Button'
+import { shortPeriodLabel } from './cashFlowStats'
+import { ActiveTooltipLabelTracker, ChartTooltipBox, ChartTooltipRow, ChartTooltipTitle } from '../common/ChartTooltip'
+import type { SpendingCategoryFocus } from './SpendingBreakdown'
 
-export type TrendsChartView = 'stacked' | 'line'
+const SERIES_OPACITY = 0.85
+const DIMMED_OPACITY = 0.3
 
 interface StackedDataPoint {
   periodLabel: string
   total: number
-  [categoryName: string]: number | string
+  [seriesName: string]: number | string
 }
 
 interface ChartItem {
@@ -26,379 +25,135 @@ interface ChartItem {
   name: string
   emoji: string
   color: string
+  categoryIds: string[]
 }
 
-export function SpendingTrends({
-  focusedCategoryId,
-  granularity = 'MONTHLY',
-  groupBy,
-  onCategoryFocusChange,
-  onGranularityChange,
-  onViewChange,
-  periods,
-  view: viewProp,
-}: {
+export function SpendingTrends({ focusedCategoryId = null, groupBy, onCategoryFocusChange, periods }: {
   focusedCategoryId?: string | null
-  granularity?: Granularity
   groupBy?: GroupBy
-  onCategoryFocusChange?: (categoryId: string | null) => void
-  onGranularityChange?: (granularity: Granularity) => void
-  onViewChange?: (view: TrendsChartView) => void
+  onCategoryFocusChange?: (focus: SpendingCategoryFocus | null) => void
   periods: SpendingPeriod[]
-  view?: TrendsChartView
-}) {
-  const [internalView, setInternalView] = useState<TrendsChartView>('stacked')
-  const view = viewProp ?? internalView
-  function setView(v: TrendsChartView) { setInternalView(v); onViewChange?.(v) }
-
-  const chartItems = useMemo((): ChartItem[] => {
-    const { visible } = topNWithEverythingElse(spendingSlices(aggregateCategories(periods), groupBy), 5)
-    return visible.map((item) => ({
-      id: item.id,
-      name: item.name,
-      emoji: item.emoji,
-      color: spendingChartColor(item.id),
-    }))
-  }, [groupBy, periods])
-
-  const stackedData = useMemo((): StackedDataPoint[] => {
-    return periods.map((p) => {
-      const point: StackedDataPoint = { periodLabel: p.periodLabel, total: p.total }
-      for (const item of chartItems) {
-        point[item.name] = 0
-      }
-
-      for (const slice of spendingSlices(p.categories, groupBy)) {
-        const chartItem = chartItems.find((item) => item.id === slice.id)
-        if (chartItem) {
-          point[chartItem.name] = Math.max(0, slice.total)
-        } else {
-          point['Everything else'] = (point['Everything else'] as number || 0) + Math.max(0, slice.total)
-        }
-      }
-
-      return point
-    })
-  }, [periods, chartItems, groupBy])
-
-  if (periods.length === 0) {
-    return <div className="p-8 text-sm text-neutral-500">No trends data available.</div>
-  }
-
-  function toggleFocus(categoryId: string) {
-    onCategoryFocusChange?.(focusedCategoryId === categoryId ? null : categoryId)
-  }
-
-  return (
-    <Card as="section" overflow="visible">
-      <div className="hidden flex-nowrap items-center justify-end gap-2 border-b border-neutral-100 p-5 lg:flex lg:flex-wrap">
-        <div className="flex flex-nowrap items-center gap-2 lg:w-auto lg:gap-3">
-          {onGranularityChange ? (
-            <GranularitySelector
-              granularity={granularity}
-              labelVariant="long"
-              onChange={onGranularityChange}
-              size="sm"
-            />
-          ) : null}
-          <SegmentedControl
-            ariaLabel="Trend chart view"
-            options={[{ value: 'stacked', label: 'Stacked' }, { value: 'line', label: 'Line' }]}
-            size="sm"
-            value={view}
-            onChange={setView}
-          />
-          {focusedCategoryId ? (
-            <button
-              className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 hover:text-brand-900"
-              onClick={() => onCategoryFocusChange?.(null)}
-              type="button"
-            >
-              Clear focus
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {focusedCategoryId ? (
-        <FocusedTrendChart
-          chartItems={chartItems}
-          focusedCategoryId={focusedCategoryId}
-          groupBy={groupBy}
-          periods={periods}
-          view={view}
-        />
-      ) : view === 'stacked' ? (
-        <StackedBarChart
-          chartItems={chartItems}
-          data={stackedData}
-          onLegendClick={onCategoryFocusChange ? toggleFocus : undefined}
-        />
-      ) : (
-        <LineTrendsChartView
-          chartItems={chartItems.filter((item) => item.name !== 'Everything else').slice(0, 5)}
-          data={stackedData}
-          onLegendClick={onCategoryFocusChange ? toggleFocus : undefined}
-        />
-      )}
-
-      {focusedCategoryId ? (
-        <div className="border-t border-neutral-100 p-4 text-sm text-neutral-600">
-          Focused on {chartItems.find((ci) => ci.id === focusedCategoryId)?.emoji} {chartItems.find((ci) => ci.id === focusedCategoryId)?.name}.{' '}
-          <button className="font-semibold text-brand-700 hover:text-brand-900" onClick={() => onCategoryFocusChange?.(null)} type="button">
-            Clear focus
-          </button>
-        </div>
-      ) : null}
-    </Card>
-  )
-}
-
-interface TrendsAxisProps {
-  yAxisWidth: number
-  yAxisFormatter: (value: number) => string
-}
-
-// Shared responsive shell for every trends chart: mobile charts shrink,
-// scroll horizontally past 3 points, and compact their y-axis labels.
-function TrendsChartFrame({
-  pointCount,
-  footer,
-  children,
-}: {
-  pointCount: number
-  footer?: ReactNode
-  children: (axis: TrendsAxisProps) => ReactElement
 }) {
   const isMobile = useIsMobile()
-  const scrollable = isMobile && pointCount > 3
-  const chartHeight = isMobile ? 200 : 320
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null)
+  const chartItems = useMemo(() => trendsChartItems(periods, groupBy), [groupBy, periods])
+  const data = useMemo(() => stackedData(periods, chartItems, groupBy), [periods, chartItems, groupBy])
+
+  if (periods.length === 0) {
+    return <p className="p-8 text-[13px] text-text-muted">No trends data available.</p>
+  }
+
+  const focused = chartItems.find((item) => item.id === focusedCategoryId)
+  const opacityFor = (item: ChartItem, label: string) =>
+    (focusedCategoryId && item.id !== focusedCategoryId) || (hoveredLabel && hoveredLabel !== label) ? DIMMED_OPACITY : SERIES_OPACITY
+  const toggleFocus = onCategoryFocusChange ? (item: ChartItem) => onCategoryFocusChange(focusedCategoryId === item.id ? null : { id: item.id, categoryIds: item.categoryIds }) : undefined
 
   return (
-    <div className="p-5">
-      <div className={isMobile ? 'overflow-x-auto trends-chart' : 'trends-chart'}>
-        <div style={{ minWidth: scrollable ? `${pointCount * 80}px` : undefined, height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            {children({ yAxisWidth: isMobile ? 56 : 88, yAxisFormatter: isMobile ? formatCurrencyCompact : formatCurrency })}
+    <div className="mt-[30px] lg:mt-7">
+      <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_190px] lg:gap-6">
+        <div className="h-[180px] lg:h-[280px]" ref={containerRef}>
+          <ResponsiveContainer height="100%" width="100%">
+            <BarChart barCategoryGap="20%" data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+              <ActiveTooltipLabelTracker onChange={setHoveredLabel} />
+              <CartesianGrid stroke={chartTheme.grid.stroke} strokeDasharray={chartTheme.grid.strokeDasharray} vertical={false} />
+              <XAxis axisLine={false} dataKey="periodLabel" tick={chartTheme.axisTickX} tickFormatter={isMobile ? shortPeriodLabel : undefined} tickLine={false} tickMargin={10} />
+              <YAxis axisLine={false} domain={[0, 'auto']} hide={isMobile} tick={chartTheme.axisTick} tickCount={5} tickFormatter={(value: number) => formatCurrencyCompact(value)} tickLine={false} width={52} />
+              <ReferenceLine stroke={chartTheme.baseline.stroke} y={0} />
+              <Tooltip {...mobileTooltipProps(isMobile)} content={(props) => <TrendsTooltip {...props} chartItems={chartItems} clampWidth={isMobile ? containerRef.current?.clientWidth : undefined} />} cursor={{ fill: 'transparent' }} />
+              {chartItems.map((item) => (
+                <Bar dataKey={item.name} fill={item.color} isAnimationActive={false} key={item.id} maxBarSize={100} stackId="spending">
+                  {data.map((point) => <Cell fillOpacity={opacityFor(item, point.periodLabel)} key={point.periodLabel} />)}
+                </Bar>
+              ))}
+            </BarChart>
           </ResponsiveContainer>
         </div>
+        <div className={clsx('grid gap-x-4 gap-y-2 text-xs lg:flex lg:flex-col lg:gap-2.5 lg:text-[13px]', isMobile && 'grid-cols-2')}>
+          {chartItems.map((item) => (
+            <button
+              aria-pressed={toggleFocus ? focusedCategoryId === item.id : undefined}
+              className={clsx('flex min-w-0 items-center gap-2 text-left transition-colors', toggleFocus ? 'cursor-pointer hover:text-text-1' : 'cursor-default', focusedCategoryId === item.id ? 'text-text-1' : 'text-text-3')}
+              key={item.id}
+              onClick={toggleFocus ? () => toggleFocus(item) : undefined}
+              type="button"
+            >
+              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="truncate">{item.emoji} {item.name}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      {footer}
+      {focused ? (
+        <div className="mt-3 flex items-center gap-2 text-[13px] text-text-3">
+          <span>Focused on {focused.emoji} {focused.name}.</span>
+          <Button onClick={() => onCategoryFocusChange?.(null)} size="sm" variant="ghost">Clear focus</Button>
+        </div>
+      ) : null}
     </div>
   )
 }
 
-function ChartLegend({
-  chartItems,
-  onLegendClick,
-}: {
-  chartItems: ChartItem[]
-  onLegendClick?: (categoryId: string) => void
-}) {
+function TrendsTooltip({ active, chartItems, clampWidth, coordinate, payload }: TooltipContentProps & { chartItems: ChartItem[]; clampWidth?: number }) {
+  if (!active || !payload?.length) return null
+  const point = payload[0]?.payload as StackedDataPoint | undefined
+  if (!point) return null
+  const rows = chartItems
+    .map((item) => ({ item, value: Number(point[item.name] ?? 0) }))
+    .filter((row) => row.value > 0)
+
   return (
-    <div className="mt-4 flex flex-wrap gap-3 px-2">
-      {chartItems.map((item) => (
-        <button
-          className={`flex items-center gap-1.5 rounded-xl px-1.5 py-0.5 text-sm transition-colors ${onLegendClick ? 'cursor-pointer hover:bg-neutral-100' : 'cursor-default'}`}
-          key={item.id}
-          onClick={onLegendClick ? () => onLegendClick(item.id) : undefined}
-          type="button"
-        >
-          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-          {item.emoji} {item.name}
-        </button>
-      ))}
-    </div>
+    <ChartTooltipBox clampWidth={clampWidth} coordinate={coordinate}>
+      <ChartTooltipTitle>{point.periodLabel}</ChartTooltipTitle>
+      <p className="text-xs font-semibold">{formatCurrency(point.total)}</p>
+      {rows.map(({ item, value }) => <ChartTooltipRow color={item.color} key={item.id} label={`${item.emoji} ${item.name}`} value={formatCurrency(value)} />)}
+    </ChartTooltipBox>
   )
 }
 
-function StackedBarChart({
-  chartItems,
-  data,
-  onLegendClick,
-}: {
-  chartItems: ChartItem[]
-  data: StackedDataPoint[]
-  onLegendClick?: (categoryId: string) => void
-}) {
-  return (
-    <TrendsChartFrame footer={<ChartLegend chartItems={chartItems} onLegendClick={onLegendClick} />} pointCount={data.length}>
-      {(axis) => (
-        <BarChart data={data}>
-          {reportChartAxes({ dataKey: 'periodLabel', ...axis })}
-          <Tooltip content={<StackedTooltip chartItems={chartItems} />} cursor={{ fill: 'transparent' }} />
-          {chartItems.map((item) => (
-            <Bar
-              activeBar={{ fillOpacity: chartMarkOpacity.active }}
-              dataKey={item.name}
-              fill={item.color}
-              fillOpacity={chartOpacityForFocus(false)}
-              key={item.id}
-              stackId="spending"
-            />
-          ))}
-        </BarChart>
-      )}
-    </TrendsChartFrame>
-  )
+// The legend's "Everything else" stands for every category outside the top
+// five (or, by group, every category of the remaining groups).
+function trendsChartItems(periods: SpendingPeriod[], groupBy?: GroupBy): ChartItem[] {
+  const categories = aggregateCategories(periods)
+  const { visible, everythingElse } = topNWithEverythingElse(spendingSlices(categories, groupBy), 5)
+  const shownIds = new Set(visible.filter((item) => item !== everythingElse).map((item) => item.id))
+  const memberIds = (item: { id: string }) => groupBy === 'group'
+    ? categories.filter((entry) => entry.category.groupName === item.id).map((entry) => entry.category.id)
+    : [item.id]
+  const remainderIds = categories.filter((entry) => !shownIds.has(groupBy === 'group' ? entry.category.groupName : entry.category.id)).map((entry) => entry.category.id)
+  return visible.map((item) => ({ id: item.id, name: item.name, emoji: item.emoji, color: spendingChartColor(item.id), categoryIds: item === everythingElse ? remainderIds : memberIds(item) }))
 }
 
-function FocusedTrendChart({
-  chartItems,
-  focusedCategoryId,
-  groupBy,
-  periods,
-  view,
-}: {
-  chartItems: ChartItem[]
-  focusedCategoryId: string
-  groupBy?: GroupBy
-  periods: SpendingPeriod[]
-  view: TrendsChartView
-}) {
-  const chartItem = chartItems.find((ci) => ci.id === focusedCategoryId)
-  if (!chartItem) return null
-
-  const data = focusedTrendData(periods, focusedCategoryId, groupBy)
-  const tooltip = (
-    <Tooltip formatter={(value) => formatCurrency(Number(value))} labelFormatter={(label) => `${chartItem.emoji} ${chartItem.name} — ${label}`} />
-  )
-  const caption = (
-    <div className="mt-2 text-center text-sm text-neutral-500">
-      {chartItem.emoji} {chartItem.name}
-    </div>
-  )
-
-  return (
-    <TrendsChartFrame footer={caption} pointCount={periods.length}>
-      {(axis) =>
-        view === 'stacked' ? (
-          <BarChart data={data}>
-            {reportChartAxes({ dataKey: 'periodLabel', ...axis })}
-            {tooltip}
-            <Bar activeBar={{ fillOpacity: chartMarkOpacity.active }} dataKey="value" fill={chartItem.color} fillOpacity={chartOpacityForFocus(true)} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        ) : (
-          <LineChart data={data}>
-            {reportChartAxes({ dataKey: 'periodLabel', ...axis })}
-            {tooltip}
-            <Line activeDot={{ opacity: chartMarkOpacity.active, r: 4 }} dataKey="value" dot={{ opacity: chartOpacityForFocus(true), r: 3 }} name={`${chartItem.emoji} ${chartItem.name}`} stroke={chartItem.color} strokeOpacity={chartOpacityForFocus(true)} strokeWidth={3} type="monotone" />
-          </LineChart>
-        )
-      }
-    </TrendsChartFrame>
-  )
-}
-
-function LineTrendsChartView({
-  chartItems,
-  data,
-  onLegendClick,
-}: {
-  chartItems: ChartItem[]
-  data: StackedDataPoint[]
-  onLegendClick?: (categoryId: string) => void
-}) {
-  return (
-    <TrendsChartFrame footer={<ChartLegend chartItems={chartItems} onLegendClick={onLegendClick} />} pointCount={data.length}>
-      {(axis) => (
-        <LineChart data={data}>
-          {reportChartAxes({ dataKey: 'periodLabel', ...axis })}
-          <Tooltip formatter={(value, name) => [formatCurrency(Number(value)), name]} />
-          {chartItems.map((item) => (
-            <Line
-              activeDot={{ opacity: chartMarkOpacity.active, r: 4 }}
-              dataKey={item.name}
-              dot={{ opacity: chartOpacityForFocus(false), r: 3 }}
-              key={item.id}
-              name={`${item.emoji} ${item.name}`}
-              stroke={item.color}
-              strokeOpacity={chartOpacityForFocus(false)}
-              strokeWidth={3}
-              type="monotone"
-            />
-          ))}
-        </LineChart>
-      )}
-    </TrendsChartFrame>
-  )
-}
-
-function focusedTrendData(periods: SpendingPeriod[], focusedCategoryId: string, groupBy?: GroupBy) {
-  return periods.map((p) => {
-    const slice = spendingSlices(p.categories, groupBy).find((item) => item.id === focusedCategoryId)
-    return { periodLabel: p.periodLabel, value: slice?.total ?? 0 }
+function stackedData(periods: SpendingPeriod[], chartItems: ChartItem[], groupBy?: GroupBy): StackedDataPoint[] {
+  const known = new Map(chartItems.map((item) => [item.id, item.name]))
+  return periods.map((period) => {
+    const point: StackedDataPoint = { periodLabel: period.periodLabel, total: period.total }
+    for (const item of chartItems) point[item.name] = 0
+    for (const slice of spendingSlices(period.categories, groupBy)) {
+      const name = known.get(slice.id) ?? 'Everything else'
+      point[name] = Number(point[name] ?? 0) + Math.max(0, slice.total)
+    }
+    return point
   })
 }
 
-function StackedTooltip({
-  chartItems,
-  payload,
-}: {
-  chartItems: ChartItem[]
-  payload?: Array<{ name: string; value: number; color: string; payload?: { periodLabel?: string } }>
-}) {
-  if (!payload?.length) return null
-
-  const periodLabel = payload[0]?.payload?.periodLabel
-  const total = payload.reduce((sum, entry) => sum + (entry.value ?? 0), 0)
-
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-3 shadow-lg">
-      <div className="mb-2 text-sm font-semibold">{periodLabel}</div>
-      <div className="mb-2 font-medium">{formatCurrency(total)}</div>
-      <div className="space-y-1">
-        {payload
-          .filter((entry) => entry.value > 0)
-          .sort(compareTooltipEntries)
-          .map((entry) => {
-            const chartItem = chartItems.find((ci) => ci.name === entry.name)
-
-            return (
-              <div className="flex items-center gap-2 text-sm" key={entry.name}>
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                <span className="text-neutral-600">{chartItem ? `${chartItem.emoji} ${chartItem.name}` : entry.name}</span>
-                <span className="ml-auto tabular-nums">{formatCurrency(entry.value)}</span>
-              </div>
-            )
-          })}
-      </div>
-    </div>
-  )
-}
-
 function aggregateCategories(periods: SpendingPeriod[]): CategorySpending[] {
-  const categoriesById = new Map<string, CategorySpending>()
-
+  const byId = new Map<string, CategorySpending>()
   for (const item of periods.flatMap((period) => period.categories)) {
-    const existing = categoriesById.get(item.category.id)
+    const existing = byId.get(item.category.id)
     if (existing) {
       existing.total += item.total
       existing.transactionCount += item.transactionCount
       existing.percentOfTotal += item.percentOfTotal
     } else {
-      categoriesById.set(item.category.id, { ...item })
+      byId.set(item.category.id, { ...item })
     }
   }
-
-  return [...categoriesById.values()].sort((a, b) => b.total - a.total)
+  return [...byId.values()].sort((a, b) => b.total - a.total)
 }
 
 function spendingSlices(categories: CategorySpending[], groupBy?: GroupBy) {
   return groupBy === 'group'
     ? aggregateByGroup(categories)
-    : categories.map((item) => ({
-        id: item.category.id,
-        name: item.category.name,
-        emoji: item.category.emoji,
-        total: item.total,
-        transactionCount: item.transactionCount,
-        percentOfTotal: item.percentOfTotal,
-      }))
-}
-
-function compareTooltipEntries(a: { name: string; value: number }, b: { name: string; value: number }) {
-  if (a.name === 'Everything else') return 1
-  if (b.name === 'Everything else') return -1
-  return b.value - a.value
+    : categories.map((item) => ({ id: item.category.id, name: item.category.name, emoji: item.category.emoji, total: item.total, transactionCount: item.transactionCount, percentOfTotal: item.percentOfTotal }))
 }

@@ -6,6 +6,12 @@ import { absoluteRoutePath, REVIEW_PATHS } from '../../routes'
 import { LocationPathname, renderWithProviders } from '../../test/renderWithProviders'
 import { AssetReviewQueue } from './AssetReviewQueue'
 
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+
+vi.mock('../../hooks/useIsMobile', () => ({
+  useIsMobile: () => mockViewport.isMobile,
+}))
+
 const mocks = vi.hoisted(() => ({
   reexecuteQuery: vi.fn(),
   updateAsset: vi.fn(),
@@ -31,6 +37,7 @@ vi.mock('./AssetEditModal', () => ({
 
 describe('AssetReviewQueue', () => {
   beforeEach(() => {
+    mockViewport.isMobile = false
     mocks.reexecuteQuery.mockClear()
     mocks.updateAsset.mockReset().mockResolvedValue({ data: { updateAsset: { asset: null } }, error: null })
     mocks.useQuery.mockReset()
@@ -41,7 +48,7 @@ describe('AssetReviewQueue', () => {
 
     renderQueue()
 
-    expect(screen.getByText(/All asset tickers are resolving correctly/i)).toBeTruthy()
+    expect(screen.getByText('All asset tickers are resolving')).toBeTruthy()
   })
 
   it('retries failed connectivity fields', async () => {
@@ -52,6 +59,17 @@ describe('AssetReviewQueue', () => {
 
     await waitFor(() => expect(mocks.updateAsset).toHaveBeenCalledWith({ input: { id: 'asset-1', priceConnectivity: 'HEALTHY' } }))
     expect(mocks.reexecuteQuery).toHaveBeenCalledWith({ requestPolicy: 'network-only' })
+  })
+
+  it('stacks actions under the asset on mobile', async () => {
+    mockViewport.isMobile = true
+    mocks.useQuery.mockReturnValue([{ data: { assets: { items: [{ id: 'asset-1', identifier: 'BAD', name: 'Bad Fund', assetType: 'SECURITY', classifier: 'PUBLIC', priceConnectivity: 'NOT_FOUND', investmentConnectivity: 'HEALTHY' }] } }, fetching: false, error: null }, mocks.reexecuteQuery])
+
+    renderQueue()
+    expect(screen.getByText('Bad Fund').compareDocumentPosition(screen.getByRole('button', { name: 'Retry' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(mocks.updateAsset).toHaveBeenCalledWith({ input: { id: 'asset-1', priceConnectivity: 'HEALTHY' } }))
   })
 
   it('dismisses both failed connectivity fields', async () => {

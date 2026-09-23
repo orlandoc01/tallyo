@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tags } from '../../mocks/fixtures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { allowAllPermissionResult } from '../../test/permissions'
-import { captureMutation, mockQuery } from '../../test/msw'
-import { GraphqlTestProvider } from '../../test/renderWithProviders'
+import { captureMutation, mockGraphqlError, mockQuery } from '../../test/msw'
+import { server } from '../../mocks/server'
+import { HttpResponse, delay, graphql } from 'msw'
+import { GraphqlTestProvider, renderWithProviders } from '../../test/renderWithProviders'
 import type { Tag } from '../../types/graphql'
 import { TagsTab } from '../settings/TagsTab'
 import { CreateTagModal } from './CreateTagModal'
@@ -85,7 +87,7 @@ describe('tag components', () => {
     mockQuery('Tags', { tags: { __typename: 'TagList', items: tags } })
     const deleteTag = captureMutation('DeleteTag', { deleteTag: { __typename: 'DeleteTagPayload', success: true } })
 
-    render(<TagsTab />, { wrapper: GraphqlTestProvider })
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
 
     expect(await screen.findByText(tags[0].name)).toBeInTheDocument()
     await user.click(screen.getAllByRole('button', { name: /delete/i })[0])
@@ -101,7 +103,7 @@ describe('tag components', () => {
     mockQuery('Tags', { tags: { __typename: 'TagList', items: tags } })
     const createTag = captureMutation('CreateTag', { createTag: { __typename: 'CreateTagPayload', tag: savedTag } })
 
-    render(<TagsTab />, { wrapper: GraphqlTestProvider })
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
 
     await user.click(await screen.findByRole('button', { name: /new tag/i }))
     await user.type(screen.getByRole('textbox', { name: /name/i }), 'Client')
@@ -117,7 +119,7 @@ describe('tag components', () => {
     mockQuery('Tags', { tags: { __typename: 'TagList', items: tags } })
     const updateTag = captureMutation('UpdateTag', { updateTag: { __typename: 'UpdateTagPayload', tag: savedTag } })
 
-    render(<TagsTab />, { wrapper: GraphqlTestProvider })
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
 
     await user.click((await screen.findAllByRole('button', { name: /edit/i }))[0])
     const name = screen.getByRole('textbox', { name: /name/i })
@@ -134,7 +136,7 @@ describe('tag components', () => {
 
     mockQuery('Tags', { tags: { __typename: 'TagList', items: tags } })
 
-    render(<TagsTab />, { wrapper: GraphqlTestProvider })
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
 
     await user.click(await screen.findByRole('button', { name: /new tag/i }))
     await user.click(screen.getByRole('button', { name: /cancel/i }))
@@ -143,6 +145,38 @@ describe('tag components', () => {
     await user.click(screen.getAllByRole('button', { name: /edit/i })[0])
     await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(screen.queryByText('Edit tag')).not.toBeInTheDocument()
+  })
+
+  it('shows the spinner, not the empty state, while tags are loading', async () => {
+    server.use(graphql.link('/query').query('Tags', async () => {
+      await delay(200)
+      return HttpResponse.json({ data: { tags: { __typename: 'TagList', items: tags } } })
+    }))
+
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
+
+    expect(await screen.findByRole('status')).toBeInTheDocument()
+    expect(screen.queryByText('No tags yet')).not.toBeInTheDocument()
+    expect(await screen.findByText(tags[0].name)).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('shows the empty state when there are no tags', async () => {
+    mockQuery('Tags', { tags: { __typename: 'TagList', items: [] } })
+
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
+
+    expect(await screen.findByText('No tags yet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /new tag/i })).toBeInTheDocument()
+  })
+
+  it('shows the error state when tags fail to load', async () => {
+    mockGraphqlError('Tags', 'tags unavailable', { status: 500 })
+
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/tags unavailable/)
+    expect(screen.queryByText('No tags yet')).not.toBeInTheDocument()
   })
 
   it('hides tag write controls from settings without tag write scope', async () => {
@@ -154,7 +188,7 @@ describe('tag components', () => {
 
     mockQuery('Tags', { tags: { __typename: 'TagList', items: tags } })
 
-    render(<TagsTab />, { wrapper: GraphqlTestProvider })
+    renderWithProviders(<TagsTab />, { withGraphql: true, withMobileHeader: true })
 
     expect(await screen.findByText(tags[0].name)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /new tag/i })).not.toBeInTheDocument()
