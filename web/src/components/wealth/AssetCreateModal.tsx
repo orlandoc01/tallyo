@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useMutation } from 'urql'
-import { SelectField, TextField } from '../common/FormControls'
+import { FormError, SelectField, TextField } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
 import { ModalTitleRow } from '../common/ModalHeader'
 import { CREATE_ASSET_MUTATION } from '../../graphql/mutations'
@@ -149,7 +149,7 @@ export function AssetCreateModal({
           ) : null}
         </div>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <FormError>{error}</FormError> : null}
 
         {canEdit ? <ModalActions busy={isSaving} busyIcon={<Loader2 className="h-4 w-4 animate-spin" />} disabled={!canSave} onCancel={onClose} submitLabel="Create" /> : null}
       </form>

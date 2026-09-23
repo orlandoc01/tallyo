@@ -32,8 +32,8 @@ export function AssetTrackingFields({
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-        <TextField controlClassName="rounded-xl" disabled={!canEdit} label="Tracking ticker" onChange={onTickerChange} placeholder="Defaults to identifier" type="text" value={trackingTicker} />
-        <TextField ariaLabel="Tracking multiplier" controlClassName="rounded-xl" disabled={!canEdit} label="Multiplier" onChange={onMultiplierChange} step="0.01" type="number" value={trackingMultiplier} />
+        <TextField disabled={!canEdit} label="Tracking ticker" onChange={onTickerChange} placeholder="Defaults to identifier" type="text" value={trackingTicker} />
+        <TextField ariaLabel="Tracking multiplier" disabled={!canEdit} label="Multiplier" onChange={onMultiplierChange} step="0.01" type="number" value={trackingMultiplier} />
       </div>
       <div className="mt-3 flex items-center gap-2 text-xs">
         <Button className="gap-1" disabled={verifyDisabled} onClick={onVerify} size="sm" type="button" variant="secondary">
@@ -42,12 +42,12 @@ export function AssetTrackingFields({
         </Button>
         <span aria-live="polite" className="contents">
           {quote ? (
-            <span className="text-neutral-500">
-              {formatUnitPrice(quote.price)} <span className="text-neutral-400">quoted {formatTransactionDatetime(quote.asOf)}</span>
+            <span className="text-text-3">
+              {formatUnitPrice(quote.price)} <span className="text-text-faint">quoted {formatTransactionDatetime(quote.asOf)}</span>
             </span>
           ) : null}
         </span>
-        {quoteError ? <span className="text-red-500" role="alert">{quoteError}</span> : null}
+        {quoteError ? <span className="text-negative" role="alert">{quoteError}</span> : null}
       </div>
     </div>
   )

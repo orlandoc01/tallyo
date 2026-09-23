@@ -1,6 +1,8 @@
-import { formatCurrency } from '../../utils/currency'
-import { CASH_FLOW_EXPENSE_BAR_FILL, CASH_FLOW_INCOME_BAR_FILL } from '../../utils/colors'
-import { chartOpacityForFocus } from '../../utils/chartStyles'
+import clsx from 'clsx'
+import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
+import { DottedBar } from '../common/DottedBar'
+import { Card } from '../common/FormControls'
+import { BUDGET_BAR_COLOR, budgetBarPercent, budgetPercent } from './budgetMath'
 
 export function BudgetTotals({
   report,
@@ -15,55 +17,45 @@ export function BudgetTotals({
   }
 }) {
   const totals = [
-    { label: 'Income', planned: report.incomeBudgeted, actual: report.incomeActual, color: 'emerald' },
-    { label: 'Expenses', planned: report.expensesBudgeted, actual: report.expensesActual, color: 'rose' },
-    { label: 'Net', planned: report.remainingBudgeted, actual: report.remainingActual, color: 'emerald' },
-  ] as const
+    { label: 'Income', planned: report.incomeBudgeted, actual: report.incomeActual, color: BUDGET_BAR_COLOR.INCOME, textClass: 'text-positive', format: formatCurrency },
+    { label: 'Expenses', planned: report.expensesBudgeted, actual: report.expensesActual, color: BUDGET_BAR_COLOR.EXPENSE, textClass: 'text-negative', format: formatCurrency },
+    { label: 'Net', planned: report.remainingBudgeted, actual: report.remainingActual, color: BUDGET_BAR_COLOR.NET, textClass: 'text-accent', format: formatSignedCurrency },
+  ]
 
   return (
-    <div className="space-y-5 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      {totals.map((total) => (
-        <BudgetTotalProgress key={total.label} {...total} />
-      ))}
-    </div>
+    <Card className="px-4 py-3.5 lg:px-5 lg:py-4">
+      <div className="grid gap-3.5 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] lg:gap-x-8 lg:gap-y-4">
+        {totals.map((total) => (
+          <BudgetTotalBlock key={total.label} {...total} />
+        ))}
+      </div>
+    </Card>
   )
 }
 
-function BudgetTotalProgress({
-  label,
-  planned,
-  actual,
-  color,
-}: {
+function BudgetTotalBlock({ actual, color, format, label, planned, textClass }: {
+  actual: number
+  color: string
+  format: (amount: number) => string
   label: string
   planned: number
-  actual: number
-  color: 'emerald' | 'rose'
+  textClass: string
 }) {
-  const ratio = planned > 0 ? actual / planned : 0
-  const percent = Math.max(0, Math.min(1, ratio)) * 100
-  const percentLabel = planned > 0 ? `${Math.round(ratio * 100)}%` : 'No plan'
-  const barFill = color === 'rose' ? CASH_FLOW_EXPENSE_BAR_FILL : CASH_FLOW_INCOME_BAR_FILL
-  const textClass = color === 'rose' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+  const percent = budgetPercent(actual, planned)
+  const barPercent = budgetBarPercent(actual, planned)
 
   return (
-    <div aria-label={`${label} budget summary`}>
-      <div className="mb-1 flex items-end justify-between gap-3">
-        <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{label}</div>
-        <div className="flex items-baseline justify-end gap-2 text-right text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          <div>Planned</div>
-          <div className={`text-sm normal-case tracking-normal tabular-nums ${textClass}`}>{formatCurrency(planned)}</div>
-        </div>
+    <div aria-label={`${label} budget summary`} className="min-w-0">
+      <div className="flex items-baseline justify-between gap-3 text-xs text-text-muted">
+        <span>{label}</span>
+        <span className="tabular-nums">{percent === null ? 'No plan' : `${percent}% of plan`}</span>
       </div>
-      <div aria-label={`${label} progress`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.round(percent)} className="h-3 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800" role="progressbar">
-        <div className="h-full rounded-full transition-all" style={{ backgroundColor: barFill, opacity: chartOpacityForFocus(false), width: `${percent}%` }} />
+      <div className="mt-0.5 flex items-baseline justify-between gap-3">
+        <span className={clsx('truncate text-[17px] font-semibold leading-[22px] tracking-[-0.3px] tabular-nums lg:text-lg lg:leading-6', textClass)}>{format(actual)}</span>
+        <span className="shrink-0 text-xs tabular-nums text-text-muted">/ <span>{format(planned)}</span></span>
       </div>
-      <div className="mt-1 flex items-start justify-between gap-3 text-sm">
-        <span className="font-semibold tabular-nums text-neutral-600 dark:text-neutral-300">{percentLabel}</span>
-        <div className="flex items-baseline justify-end gap-2 text-right">
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Actual</div>
-          <div className={`font-semibold tabular-nums ${textClass}`}>{formatCurrency(actual)}</div>
-        </div>
+      <div aria-label={`${label} progress`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={barPercent} className="mt-2" role="progressbar">
+        <DottedBar color={color} percent={barPercent} />
       </div>
     </div>
   )

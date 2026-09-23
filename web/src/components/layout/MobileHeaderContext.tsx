@@ -5,7 +5,6 @@ import { MobileHeaderContext, type MobileHeaderContextValue } from './mobileHead
 export function MobileHeaderProvider({ children }: { children: ReactNode }) {
   const [filterOpen, setFilterOpen] = useState(false)
   const [filtersActive, setFiltersActive] = useState(false)
-  const [headerLeading, setHeaderLeading] = useState<ReactNode | null>(null)
   const [headerActions, setHeaderActions] = useState<ReactNode | null>(null)
 
   const openFilter = useCallback(() => setFilterOpen(true), [])
@@ -18,12 +17,10 @@ export function MobileHeaderProvider({ children }: { children: ReactNode }) {
       openFilter,
       closeFilter,
       setFiltersActive,
-      headerLeading,
-      setHeaderLeading,
       headerActions,
       setHeaderActions,
     }),
-    [filterOpen, filtersActive, openFilter, closeFilter, headerLeading, headerActions],
+    [filterOpen, filtersActive, openFilter, closeFilter, headerActions],
   )
 
   return (

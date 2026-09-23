@@ -11,7 +11,7 @@ describe('ConnectionsTab', () => {
     const user = userEvent.setup()
     render(<ConnectionsTab />, { wrapper: GraphqlTestProvider })
 
-    await user.click(screen.getByRole('tab', { name: /simplefin/i }))
+    await user.click(screen.getByRole('radio', { name: /simplefin/i }))
     expect(await screen.findByText('SimpleFIN Bridge')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /expand simplefin bridge/i }))
@@ -23,7 +23,7 @@ describe('ConnectionsTab', () => {
     const user = userEvent.setup()
     render(<ConnectionsTab />, { wrapper: GraphqlTestProvider })
 
-    await user.click(screen.getByRole('tab', { name: /simplefin/i }))
+    await user.click(screen.getByRole('radio', { name: /simplefin/i }))
     await user.click(await screen.findByRole('button', { name: /create access token/i }))
 
     const dialog = screen.getByRole('dialog', { name: /link connection/i })

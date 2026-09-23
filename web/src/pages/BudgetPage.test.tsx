@@ -2,8 +2,10 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { graphql, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { usePermissions } from '../hooks/usePermissions'
 import { server } from '../mocks/server'
+import { allowAllPermissionResult } from '../test/permissions'
 import { mockGraphqlError, mockQuery } from '../test/msw'
 import { LocationDisplay, MobileHeaderActionsHost, renderWithProviders } from '../test/renderWithProviders'
 import { BudgetPage } from './BudgetPage'
@@ -34,9 +36,212 @@ function useExistingBudgetHistory(month = '2026-06') {
   })
 }
 
+function useSetBudgetMock() {
+  const calls: { month: string; categoryId: string; amount: number }[] = []
+  server.use(
+    graphql.link('/query').mutation<Record<string, unknown>, { input: { month: string; categoryId: string; amount: number } }>('SetBudget', ({ variables: { input } }) => {
+      calls.push(input)
+      return HttpResponse.json({
+        data: {
+          setBudget: {
+            __typename: 'SetBudgetPayload',
+            budget: {
+              __typename: 'Budget',
+              id: input.categoryId,
+              month: input.month,
+              amount: input.amount,
+              category: { __typename: 'Category', id: input.categoryId, name: 'Utilities', emoji: '💡', groupName: 'Home', groupEmoji: '🏠', kind: 'EXPENSE', sortOrder: 6, plaidPFC2Codes: [] },
+            },
+          },
+        },
+      })
+    }),
+  )
+  return calls
+}
+
+function useEmptyMonthHistory(months: string[]) {
+  mockQuery('BudgetReportHistory', {
+    budgetReportHistory: {
+      __typename: 'BudgetReportHistory',
+      items: months.map((month) => ({ __typename: 'BudgetReport', month, expensesBudgeted: 500, expensesActual: 200, incomeBudgeted: 0, incomeActual: 0, remainingBudgeted: -500, remainingActual: -200 })),
+    },
+  })
+}
+
+const groceries = { __typename: 'Category', id: '1', name: 'Groceries', emoji: '🍏', groupName: 'Food', groupEmoji: '🍽️', kind: 'EXPENSE', sortOrder: 1, plaidPFC2Codes: [] }
+
+function foodReport(month: string, lines: Array<{ category: typeof groceries; budgeted: number; actual: number }>) {
+  const budgeted = lines.reduce((sum, line) => sum + line.budgeted, 0)
+  const actual = lines.reduce((sum, line) => sum + line.actual, 0)
+  return {
+    __typename: 'BudgetReport',
+    month,
+    expensesBudgeted: budgeted,
+    expensesActual: actual,
+    incomeBudgeted: 0,
+    incomeActual: 0,
+    remainingBudgeted: -budgeted,
+    remainingActual: -actual,
+    sections: [{
+      __typename: 'BudgetSection',
+      label: 'Food',
+      budgeted,
+      actual,
+      remaining: budgeted - actual,
+      group: { __typename: 'CategoryGroup', id: '1', name: 'Food', emoji: '🍽️', kind: 'EXPENSE' },
+      lines: lines.map((line) => ({ __typename: 'BudgetLine', id: line.category.id, remaining: line.budgeted - line.actual, ...line })),
+    }],
+  }
+}
+
 describe('BudgetPage', () => {
   beforeEach(() => {
     useExistingBudgetHistory()
+  })
+
+  afterEach(() => {
+    vi.mocked(usePermissions).mockReturnValue(allowAllPermissionResult)
+  })
+
+  it('adds a budget for an unbudgeted category through the header modal', async () => {
+    const user = userEvent.setup()
+    const setBudgetCalls = useSetBudgetMock()
+
+    renderBudgetPage()
+
+    await screen.findByLabelText('Income budget summary')
+    await user.click(screen.getAllByRole('button', { name: 'Add budget' })[0])
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add budget' })
+    const select = within(dialog).getByRole('combobox', { name: 'Category' })
+    expect(within(select).queryByRole('option', { name: /groceries/i })).not.toBeInTheDocument()
+    await user.selectOptions(select, '6')
+    await user.type(within(dialog).getByLabelText('Amount'), '125')
+    await user.click(within(dialog).getByRole('button', { name: 'Save budget' }))
+
+    await waitFor(() => expect(setBudgetCalls).toContainEqual({ month: '2026-06', categoryId: '6', amount: 125 }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add budget' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: /review budget targets/i })).not.toBeInTheDocument()
+  })
+
+  it('disables Add budget once every category has a budget', async () => {
+    const budgetedIds = ['1', '2', '3', '5', '6', '7', '8', '9']
+    mockQuery('BudgetReport', {
+      budgetReport: foodReport('2026-06', budgetedIds.map((id) => ({ category: { ...groceries, id, name: `Category ${id}` }, budgeted: 10, actual: 1 }))),
+    })
+
+    renderBudgetPage()
+
+    await screen.findByLabelText('Income budget summary')
+    const addButtons = screen.getAllByRole('button', { name: 'Add budget' })
+    expect(addButtons).toHaveLength(2)
+    expect(within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: 'Add budget' })).toBeDisabled()
+    for (const button of addButtons) {
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('title', 'Every category already has a budget')
+    }
+  })
+
+  it('adding a budget to an empty month flips into the month view', async () => {
+    const user = userEvent.setup()
+    const setBudgetCalls = useSetBudgetMock()
+    useEmptyMonthHistory(['2026-05'])
+
+    renderBudgetPage('/budgets/2026-06')
+
+    await screen.findByRole('heading', { name: 'No budget for June 2026' })
+    await user.click(screen.getAllByRole('button', { name: 'Add budget' })[0])
+    const dialog = await screen.findByRole('dialog', { name: 'Add budget' })
+    await user.type(within(dialog).getByLabelText('Amount'), '80')
+    await user.click(within(dialog).getByRole('button', { name: 'Save budget' }))
+
+    await waitFor(() => expect(setBudgetCalls).toHaveLength(1))
+    expect(setBudgetCalls[0].month).toBe('2026-06')
+    expect(await screen.findByLabelText('Income budget summary')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'No budget for June 2026' })).not.toBeInTheDocument()
+  })
+
+  it('waits for the previous month report before prefilling wizard drafts', async () => {
+    const user = userEvent.setup()
+    let releasePrevious = () => {}
+    const previousSettled = new Promise<void>((resolve) => { releasePrevious = resolve })
+    server.use(
+      graphql.link('/query').query<Record<string, unknown>, { input: { month: string } }>('BudgetReport', async ({ variables }) => {
+        const month = variables.input.month
+        if (month === '2026-05') await previousSettled
+        return HttpResponse.json({ data: { budgetReport: foodReport(month, [{ category: groceries, budgeted: 0, actual: 390 }]) } })
+      }),
+    )
+    useEmptyMonthHistory(['2026-05'])
+
+    renderBudgetPage('/budgets/2026-06')
+
+    await user.click(await screen.findByRole('button', { name: 'Set up manually' }))
+    expect(await screen.findByRole('heading', { name: /review budget targets/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Budget amount for Groceries')).not.toBeInTheDocument()
+
+    releasePrevious()
+
+    expect(await screen.findByLabelText('Budget amount for Groceries')).toHaveValue('390.00')
+    expect(screen.getByText('Last month: $390.00')).toBeInTheDocument()
+  })
+
+  it('opens the add-budget modal from the mobile header action', async () => {
+    const user = userEvent.setup()
+
+    renderBudgetPage()
+
+    await screen.findByLabelText('Income budget summary')
+    await user.click(within(screen.getByTestId('mobile-header-actions')).getByRole('button', { name: 'Add budget' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Add budget' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add budget' })).not.toBeInTheDocument())
+  })
+
+  it('hides every write affordance without budget write access', async () => {
+    vi.mocked(usePermissions).mockReturnValue({ canRead: () => true, canWrite: () => false, hasScope: () => true })
+    useEmptyMonthHistory(['2026-05'])
+
+    renderBudgetPage('/budgets/2026-06')
+
+    expect(await screen.findByLabelText('Income budget summary')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add budget' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit budget for Groceries' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy from/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set up manually' })).not.toBeInTheDocument()
+    expect(screen.getByText('$460.00')).toBeInTheDocument()
+  })
+
+  it('copies from the only budgeted month without a month picker', async () => {
+    const user = userEvent.setup()
+    const copyCalls: { fromMonth: string; toMonth: string }[] = []
+    server.use(
+      graphql.link('/query').mutation<Record<string, unknown>, { input: { fromMonth: string; toMonth: string } }>('CopyBudgets', ({ variables }) => {
+        copyCalls.push(variables.input)
+        return HttpResponse.json({ data: { copyBudgets: { __typename: 'CopyBudgetsPayload', copiedCount: 3 } } })
+      }),
+    )
+    useEmptyMonthHistory(['2026-05'])
+
+    renderBudgetPage('/budgets/2026-06')
+
+    await user.click(await screen.findByRole('button', { name: 'Copy from May 2026' }))
+    expect(screen.queryByRole('combobox', { name: 'Month to copy from' })).not.toBeInTheDocument()
+    await waitFor(() => expect(copyCalls).toEqual([{ fromMonth: '2026-05', toMonth: '2026-06' }]))
+  })
+
+  it('cancels the setup wizard back to the empty-month state', async () => {
+    const user = userEvent.setup()
+    useEmptyMonthHistory(['2026-05'])
+
+    renderBudgetPage('/budgets/2026-06')
+
+    await user.click(await screen.findByRole('button', { name: 'Set up manually' }))
+    expect(await screen.findByRole('heading', { name: /review budget targets/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('heading', { name: 'No budget for June 2026' })).toBeInTheDocument()
   })
 
   it('renders sections, lines, and totals from the report', async () => {
@@ -73,21 +278,19 @@ describe('BudgetPage', () => {
     const expensesProgress = await screen.findByRole('progressbar', { name: 'Expenses progress' })
     const netProgress = await screen.findByRole('progressbar', { name: 'Net progress' })
 
-    expect(within(incomeSummary).getByText('Planned').compareDocumentPosition(within(incomeSummary).getByText('$1,600.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(incomeSummary).getByText('Actual').compareDocumentPosition(within(incomeSummary).getByText('$1,680.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(expensesSummary).getByText('Planned').compareDocumentPosition(within(expensesSummary).getByText('$780.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(expensesSummary).getByText('Actual').compareDocumentPosition(within(expensesSummary).getByText('$640.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(netSummary).getByText('Planned').compareDocumentPosition(within(netSummary).getByText('$820.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(within(netSummary).getByText('Actual').compareDocumentPosition(within(netSummary).getByText('$1,040.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(within(incomeSummary).getByText('$1,680.00').compareDocumentPosition(within(incomeSummary).getByText('$1,600.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(within(expensesSummary).getByText('$640.00').compareDocumentPosition(within(expensesSummary).getByText('$780.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(within(netSummary).getByText('$1,040.00').compareDocumentPosition(within(netSummary).getByText('$820.00'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(incomeProgress).toHaveAttribute('aria-valuenow', '100')
     expect(expensesProgress).toHaveAttribute('aria-valuenow', '82')
     expect(netProgress).toHaveAttribute('aria-valuenow', '100')
     expect(incomeProgress.compareDocumentPosition(expensesProgress)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(expensesProgress.compareDocumentPosition(netProgress)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(screen.getAllByText('Planned').length).toBeGreaterThanOrEqual(3)
-    expect(screen.getAllByText('Actual').length).toBeGreaterThanOrEqual(3)
-    expect(screen.getAllByText('105%').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('127%')).toBeInTheDocument()
+    expect(within(incomeSummary).getByText('105% of plan')).toBeInTheDocument()
+    expect(within(expensesSummary).getByText('82% of plan')).toBeInTheDocument()
+    expect(within(netSummary).getByText('127% of plan')).toBeInTheDocument()
+    expect(screen.getByText('85%')).toBeInTheDocument()
+    expect(screen.getByText('78%')).toBeInTheDocument()
   })
 
   it('navigates months with the stepper', async () => {
@@ -240,8 +443,8 @@ describe('BudgetPage', () => {
     renderBudgetPage()
 
     expect(await screen.findByLabelText('Income budget summary')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /copy last month/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /copy month/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy from/i })).not.toBeInTheDocument()
   })
 
   it('shows first-budget setup when there is no budget history', async () => {
@@ -271,8 +474,8 @@ describe('BudgetPage', () => {
     renderBudgetPage('/budgets/2026-06')
 
     expect(await screen.findByRole('heading', { name: /set up your first monthly budget/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /copy last month/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: /budget view/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /copy month/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup', { name: /budget view/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /setup budget/i }))
 
@@ -305,24 +508,26 @@ describe('BudgetPage', () => {
     mockQuery('BudgetReportHistory', {
       budgetReportHistory: {
         __typename: 'BudgetReportHistory',
-        items: [{ __typename: 'BudgetReport', month: '2026-05', expensesBudgeted: 500, expensesActual: 200, incomeBudgeted: 0, incomeActual: 0, remainingBudgeted: -500, remainingActual: -200 }],
+        items: [
+          { __typename: 'BudgetReport', month: '2026-04', expensesBudgeted: 400, expensesActual: 100, incomeBudgeted: 0, incomeActual: 0, remainingBudgeted: -400, remainingActual: -100 },
+          { __typename: 'BudgetReport', month: '2026-05', expensesBudgeted: 500, expensesActual: 200, incomeBudgeted: 0, incomeActual: 0, remainingBudgeted: -500, remainingActual: -200 },
+        ],
       },
     })
 
     renderBudgetPage('/budgets/2026-06')
 
-    expect(await screen.findByRole('button', { name: /copy month/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^setup$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No budget for June 2026' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy from May 2026' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set up manually' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /set up your first monthly budget/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Income budget summary')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Expenses budget summary')).not.toBeInTheDocument()
 
-    // month picker defaults to the last budget month (May 2026)
-    const select = screen.getByRole('combobox')
+    const select = screen.getByRole('combobox', { name: 'Month to copy from' })
     expect(select).toHaveValue('2026-05')
 
-    // copy button calls copyBudgets with the selected source month
-    await user.click(screen.getByRole('button', { name: /copy month/i }))
+    await user.click(screen.getByRole('button', { name: 'Copy from May 2026' }))
     await waitFor(() => expect(copyCalls.length).toBeGreaterThan(0))
     expect(copyCalls[0].fromMonth).toBe('2026-05')
     expect(copyCalls[0].toMonth).toBe('2026-06')

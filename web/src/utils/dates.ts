@@ -48,7 +48,22 @@ export function formatRelativeTime(value: string, now = Date.now()) {
   if (hours < 24) return `${hours}h ago`
 
   const days = Math.round(hours / 24)
-  return `${days}d ago`
+  if (days < 30) return `${days}d ago`
+
+  const months = Math.round(days / 30)
+  if (months < 12) return `${months}mo ago`
+
+  return `${Math.round(days / 365)}y ago`
+}
+
+const STALE_SYNC_MS = 30 * 24 * 60 * 60 * 1000
+
+export function isSyncStale(lastSyncedAt: string, now = Date.now()) {
+  return now - new Date(lastSyncedAt).getTime() > STALE_SYNC_MS
+}
+
+export function formatScheduleTime(value?: string | null) {
+  return value ? format(new Date(value), 'M/d h:mm a') : 'not scheduled'
 }
 
 export function localDateKeyFromDatetime(value: string): string {
@@ -94,8 +109,10 @@ function formatDatetimeFull(value: string): string {
  * the date — the time component carries no real information. For exact timestamps
  * from Plaid, show the full date and local time.
  */
-export function formatTransactionDatetime(value: string): string {
-  return value.endsWith('T12:00:00Z') ? formatDatetimeAsDate(value) : formatDatetimeFull(value)
+export function formatTransactionDatetime(value: string, style: 'iso' | 'long' = 'iso'): string {
+  const sentinel = value.endsWith('T12:00:00Z')
+  if (style === 'long') return format(parseDatetime(value), sentinel ? 'MMMM d, yyyy' : 'MMMM d, yyyy h:mma')
+  return sentinel ? formatDatetimeAsDate(value) : formatDatetimeFull(value)
 }
 
 export function getCurrentPeriod(granularity: Granularity = 'MONTHLY', anchor = new Date()): PeriodRange {
@@ -169,4 +186,9 @@ function makePeriod(granularity: Granularity, anchor: Date): PeriodRange {
 
 function startOfLocalDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)
+}
+
+export function chartDateTick(date: string, { asOfDate, compact, lastDate }: { asOfDate?: string | null; compact: boolean; lastDate?: string }) {
+  if (date === lastDate && date === asOfDate) return 'Today'
+  return format(parseLocalDate(date), compact ? 'MMM' : 'MMM yyyy')
 }

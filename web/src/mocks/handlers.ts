@@ -27,8 +27,9 @@ import {
   demoNetWorthReport,
   persistAccountSnapshot,
 } from './fixtures'
+import { stubClassifierBreakdown, stubNetWorthAssetsUSD, stubNetWorthHistory } from './netWorthFixtures'
 import { cashFlowPeriodsForFilter, spendingReportForFilter, type ReportFilter } from './reportFixtures'
-import type { Account, AccountSnapshot, AccountSnapshotInput, AccountSnapshotsInput, AddUserInput, AnalysisInput, Asset, AssetsInput, BudgetReportInput, BulkDeleteTransactionsInput, BulkUpdateTransactionsInput, CashFlowPeriod, ChangeAccountSnapshotInput, CopyBudgetsInput, CreateAssetInput, CreateCategoryGroupInput, CreateCategoryInput, CreateManualAccountInput, CreateOwnerInput, CreatePlaidCredentialInput, CreateRuleInput, CreateSimpleFinAccessTokenInput, CreateTransactionInput, Holding, LinkEVMWalletInput, MergeAssetInput, ReorderCategoriesInput, RulesInput, SetBudgetInput, SpendingByCategoryReport, TransactionsFilter, TransactionsInput, UpdateAccountInput, UpdateCategoryGroupInput, UpdateCategoryInput, UpdateConnectionInput, UpdatePlaidCredentialInput, UpdateRuleInput, UpdateTransactionInput, UpdateUserInput, User } from '../types/graphql'
+import type { Account, AccountSnapshot, AccountSnapshotInput, AccountSnapshotsInput, AddUserInput, AnalysisInput, Asset, AssetsInput, BudgetReportInput, BulkDeleteTransactionsInput, BulkUpdateTransactionsInput, CashFlowPeriod, ChangeAccountSnapshotInput, CopyBudgetsInput, CreateAssetInput, CreateCategoryGroupInput, CreateCategoryInput, CreateManualAccountInput, CreateOwnerInput, CreatePlaidCredentialInput, CreateRuleInput, CreateSimpleFinAccessTokenInput, CreateTransactionInput, LinkEVMWalletInput, MergeAssetInput, ReorderCategoriesInput, RulesInput, SetBudgetInput, SpendingByCategoryReport, TransactionsFilter, TransactionsInput, UpdateAccountInput, UpdateCategoryGroupInput, UpdateCategoryInput, UpdateConnectionInput, UpdatePlaidCredentialInput, UpdateRuleInput, UpdateTransactionInput, UpdateUserInput, User } from '../types/graphql'
 
 const base = import.meta.env.BASE_URL
 const api = graphql.link(`${base}query`)
@@ -207,9 +208,10 @@ function transactionPage(items: ReturnType<typeof transactionsForInput>, input?:
   }
 }
 
+const stubApiStartedOnSetup = window.location.pathname.startsWith(`${base}setup`)
+
 function setupCompleteForStubApi() {
-  if (!disableAuthForStubApi) return true
-  return !window.location.pathname.startsWith(`${base}setup`)
+  return !disableAuthForStubApi || !stubApiStartedOnSetup
 }
 
 export const configuration = {
@@ -752,60 +754,29 @@ export const handlers = [
   api.query('NetWorth', ({ variables }) => {
     if (demoNetWorthReport) return HttpResponse.json({ data: { netWorth: demoNetWorthReport } })
     const { includeHoldings, input } = variables as { includeHoldings?: boolean; input?: { asOfDate?: string | null } }
-    const cashAccount: Account = { ...accounts[0], latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-cash', balanceUSD: 4500, netContributionUSD: 300 }, lastSyncedAt: '2026-05-21T10:00:00Z' }
-    const taxAdvantagedInvestmentAccount: Account = { ...accounts[1], id: 'acct-invest-tax-advantaged', name: 'Roth 401k', type: 'INVESTMENT', subtype: 'roth 401k', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-tax-advantaged', accountId: 'acct-invest-tax-advantaged', balanceUSD: 12200, netContributionUSD: 950 }, closed: false, lastSyncedAt: '2026-05-21T10:00:00Z' }
-    const investmentAccount: Account = { ...accounts[1], id: 'acct-invest-brokerage', name: 'Brokerage', type: 'INVESTMENT', subtype: 'brokerage', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-brokerage', accountId: 'acct-invest-brokerage', balanceUSD: 6000, netContributionUSD: 300 }, closed: false, lastSyncedAt: '2026-05-21T10:00:00Z' }
     const creditAccount: Account = { ...accounts[0], id: 'acct-credit', name: 'Credit Card', type: 'CREDIT', subtype: 'credit card', latestSnapshot: { ...accountSnapshots[0], id: 'snapshot-credit', accountId: 'acct-credit', balanceUSD: 1200, netContributionUSD: -150 }, lastSyncedAt: '2026-05-21T10:00:00Z' }
-    const rollupHoldings = (asset: Asset, rows: Array<{ account: Account; quantity: number | null; valueUSD: number }>): Holding[] | null => (
-      includeHoldings ? rows.map((row) => ({ __typename: 'Holding' as const, assetId: asset.id, asset, accountId: row.account.id, account: row.account, quantity: row.quantity, valueUSD: row.valueUSD, manual: false })) : null
-    )
-    const totals = input?.asOfDate
-      ? { asOfDate: input.asOfDate, currentNetWorthUSD: 19850, currentAssetsUSD: 21000, currentLiabilitiesUSD: 1150 }
-      : { asOfDate: '2026-05-21', currentNetWorthUSD: 23000, currentAssetsUSD: 24200, currentLiabilitiesUSD: 1200 }
+    const scale = input?.asOfDate ? 0.93 : 1
+    const currentAssetsUSD = Math.round(stubNetWorthAssetsUSD * scale)
+    const currentLiabilitiesUSD = input?.asOfDate ? 1150 : 1200
 
     return HttpResponse.json({
       data: {
         netWorth: {
           __typename: 'NetWorthReport',
-          ...totals,
-          classifierBreakdown: [
-            {
-              __typename: 'ClassifierBreakdown',
-              classifier: 'CASH',
-              label: 'Cash',
-              valueUSD: 4500,
-              percentOfAssets: 19.82,
-              assetCount: 1,
-              holdings: [{ __typename: 'HoldingRollup', asset: assets[0], totalQuantity: 4500, valueUSD: 4500, holdings: rollupHoldings(assets[0], [{ account: cashAccount, quantity: 4500, valueUSD: 4500 }]) }],
-            },
-            {
-              __typename: 'ClassifierBreakdown',
-              classifier: 'PUBLIC',
-              label: 'Public markets',
-              valueUSD: 18200,
-              percentOfAssets: 80.18,
-              assetCount: 2,
-              holdings: [{ __typename: 'HoldingRollup', asset: assets[1], totalQuantity: 66.06, valueUSD: 18200, holdings: rollupHoldings(assets[1], [{ account: taxAdvantagedInvestmentAccount, quantity: 44, valueUSD: 12200 }, { account: investmentAccount, quantity: 22.06, valueUSD: 6000 }]) }],
-            },
-            {
-              __typename: 'ClassifierBreakdown',
-              classifier: 'COMPANY_EQUITY',
-              label: 'Company Equity',
-              valueUSD: 1500,
-              percentOfAssets: 6.61,
-              assetCount: 1,
-              holdings: [{ __typename: 'HoldingRollup', asset: assets[4], totalQuantity: 10, valueUSD: 1500, holdings: rollupHoldings(assets[4], [{ account: investmentAccount, quantity: 10, valueUSD: 1500 }]) }],
-            },
-          ],
+          asOfDate: input?.asOfDate ?? '2026-05-21',
+          currentNetWorthUSD: currentAssetsUSD - currentLiabilitiesUSD,
+          currentAssetsUSD,
+          currentLiabilitiesUSD,
+          classifierBreakdown: stubClassifierBreakdown(includeHoldings ?? false, scale),
           liabilityBreakdown: [
             {
               __typename: 'LiabilityBreakdown',
               category: 'CARD',
               label: 'Cards',
-              valueUSD: totals.currentLiabilitiesUSD,
+              valueUSD: currentLiabilitiesUSD,
               percentOfLiabilities: 100,
               accountCount: 1,
-              balances: [{ __typename: 'LiabilityAccountBalance', account: creditAccount, balanceUSD: totals.currentLiabilitiesUSD }],
+              balances: [{ __typename: 'LiabilityAccountBalance', account: creditAccount, balanceUSD: currentLiabilitiesUSD }],
             },
           ],
         },
@@ -814,36 +785,14 @@ export const handlers = [
   }),
   api.query('HistoricalNetWorth', () => {
     if (demoHistoricalNetWorthReport) return HttpResponse.json({ data: { historicalNetWorth: demoHistoricalNetWorthReport } })
+    const { series, classifierSeries } = stubNetWorthHistory(1200)
     return HttpResponse.json({
       data: {
         historicalNetWorth: {
           __typename: 'HistoricalNetWorthReport',
-          series: [
-            { __typename: 'NetWorthPoint', date: '2026-01-01', totalAssetsUSD: 19000, totalLiabilitiesUSD: 1050, netWorthUSD: 17950 },
-            { __typename: 'NetWorthPoint', date: '2026-02-01', totalAssetsUSD: 20100, totalLiabilitiesUSD: 1100, netWorthUSD: 19000 },
-            { __typename: 'NetWorthPoint', date: '2026-03-01', totalAssetsUSD: 21000, totalLiabilitiesUSD: 1150, netWorthUSD: 19850 },
-            { __typename: 'NetWorthPoint', date: '2026-04-01', totalAssetsUSD: 22000, totalLiabilitiesUSD: 1200, netWorthUSD: 20800 },
-            { __typename: 'NetWorthPoint', date: '2026-05-01', totalAssetsUSD: 22700, totalLiabilitiesUSD: 1200, netWorthUSD: 21500 },
-          ],
-          classifierSeries: [
-            { __typename: 'ClassifierHistoryPoint', date: '2026-01-01', classifier: 'CASH', label: 'Cash & Equivalents', valueUSD: 4200 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-01-01', classifier: 'PUBLIC', label: 'Public Assets', valueUSD: 14800 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-02-01', classifier: 'CASH', label: 'Cash & Equivalents', valueUSD: 4300 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-02-01', classifier: 'PUBLIC', label: 'Public Assets', valueUSD: 15800 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-03-01', classifier: 'CASH', label: 'Cash & Equivalents', valueUSD: 4350 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-03-01', classifier: 'PUBLIC', label: 'Public Assets', valueUSD: 16650 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-04-01', classifier: 'CASH', label: 'Cash & Equivalents', valueUSD: 4425 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-04-01', classifier: 'PUBLIC', label: 'Public Assets', valueUSD: 17575 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-05-01', classifier: 'CASH', label: 'Cash & Equivalents', valueUSD: 4500 },
-            { __typename: 'ClassifierHistoryPoint', date: '2026-05-01', classifier: 'PUBLIC', label: 'Public Assets', valueUSD: 18200 },
-          ],
-          liabilitySeries: [
-            { __typename: 'LiabilityHistoryPoint', date: '2026-01-01', category: 'CARD', label: 'Credit Card', valueUSD: -1050 },
-            { __typename: 'LiabilityHistoryPoint', date: '2026-02-01', category: 'CARD', label: 'Credit Card', valueUSD: -1100 },
-            { __typename: 'LiabilityHistoryPoint', date: '2026-03-01', category: 'CARD', label: 'Credit Card', valueUSD: -1150 },
-            { __typename: 'LiabilityHistoryPoint', date: '2026-04-01', category: 'CARD', label: 'Credit Card', valueUSD: -1200 },
-            { __typename: 'LiabilityHistoryPoint', date: '2026-05-01', category: 'CARD', label: 'Credit Card', valueUSD: -1200 },
-          ],
+          series,
+          classifierSeries,
+          liabilitySeries: series.map((point) => ({ __typename: 'LiabilityHistoryPoint', date: point.date, category: 'CARD', label: 'Credit Card', valueUSD: -point.totalLiabilitiesUSD })),
         },
       },
     })

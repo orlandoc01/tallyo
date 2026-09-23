@@ -28,7 +28,7 @@ describe('PlaidTab', () => {
     await user.type(screen.getByLabelText(/client id/i), 'new-client')
     await user.type(screen.getByLabelText(/client secret/i), 'new-secret')
     await user.type(screen.getByLabelText(/label/i), 'New label')
-    await user.click(screen.getByRole('button', { name: /production/i }))
+    await user.click(screen.getByRole('radio', { name: /production/i }))
     await user.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())

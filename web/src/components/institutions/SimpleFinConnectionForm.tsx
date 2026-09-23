@@ -62,7 +62,7 @@ export function SimpleFinConnectionForm({
           <OwnerLoadStatus error={ownersError} fetching={ownersFetching} />
           {noOwnersReadOnly ? <ErrorState message="No owners exist. An admin must create an owner before linking SimpleFIN." /> : null}
 
-          <TextAreaField className="space-y-1" controlClassName="font-mono" label="Setup Token" labelClassName="font-semibold text-neutral-950" minHeight="min-h-32" onChange={setSetupToken} placeholder="Paste the base64 setup token from SimpleFIN Bridge" required value={setupToken} />
+          <TextAreaField className="space-y-1" label="Setup Token" mono labelClassName="font-semibold text-text-1" minHeight="min-h-32" onChange={setSetupToken} placeholder="Paste the base64 setup token from SimpleFIN Bridge" required value={setupToken} />
 
           <TextField label="Label" onChange={setLabel} placeholder="SimpleFIN Bridge" value={label} />
 

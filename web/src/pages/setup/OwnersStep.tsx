@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Trash2 } from 'lucide-react'
 import { useMutation } from 'urql'
 import { CREATE_OWNER_MUTATION, DELETE_OWNER_MUTATION } from '../../graphql/mutations'
 import { useOwners } from '../../hooks/useEntityQueries'
 import type { Owner } from '../../types/graphql'
-import { SetupActions, SetupHeading, inputClass, primaryButtonClass, secondaryButtonClass } from './SetupLayout'
+import { Button } from '../../components/common/Button'
+import { OwnerDot } from '../../components/common/OwnerDot'
+import { setupInputClass } from './setupClasses'
+import { SetupActions, SetupHeading, SetupListCard, SetupMessage } from './SetupLayout'
 
 export function OwnersStep() {
   const navigate = useNavigate()
@@ -41,33 +43,35 @@ export function OwnersStep() {
 
   return (
     <div>
-      <SetupHeading eyebrow="Household owners" title="Who owns the accounts?" />
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Owners let Tallyo separate household members across linked accounts, assets, and reports.</p>
+      <SetupHeading subtitle="Owners let Tallyo separate household members across linked accounts, assets, and reports." title="Household owners" />
 
-      <div className="mt-8 max-w-2xl space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input className={inputClass} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void addOwner() } }} placeholder="Owner name" value={name} />
-          <button className={primaryButtonClass} disabled={createResult.fetching || !name.trim()} onClick={addOwner} type="button">{createResult.fetching ? 'Adding...' : 'Add'}</button>
-        </div>
-        {fetching ? <p className="text-sm text-neutral-500">Loading owners...</p> : null}
-        {error ? <p className="text-sm font-semibold text-red-700">Failed to load owners.</p> : null}
-        {createResult.error ? <p className="text-sm font-semibold text-red-700">{createResult.error.message}</p> : null}
-        {deleteResult.error ? <p className="text-sm font-semibold text-red-700">{deleteResult.error.message}</p> : null}
-        {message ? <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{message}</p> : null}
-
-        <ul className="space-y-2">
-          {owners.map((owner) => (
-            <li className="flex items-center justify-between rounded-2xl border border-brand-100 bg-white px-4 py-3" key={owner.id}>
-              <span className="font-bold text-neutral-900">{owner.name}</span>
-              <button aria-label={`Delete ${owner.name}`} className="rounded-xl p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600" onClick={() => void removeOwner(owner)} type="button"><Trash2 className="h-4 w-4" /></button>
-            </li>
-          ))}
-        </ul>
+      <div className="mt-4 flex max-w-[480px] gap-2">
+        <input aria-label="Owner name" className={setupInputClass} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void addOwner() } }} placeholder="Owner name" value={name} />
+        <Button className="shrink-0 whitespace-nowrap" disabled={createResult.fetching || !name.trim()} onClick={addOwner}>{createResult.fetching ? 'Adding...' : '+ Add'}</Button>
       </div>
 
+      {fetching && owners.length === 0 ? null : (
+        <SetupListCard className="mt-3 max-w-[480px]">
+          {owners.length === 0 ? <p className="p-4 text-center text-xs text-text-faint">No owners yet</p> : null}
+          {owners.map((owner) => (
+            <div className="flex h-11 items-center gap-2.5 pl-4 pr-3 transition hover:bg-raised" key={owner.id}>
+              <OwnerDot name={owner.name} />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-1">{owner.name}</span>
+              <Button aria-label={`Delete ${owner.name}`} onClick={() => void removeOwner(owner)} size="sm" variant="danger">Remove</Button>
+            </div>
+          ))}
+        </SetupListCard>
+      )}
+
+      {fetching ? <SetupMessage tone="muted">Loading owners...</SetupMessage> : null}
+      {error ? <SetupMessage tone="negative">Failed to load owners.</SetupMessage> : null}
+      {createResult.error ? <SetupMessage tone="negative">{createResult.error.message}</SetupMessage> : null}
+      {deleteResult.error ? <SetupMessage tone="negative">{deleteResult.error.message}</SetupMessage> : null}
+      {message ? <SetupMessage tone="warning">{message}</SetupMessage> : null}
+
       <SetupActions>
-        <button className={secondaryButtonClass} onClick={() => navigate(-1)} type="button">Back</button>
-        <button className={primaryButtonClass} onClick={continueSetup} type="button">Continue</button>
+        <Button onClick={() => navigate(-1)} variant="secondary">Back</Button>
+        <Button onClick={continueSetup}>Continue</Button>
       </SetupActions>
     </div>
   )

@@ -55,8 +55,8 @@ export function LinkRealEstateModal({
 
         <AddressFields address={addressDraft} onChange={handleAddressChange} />
 
-        <TextField label="Label" labelSuffix={<span className="text-xs font-normal text-neutral-400"> (optional)</span>} onChange={setLabel} placeholder="e.g. Primary home" type="text" value={label} />
-        <TextField inputMode="decimal" label="Manual valuation USD" labelSuffix={<span className="text-red-500"> *</span>} onChange={setValuationUSD} placeholder="850000" required type="number" value={valuationUSD} />
+        <TextField label="Label" labelSuffix={<span className="text-xs font-normal text-text-muted"> (optional)</span>} onChange={setLabel} placeholder="e.g. Primary home" type="text" value={label} />
+        <TextField inputMode="decimal" label="Manual valuation USD" labelSuffix={<span className="text-negative"> *</span>} onChange={setValuationUSD} placeholder="850000" required type="number" value={valuationUSD} />
 
         <OwnerSelectField
           canCreateOwner={canCreateOwner}

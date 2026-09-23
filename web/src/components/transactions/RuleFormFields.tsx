@@ -1,12 +1,13 @@
 import type { Account, Category, Tag } from '../../types/graphql'
-import { TextField } from '../common/FormControls'
+import { checkboxClass, SectionLabel, TextField } from '../common/FormControls'
 import { ScrollFadeBox } from '../common/ScrollFadeBox'
 import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { AccountCheckboxList } from './AccountCheckboxList'
 import { CategorySelect } from './CategorySelect'
 import type { RuleFormFieldsState } from './useRuleFormFields'
 
-const inputClassName = 'mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-brand-500'
+const sectionClass = 'rounded-md border border-border p-4'
+const groupLabelClass = 'text-xs text-text-muted'
 
 export function RuleFormFields({
   fields,
@@ -27,96 +28,44 @@ export function RuleFormFields({
 
   return (
     <>
-      <section className="rounded-xl border border-neutral-100 p-4">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-500">Filters</h3>
-        <div className="mt-4 space-y-4">
-          <label className="block text-sm font-semibold text-neutral-950">
-            Merchant pattern
-            <input
-              aria-label="Merchant pattern"
-              className={inputClassName}
-              onChange={(event) => fields.setMerchantPattern(event.target.value)}
-              placeholder="Merchant name pattern"
-              value={fields.merchantPattern}
-            />
-          </label>
-
-          <label className="block text-sm font-semibold text-neutral-950">
-            Original name pattern
-            <input
-              aria-label="Original name pattern"
-              className={inputClassName}
-              onChange={(event) => fields.setOriginalPattern(event.target.value)}
-              placeholder="Original transaction name pattern"
-              value={fields.originalPattern}
-            />
-          </label>
-
+      <section className={sectionClass}>
+        <SectionLabel as="h3">Filters</SectionLabel>
+        <div className="mt-3 space-y-3">
+          <TextField label="Merchant pattern" onChange={fields.setMerchantPattern} placeholder="Merchant name pattern" value={fields.merchantPattern} />
+          <TextField label="Original name pattern" onChange={fields.setOriginalPattern} placeholder="Original transaction name pattern" value={fields.originalPattern} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-neutral-950">
-              Amount min
-              <input
-                aria-label="Amount min"
-                className={inputClassName}
-                onChange={(event) => fields.setAmountMin(event.target.value)}
-                step="0.01"
-                type="number"
-                value={fields.amountMin}
-              />
-            </label>
-            <label className="block text-sm font-semibold text-neutral-950">
-              Amount max
-              <input
-                aria-label="Amount max"
-                className={inputClassName}
-                onChange={(event) => fields.setAmountMax(event.target.value)}
-                step="0.01"
-                type="number"
-                value={fields.amountMax}
-              />
-            </label>
+            <TextField label="Amount min" onChange={fields.setAmountMin} step="0.01" type="number" value={fields.amountMin} />
+            <TextField label="Amount max" onChange={fields.setAmountMax} step="0.01" type="number" value={fields.amountMax} />
           </div>
-
           {includePriority ? (
-            <label className="block text-sm font-semibold text-neutral-950">
-              Priority
-              <input
-                aria-label="Priority"
-                className={inputClassName}
-                min="0"
-                onChange={(event) => fields.setPriority(event.target.value)}
-                type="number"
-                value={fields.priority}
-              />
-            </label>
+            <TextField label="Priority" min="0" onChange={fields.setPriority} type="number" value={fields.priority} />
           ) : null}
-
           <div>
-            <div className="text-sm font-semibold text-neutral-950">Accounts</div>
-            <ScrollFadeBox className="mt-2 max-h-56 rounded-xl border border-neutral-100 p-2">
+            <div className={groupLabelClass}>Accounts</div>
+            <ScrollFadeBox className="mt-1 max-h-56 rounded-md border border-border p-2">
               <AccountCheckboxList accounts={accounts} onChange={(ids) => fields.setAccountIds(ids ?? [])} selectedAccountIds={fields.accountIds} showCount />
             </ScrollFadeBox>
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-neutral-100 p-4">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-500">Changes</h3>
-        <div className="mt-4 space-y-4">
+      <section className={sectionClass}>
+        <SectionLabel as="h3">Changes</SectionLabel>
+        <div className="mt-3 space-y-3">
           <TextField label="Merchant name" onChange={fields.setMerchantName} placeholder="Replace merchant name" value={fields.merchantName} />
 
           <CategorySelect categories={categories} label="Category" onChange={fields.setCategoryId} placeholder="Choose category" value={fields.categoryId} />
 
           <div>
-            <div className="text-sm font-semibold text-neutral-950">Tags</div>
-            <div className="mt-2 max-h-36 space-y-1 overflow-auto rounded-xl border border-neutral-100 p-2">
+            <div className={groupLabelClass}>Tags</div>
+            <div className="mt-1 max-h-36 overflow-auto rounded-md border border-border p-1.5">
               {tags.length ? tags.map((tag) => (
-                <label key={tag.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-50">
-                  <input checked={fields.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} type="checkbox" />
+                <label className="flex h-8 cursor-pointer items-center gap-2 rounded-[5px] px-2 text-[13px] text-text-1 hover:bg-raised" key={tag.id}>
+                  <input checked={fields.tagIds.includes(tag.id)} className={`${checkboxClass} h-4 w-4`} onChange={() => toggleTag(tag.id)} type="checkbox" />
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
                   {tag.name}
                 </label>
-              )) : <div className="px-2 py-1 text-sm text-neutral-500">No tags yet.</div>}
+              )) : <div className="px-2 py-1 text-[13px] text-text-muted">No tags yet.</div>}
             </div>
           </div>
 

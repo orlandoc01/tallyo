@@ -61,7 +61,7 @@ export function AccountDetailModal({
   return (
     <Modal className="flex h-[calc(100vh-5rem)] max-h-[48rem] flex-col" label={`Details for ${displayName}`} onClose={onClose} scrollable size="lg">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-xl font-bold text-neutral-950">{displayName}</h2>
+        <h2 className="text-xl font-bold text-text-1">{displayName}</h2>
         <ModalCloseButton label={`Close details for ${displayName}`} onClick={onClose} />
       </div>
 
@@ -70,22 +70,22 @@ export function AccountDetailModal({
       <dl className="mt-4 space-y-2 text-sm">
         {account.manual ? (
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Source</dt>
+            <dt className="text-text-3">Source</dt>
             <dd><span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">Manual</span></dd>
           </div>
         ) : null}
         {account.typeLocked ? null : (
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Institution</dt>
+            <dt className="text-text-3">Institution</dt>
             <dd className="font-medium">{institutionName(account)}</dd>
           </div>
         )}
         <div className="flex justify-between">
-          <dt className="text-neutral-500">Created</dt>
+          <dt className="text-text-3">Created</dt>
           <dd className="font-medium">{formatDisplayDate(account.createdAt.slice(0, 10))}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-neutral-500">Updated</dt>
+          <dt className="text-text-3">Updated</dt>
           <dd className="font-medium">{formatDisplayDate(account.updatedAt.slice(0, 10))}</dd>
         </div>
       </dl>
@@ -103,7 +103,7 @@ export function AccountDetailModal({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {currentTab === 'info' && loadingEVMProvider ? (
-          <p className="mt-4 text-sm text-neutral-500" role="status">Loading wallet chains…</p>
+          <p className="mt-4 text-sm text-text-3" role="status">Loading wallet chains…</p>
         ) : null}
 
         {currentTab === 'info' && evmProviderError ? (

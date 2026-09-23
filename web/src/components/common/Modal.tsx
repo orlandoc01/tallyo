@@ -33,21 +33,20 @@ export function Modal({
   return (
     <div
       className={clsx(
-        'fixed inset-0 z-40 flex justify-center p-4 pt-16 lg:p-4',
-        scrollable ? 'items-start overflow-y-auto' : 'items-center',
+        'fixed inset-0 z-40 flex items-start justify-center px-5 pb-5 pt-[60px]',
+        scrollable && 'overflow-y-auto',
       )}
       onClick={dismissOnBackdrop ? onClose : undefined}
       role="presentation"
     >
-      <div aria-hidden className="fixed inset-x-0 bottom-0 top-12 bg-neutral-950/40 lg:inset-0" />
+      <div aria-hidden className="fixed inset-0 bg-overlay" />
       <section
         aria-label={label}
         aria-labelledby={labelledBy}
         aria-modal="true"
         className={clsx(
-          'relative w-full rounded-2xl bg-white p-6 shadow-2xl',
-          size === 'lg' ? 'max-w-lg' : 'max-w-md',
-          scrollable && 'my-auto',
+          'relative w-full rounded-lg border border-border-strong bg-surface p-6 shadow-modal',
+          size === 'lg' ? 'max-w-lg' : 'max-w-[520px]',
           className,
         )}
         onClick={(event) => event.stopPropagation()}
@@ -60,7 +59,7 @@ export function Modal({
 }
 
 export function ModalFooter({ children }: { children: ReactNode }) {
-  return <div className="flex justify-end gap-3 border-t border-neutral-100 pt-4">{children}</div>
+  return <div className="flex justify-end gap-3 border-t border-border pt-4">{children}</div>
 }
 
 export function ModalActions({

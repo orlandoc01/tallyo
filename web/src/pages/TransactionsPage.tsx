@@ -1,21 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { BarChart3 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
+import { Button, IconButton } from '../components/common/Button'
 import { EmptyState } from '../components/common/EmptyState'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import { MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
-import { PageHeader } from '../components/common/PageHeader'
 import { SearchInput } from '../components/common/FormControls'
 import { BulkActionBar, BulkSelectAllCheckbox, BulkTransactionModals } from '../components/transactions/BulkTransactionsUI'
 import { CreateTransactionModal } from '../components/transactions/CreateTransactionModal'
+import { TransactionActivePills } from '../components/transactions/TransactionActivePills'
+import { TransactionFilterPanel } from '../components/transactions/TransactionFilterPanel'
 import { TransactionList } from '../components/transactions/TransactionList'
+import { TransactionsHeader } from '../components/transactions/TransactionsHeader'
 import { TransactionsMobileFilters } from '../components/transactions/TransactionsMobileFilters'
 import { TransactionsMobileHeaderActions } from '../components/transactions/TransactionsMobileHeaderActions'
-import { TransactionsToolbar } from '../components/transactions/TransactionsToolbar'
 import { TransactionSummaryCard } from '../components/transactions/TransactionSummary'
 import { useBulkTransactionActions } from '../components/transactions/useBulkTransactionActions'
 import { useMobileHeader, useMobileHeaderActions } from '../components/layout/useMobileHeader'
+import { useFilterCaretRight } from '../hooks/useFilterCaretRight'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { useTransactionSelection } from '../components/transactions/useTransactionSelection'
-import { useAccounts, useCategories, useTags } from '../hooks/useEntityQueries'
+import { useAccounts, useCategories, useCategoryGroups, useOwners, useTags } from '../hooks/useEntityQueries'
 import { useQueryParamState } from '../hooks/useQueryParamState'
 import { usePaginatedTransactions } from '../hooks/useTransactions'
 import { useTransactionsSummary } from '../hooks/useTransactionsSummary'
@@ -32,63 +36,57 @@ export function TransactionsPage() {
   const { filter, sort, setFilter, setSort, setFilterAndSort, clearFilters } = useTransactionFilterParams()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
+  const { categoryGroups } = useCategoryGroups()
+  const { owners } = useOwners()
   const { tags } = useTags()
-  const {
-    closeFilter,
-    filterOpen,
-    filtersActive,
-    openFilter,
-  } = useMobileHeader()
+  const { closeFilter, filterOpen, openFilter } = useMobileHeader()
   const { enterBulkMode, isBulkMode, selectedIds, toggleSelected } = useTransactionSelection()
   const { canWrite } = usePermissions()
   const canWriteTransactions = canWrite('transactions')
+  const isMobile = useIsMobile()
+  const pageRef = useRef<HTMLDivElement>(null)
+  const filtersButtonRef = useRef<HTMLButtonElement>(null)
 
   const [draftFilter, setDraftFilter] = useState<TransactionsFilter>(filter)
   const [search, setSearch] = useQueryParamState('q')
   const [showCreate, setShowCreate] = useState(false)
-  const [showMobileSummary, setShowMobileSummary] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [desktopFiltersOpen, setDesktopFiltersOpen] = useState(false)
   const trimmedSearch = search.trim()
   const summaryFilter = useMemo(() => trimmedSearch ? { ...draftFilter, search: trimmedSearch } : draftFilter, [draftFilter, trimmedSearch])
+  const now = new Date()
 
   const transactions = usePaginatedTransactions(draftFilter, sort, 50, trimmedSearch || undefined)
   const summary = useTransactionsSummary(summaryFilter)
+  const unfilteredSummaryFilter = useMemo(() => ({ isHidden: draftFilter.isHidden }), [draftFilter.isHidden])
+  const allSummary = useTransactionsSummary(unfilteredSummaryFilter)
+  const caretRight = useFilterCaretRight(desktopFiltersOpen, filtersButtonRef, pageRef)
   const refetchTransactions = () => transactions.reexecuteQuery({ requestPolicy: 'network-only' })
   const bulk = useBulkTransactionActions({ filter: summaryFilter, sort, refetch: refetchTransactions })
   const filteredTotalCount = summary.summary?.totalCount ?? 0
   const allFilteredSelected = filteredTotalCount > 0 && selectedIds.size === filteredTotalCount
   const someFilteredSelected = selectedIds.size > 0 && selectedIds.size < filteredTotalCount
+  const activeFilterCount = activeTransactionFilterCount(draftFilter, trimmedSearch)
+  const lookups = useMemo(() => ({ accounts, categories, owners, tags }), [accounts, categories, owners, tags])
 
   useEffect(() => {
     setDraftFilter(filter)
   }, [filter])
 
   const { cancelBulkMode } = bulk
-  const summaryAvailable = Boolean(summary.summary)
   const mobileHeaderActions = useMemo(() => (
     <TransactionsMobileHeaderActions
+      activeFilterCount={activeFilterCount}
       canWrite={canWriteTransactions}
       filterOpen={filterOpen}
-      filtersActive={filtersActive}
       isBulkMode={isBulkMode}
-      showCreate={showCreate}
-      showMobileSummary={showMobileSummary}
-      summaryAvailable={summaryAvailable}
       onCreate={() => setShowCreate(true)}
       onToggleBulk={isBulkMode ? cancelBulkMode : enterBulkMode}
-      onToggleFilter={() => {
-        setShowMobileSummary(false)
-        if (filterOpen) closeFilter()
-        else openFilter()
-      }}
-      onToggleSummary={() => {
-        closeFilter()
-        setShowMobileSummary((open) => !open)
-      }}
+      onToggleFilter={() => (filterOpen ? closeFilter() : openFilter())}
     />
-  ), [canWriteTransactions, cancelBulkMode, closeFilter, enterBulkMode, filterOpen, filtersActive, isBulkMode, openFilter, showCreate, showMobileSummary, summaryAvailable])
+  ), [activeFilterCount, canWriteTransactions, cancelBulkMode, closeFilter, enterBulkMode, filterOpen, isBulkMode, openFilter])
 
   useFiltersActive(activeTransactionFilterCount(filter, trimmedSearch))
-
   useMobileHeaderActions(mobileHeaderActions)
 
   function handleFilterDraftChange(nextFilter: TransactionsFilter) {
@@ -121,52 +119,91 @@ export function TransactionsPage() {
     closeFilter()
   }
 
+  const activePills = (size: 'sm' | 'md') => (
+    <TransactionActivePills
+      allCount={allSummary.summary?.totalCount}
+      filter={draftFilter}
+      lookups={lookups}
+      now={now}
+      onChange={handleFilterDraftChange}
+      onSearchChange={setSearch}
+      search={trimmedSearch}
+      size={size}
+      totalCount={summary.summary?.totalCount}
+    />
+  )
+  const clearFiltersButton = <Button onClick={handleClearFilters} size="sm" variant="ghost">Clear filters</Button>
+
   return (
-    <div className="space-y-4">
-      <PageHeader
-        actions={(
-          <TransactionsToolbar
-            activeFilterCount={activeTransactionFilterCount(draftFilter, trimmedSearch)}
-            canWrite={canWriteTransactions}
-            draftFilter={draftFilter}
-            filter={filter}
-            isBulkMode={isBulkMode}
-            selectedCount={selectedIds.size}
-            sort={sort}
-            summary={summary.summary}
-            onCancelBulkMode={bulk.cancelBulkMode}
-            onClearFilters={handleClearFilters}
-            onCreate={() => setShowCreate(true)}
-            onEnterBulkMode={enterBulkMode}
-            onFilterChange={handleFilterDraftChange}
-            onImportSuccess={refetchTransactions}
+    <div className="flex flex-col gap-3" ref={pageRef}>
+      {isMobile ? <h1 className="sr-only">Transactions</h1> : (
+      <TransactionsHeader
+        activeFilterCount={activeFilterCount}
+        canWrite={canWriteTransactions}
+        filter={filter}
+        filtersButtonRef={filtersButtonRef}
+        filtersOpen={desktopFiltersOpen}
+        isBulkMode={isBulkMode}
+        onCancelBulkMode={bulk.cancelBulkMode}
+        onCreate={() => setShowCreate(true)}
+        onEnterBulkMode={enterBulkMode}
+        onImportSuccess={refetchTransactions}
+        onToggleFilters={() => setDesktopFiltersOpen((open) => !open)}
+        onToggleSummary={() => setSummaryOpen((open) => !open)}
+        summaryAvailable={Boolean(summary.summary)}
+        summaryOpen={summaryOpen}
+      />
+      )}
+
+      {desktopFiltersOpen ? (
+        <div className="hidden lg:block">
+          <TransactionFilterPanel
+            accounts={accounts}
+            activeRow={activeFilterCount > 0 ? activePills('md') : undefined}
+            caretRight={caretRight}
+            categoryGroups={categoryGroups}
+            clearable={activeFilterCount > 0}
+            filter={draftFilter}
+            now={now}
+            onChange={handleFilterDraftChange}
+            onClear={handleClearFilters}
             onRuleCreated={refetchTransactions}
             onSortChange={setSort}
+            owners={owners}
+            sort={sort}
+            tags={tags}
           />
-        )}
-        title="Transactions"
-      />
-
-      <div aria-busy={transactions.fetching} aria-live="polite">
-        <div className="mb-4">
-          <div className="flex items-center gap-3">
-            {isBulkMode && canWriteTransactions ? (
-              <BulkSelectAllCheckbox
-                allSelected={allFilteredSelected}
-                selecting={bulk.selectingAll}
-                someSelected={someFilteredSelected}
-                onToggle={bulk.toggleSelectAll}
-              />
-            ) : null}
-            <SearchInput ariaLabel="Search transactions" className="flex-1" onChange={setSearch} placeholder="Search transactions..." value={search} />
-          </div>
-          {bulk.bulkSelectError ? <p className="mt-2 text-sm font-medium text-red-600" role="alert">{bulk.bulkSelectError}</p> : null}
         </div>
+      ) : null}
+
+      {summary.summary ? <div className="order-3 lg:order-none"><TransactionSummaryCard open={summaryOpen} summary={summary.summary} /></div> : null}
+
+      <div className="order-1 lg:order-none">
+        <div className="flex items-center gap-2 lg:gap-3">
+          {isBulkMode && canWriteTransactions ? (
+            <BulkSelectAllCheckbox allSelected={allFilteredSelected} selecting={bulk.selectingAll} someSelected={someFilteredSelected} onToggle={bulk.toggleSelectAll} />
+          ) : null}
+          <SearchInput ariaLabel="Search transactions" className="flex-1" onChange={setSearch} placeholder="Search transactions..." size="lg" value={search} />
+          <IconButton ariaLabel="Toggle summary" className="touch-manipulation lg:hidden" onClick={() => setSummaryOpen((open) => !open)} pressed={summaryOpen}>
+            <BarChart3 className="h-4 w-4" />
+          </IconButton>
+        </div>
+        {bulk.bulkSelectError ? <p className="mt-2 text-sm font-medium text-negative" role="alert">{bulk.bulkSelectError}</p> : null}
+      </div>
+      {activeFilterCount > 0 ? <div className="order-2 lg:hidden">{activePills('sm')}</div> : null}
+
+      {isBulkMode ? (
+        <BulkActionBar className="order-4 lg:order-none" selectedCount={selectedIds.size} onDelete={bulk.openBulkDelete} onEdit={bulk.openBulkEdit} />
+      ) : null}
+
+      <div aria-busy={transactions.fetching} aria-live="polite" className="order-5 lg:order-none">
         {transactions.fetching && transactions.transactions.length === 0 ? <LoadingSpinner label="Loading transactions" /> : null}
         {!transactions.fetching ? (
           <TransactionList
             categories={categories}
-            emptyState={<EmptyState title="No transactions found" description="Try changing or clearing filters." />}
+            emptyState={activeFilterCount > 0
+              ? <EmptyState action={clearFiltersButton} title="No transactions match" description="Try changing or clearing filters." />
+              : <EmptyState title="No transactions found" description="Transactions appear here once an account has synced." />}
             hasNextPage={transactions.hasNextPage}
             isBulkMode={isBulkMode}
             loadMore={transactions.loadMore}
@@ -179,32 +216,15 @@ export function TransactionsPage() {
             transactions={transactions.transactions}
             onDetailsClose={() => navigate({ pathname: '/transactions', search: window.location.search })}
             onDetailsOpen={(transaction) => navigate({ pathname: `/transactions/${transaction.id}`, search: window.location.search })}
+            onShowMerchant={(merchant) => handleFilterDraftChange({ ...draftFilter, merchantPrefix: merchant })}
           />
         ) : null}
       </div>
 
-      {isBulkMode ? (
-        <BulkActionBar
-          selectedCount={selectedIds.size}
-          onDelete={bulk.openBulkDelete}
-          onEdit={bulk.openBulkEdit}
-        />
-      ) : null}
-
-      {showMobileSummary && summary.summary ? (
-        <MobileFilterDropdown
-          bodyClassName="p-3"
-          labelledBy="transaction-summary-title"
-          onClose={() => setShowMobileSummary(false)}
-          title="Summary"
-        >
-          <TransactionSummaryCard className="rounded-2xl border border-neutral-200 bg-white p-4" showTitle={false} summary={summary.summary} />
-        </MobileFilterDropdown>
-      ) : null}
-
       {filterOpen && (
         <TransactionsMobileFilters
           filter={filter}
+          now={now}
           sort={sort}
           onApply={handleApplyMobileFilters}
           onClear={() => { handleClearFilters(); closeFilter() }}

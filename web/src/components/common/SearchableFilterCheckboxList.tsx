@@ -50,7 +50,7 @@ export function SearchableGroupedFilterCheckboxList({
   return (
     <div className={className}>
       <TextField hideLabel label={searchLabel} onChange={setSearch} placeholder={searchPlaceholder} type="search" value={search} />
-      {summary ? <div className="text-xs text-neutral-500">{summary}</div> : null}
+      {summary ? <div className="text-xs text-text-muted">{summary}</div> : null}
       <div className={optionsClassName}>
         <FilterCheckboxList
           options={[{ id: 'select-all', label: 'Select all', ariaLabel: selectAllAriaLabel }]}
@@ -62,7 +62,7 @@ export function SearchableGroupedFilterCheckboxList({
         ) : (
           <FilterCheckboxGroups groups={visibleGroups} selectedIds={selectedIds} onChange={onChange} />
         )}
-        {visibleGroups.length === 0 ? <div className="text-sm text-neutral-500">{emptyMessage}</div> : null}
+        {visibleGroups.length === 0 ? <div className="text-sm text-text-muted">{emptyMessage}</div> : null}
       </div>
     </div>
   )
@@ -73,7 +73,7 @@ function FilterCheckboxGroups({ groups, selectedIds, onChange }: { groups: Filte
     <>
       {groups.map((group) => (
         <div className="mb-3 last:mb-0" key={group.id}>
-          <div className="mb-1 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{group.label}</div>
+          <div className="mb-1 px-2 pt-2 text-[11px] font-medium text-text-muted">{group.label}</div>
           <FilterCheckboxList options={group.options} selectedIds={selectedIds} onChange={onChange} />
         </div>
       ))}

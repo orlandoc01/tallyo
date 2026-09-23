@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { useState } from 'react'
 import { useMutation } from 'urql'
 import { FormError, TextField } from '../common/FormControls'
@@ -35,7 +36,7 @@ export function CreateTagModal({ onClose, onSaved, tag }: { onClose: () => void;
         <TextField autoFocus className="mt-4" label="Name" onChange={setName} value={name} />
         <div className="mt-4 grid grid-cols-7 gap-2">
           {colors.map((option) => (
-            <button key={option} type="button" aria-label={`Color ${option}`} className="h-8 rounded-full border-2" style={{ backgroundColor: option, borderColor: color === option ? '#111827' : 'transparent' }} onClick={() => setColor(option)} />
+            <button key={option} type="button" aria-label={`Color ${option}`} className={clsx('h-8 rounded-full border-2', color === option ? 'border-text-1' : 'border-transparent')} style={{ backgroundColor: option }} onClick={() => setColor(option)} />
           ))}
         </div>
         <ModalActions busy={saving} className="mt-5 gap-2" disabled={saving || !name.trim()} onCancel={onClose} onSubmit={handleSave} submitType="button" />

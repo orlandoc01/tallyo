@@ -15,22 +15,18 @@ export function ConfigurationTab() {
   }
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-3">
       <ConfigStatus configuration={configuration} error={error} fetching={fetching} />
 
-      {!fetching && !error && configuration ? (
-        <div className="max-w-2xl">
-          <RuntimeCard configuration={configuration} />
-        </div>
-      ) : null}
+      {!fetching && !error && configuration ? <RuntimeCard configuration={configuration} /> : null}
     </section>
   )
 }
 
 function RuntimeCard({ configuration }: { configuration: Configuration }) {
   return (
-    <Card as="section" compact>
-      <SectionLabel as="h3" className="border-b border-neutral-100 bg-neutral-50 px-4 py-3">Runtime</SectionLabel>
+    <Card as="section" className="max-w-[760px]">
+      <SectionLabel as="h3" className="flex h-11 items-center px-4">Runtime</SectionLabel>
       <ReadOnlyRow label="Config file path" value={configuration.configFilePath} />
       <ReadOnlyRow label="Database path" value={configuration.dbPath} />
       <ReadOnlyRow label="Port" value={configuration.port} />
@@ -42,9 +38,9 @@ function RuntimeCard({ configuration }: { configuration: Configuration }) {
 function ReadOnlyRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
-    <div className="grid gap-1 border-b border-neutral-100 px-4 py-3 last:border-b-0 sm:grid-cols-[12rem_1fr] sm:gap-4">
-      <span className="text-sm font-semibold text-neutral-700">{label}</span>
-      <span className="break-all font-mono text-sm text-neutral-950">{value}</span>
+    <div className="grid h-11 grid-cols-[minmax(140px,200px)_minmax(0,1fr)] items-center gap-3 border-t border-border px-4">
+      <span className="text-[13px] text-text-muted">{label}</span>
+      <span className="truncate font-mono text-xs text-text-1" title={value}>{value}</span>
     </div>
   )
 }

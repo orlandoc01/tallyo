@@ -28,8 +28,8 @@ export function ConnectionModal({
   return (
     <Modal dismissOnBackdrop={false} label="Link Connection" onClose={onClose} size="lg">
       <div>
-        <h2 className="text-lg font-semibold text-neutral-950">Link Connection</h2>
-        <p className="mt-1 text-sm text-neutral-500">Choose how this provider connection should be linked.</p>
+        <h2 className="text-lg font-semibold text-text-1">Link Connection</h2>
+        <p className="mt-1 text-sm text-text-3">Choose how this provider connection should be linked.</p>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-2" role="tablist" aria-label="Bank data providers">
@@ -38,7 +38,7 @@ export function ConnectionModal({
             aria-selected={activeTab === tab.value}
             className={clsx(
               'rounded-xl border px-4 py-3 text-left text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
-              activeTab === tab.value ? 'border-brand-500 bg-brand-50 text-neutral-950' : 'border-neutral-200 text-neutral-500 hover:border-brand-300 hover:text-neutral-800',
+              activeTab === tab.value ? 'border-brand-500 bg-brand-50 text-text-1' : 'border-border text-text-3 hover:border-brand-300 hover:text-text-1',
             )}
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
@@ -46,7 +46,7 @@ export function ConnectionModal({
             type="button"
           >
             <span className="block">{tab.label}</span>
-            <span className="mt-0.5 hidden text-xs font-normal text-neutral-500 sm:block">{tab.description}</span>
+            <span className="mt-0.5 hidden text-xs font-normal text-text-3 sm:block">{tab.description}</span>
           </button>
         ))}
       </div>

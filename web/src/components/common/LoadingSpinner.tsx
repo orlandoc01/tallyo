@@ -1,7 +1,7 @@
 export function LoadingSpinner({ label = 'Loading' }: { label?: string }) {
   return (
-    <div aria-live="polite" className="flex items-center gap-3 p-6 text-sm text-neutral-500" role="status">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+    <div aria-live="polite" className="flex items-center gap-3 p-6 text-sm text-text-muted" role="status">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-accent" />
       {label}
     </div>
   )

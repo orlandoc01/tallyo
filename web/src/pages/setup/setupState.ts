@@ -20,6 +20,7 @@ export type SetupState = {
   webauthnRpName: string
   webauthnRpOrigins: string
   registeredEmail: string
+  dataProviderSummary: string[]
 }
 
 const origin = typeof window === 'undefined' ? '' : window.location.origin
@@ -44,4 +45,15 @@ export const initialSetupState: SetupState = {
   webauthnRpName: 'Tallyo',
   webauthnRpOrigins: origin,
   registeredEmail: '',
+  dataProviderSummary: [],
+}
+
+const providerFlags: [keyof SetupState, string][] = [['passkeyEnabled', 'Passkey'], ['emailEnabled', 'Email'], ['googleEnabled', 'Google']]
+
+export function enabledProviderNames(setup: SetupState) {
+  return providerFlags.filter(([flag]) => setup[flag]).map(([, name]) => name)
+}
+
+export function withDataProvider(summary: string[], provider: 'Plaid' | 'SimpleFIN', entry: string) {
+  return [...summary.filter((item) => !item.startsWith(provider)), entry]
 }

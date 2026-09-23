@@ -3,12 +3,10 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useMobileHeader, useMobileHeaderActions } from '../components/layout/useMobileHeader'
 import { MobileFilterButton, MobileFilterDropdown } from '../components/common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../components/common/MobileFilterFooter'
-import { PageHeader } from '../components/common/PageHeader'
 import { AmountVisibilityButton } from '../components/common/AmountVisibilityButton'
-import { AnalysisFilterContent, AnalysisFilters } from '../components/portfolio/AnalysisFilters'
-import { AnalysisPieChart } from '../components/portfolio/AnalysisPieChart'
-import { AnalysisSliceList } from '../components/portfolio/AnalysisSliceList'
-import { AnalysisViewToggle } from '../components/portfolio/AnalysisViewToggle'
+import { AnalysisFilterContent } from '../components/portfolio/AnalysisFilters'
+import { PortfolioCard } from '../components/portfolio/PortfolioCard'
+import { PORTFOLIO_VIEW_PARAMS, portfolioFilterCount, portfolioViewOption, type PortfolioFilters, type PortfolioViewParam } from '../components/portfolio/portfolioSlices'
 import { QueryGate } from '../components/common/QueryGate'
 import { AssetEditModal } from '../components/wealth/AssetEditModal'
 import { isAssetEditTab, type AssetEditTab } from '../components/wealth/assetEditTabs'
@@ -17,34 +15,22 @@ import { useAccounts, useOwners } from '../hooks/useEntityQueries'
 import { useAnalysis } from '../hooks/useAnalysis'
 import { useNormalizeTabParam } from '../hooks/useNormalizeTabParam'
 import { useSearchParamWriters } from '../hooks/useSearchParamWriters'
-import { boolParam, clearParamUpdates, enumParam, listParam, paramUpdate, readParams, type ParamCodec } from '../hooks/urlParams'
+import { boolParam, clearParamUpdates, enumParam, listParam, paramUpdate, paramUpdates, readParams, type ParamCodec } from '../hooks/urlParams'
 import { isInvalidGlobalIDError } from '../utils/graphqlErrors'
 import type { AnalysisInput, AnalysisReport, AnalysisView, Asset } from '../types/graphql'
 import { ASSET_ACCOUNT_GROUPS, subtypesForAccountGroupIds, type AccountGroupId } from '../utils/accountGroups'
 
 const ACCOUNT_GROUP_IDS = ASSET_ACCOUNT_GROUPS.map((group) => group.id)
-const PORTFOLIO_VIEW_PARAMS = ['composition', 'category', 'group', 'sectors'] as const
-type PortfolioViewParam = typeof PORTFOLIO_VIEW_PARAMS[number]
 
-const VIEW_BY_PARAM: Record<PortfolioViewParam, AnalysisView> = {
-  composition: 'COMPOSITION',
-  category: 'MORNINGSTAR_CATEGORY',
-  group: 'MORNINGSTAR_GROUP',
-  sectors: 'SECTORS',
-}
-const PARAM_BY_VIEW: Record<AnalysisView, PortfolioViewParam> = {
-  COMPOSITION: 'composition',
-  MORNINGSTAR_CATEGORY: 'category',
-  MORNINGSTAR_GROUP: 'group',
-  SECTORS: 'sectors',
-}
-
-const PORTFOLIO_PARAMS = {
-  view: enumParam('view', PORTFOLIO_VIEW_PARAMS, 'composition'),
+const FILTER_PARAMS = {
   ownerIds: listParam('owners'),
   accountGroupIds: accountGroupIdsParam('accountTypes'),
   accountIds: listParam('accounts'),
   includeUnclassified: boolParam('includeUnclassified'),
+}
+const PORTFOLIO_PARAMS = {
+  view: enumParam('view', PORTFOLIO_VIEW_PARAMS, 'composition'),
+  ...FILTER_PARAMS,
 }
 
 export function PortfolioPage() {
@@ -54,48 +40,40 @@ export function PortfolioPage() {
   const [selectedSliceState, setSelectedSliceState] = useState<{ label: string | null; scope: string }>({ label: null, scope: '' })
   const { searchParams, pushParams, replaceParams } = useSearchParamWriters()
   const params = useMemo(() => readParams(PORTFOLIO_PARAMS, searchParams), [searchParams])
-  const view = VIEW_BY_PARAM[params.view]
+  const view = portfolioViewOption(params.view).view
   const amountsHidden = amountVisibilityFromParams(searchParams)
   const mobile = useMobileHeader()
-  const filterParams = useMemo(() => ({
+  const filters = useMemo<PortfolioFilters>(() => ({
     ownerIds: params.ownerIds,
     accountGroupIds: params.accountGroupIds,
     accountIds: params.accountIds,
     includeUnclassified: Boolean(params.includeUnclassified),
   }), [params.accountGroupIds, params.accountIds, params.includeUnclassified, params.ownerIds])
-  const { ownerIds, accountGroupIds, accountIds, includeUnclassified } = filterParams
   const { owners } = useOwners()
   const { accounts } = useAccounts()
-  const input = useMemo(() => analysisInput(view, ownerIds, accountGroupIds, accountIds, includeUnclassified), [view, ownerIds, accountGroupIds, accountIds, includeUnclassified])
+  const input = useMemo(() => analysisInput(view, filters), [view, filters])
   const { report, fetching, error, refetch } = useAnalysis(input)
   const invalidIDError = isInvalidGlobalIDError(error)
   const selectedAsset = selectedAssetId && report ? assetFromAnalysisReport(report, selectedAssetId) : null
   const selectedAssetTab: AssetEditTab = selectedAssetTabParam === 'tracking' ? 'tracking' : 'info'
-  const selectionScope = `${view}:${ownerIds.join(',')}:${accountGroupIds.join(',')}:${accountIds.join(',')}:${includeUnclassified}`
+  const selectionScope = `${view}:${filters.ownerIds.join(',')}:${filters.accountGroupIds.join(',')}:${filters.accountIds.join(',')}:${filters.includeUnclassified}`
   const selectedSlice = selectedSliceState.scope === selectionScope ? selectedSliceState.label : null
   const setSelectedSlice = useCallback((label: string | null) => {
     setSelectedSliceState({ label, scope: selectionScope })
   }, [selectionScope])
-  const setView = useCallback((nextView: AnalysisView) => {
-    pushParams(paramUpdate(PORTFOLIO_PARAMS.view, PARAM_BY_VIEW[nextView]))
+  const setView = useCallback((next: PortfolioViewParam) => {
+    pushParams(paramUpdate(PORTFOLIO_PARAMS.view, next))
   }, [pushParams])
-  const setListFilter = useCallback(<T extends string>(codec: ParamCodec<T[]>, ids: T[]) => {
-    pushParams(paramUpdate(codec, ids))
-  }, [pushParams])
-  const setIncludeUnclassified = useCallback((value: boolean) => {
-    pushParams(paramUpdate(PORTFOLIO_PARAMS.includeUnclassified, value))
+  const updateFilters = useCallback((patch: Partial<PortfolioFilters>) => {
+    pushParams(paramUpdates(FILTER_PARAMS, patch))
   }, [pushParams])
   const clearFilters = useCallback(() => {
-    pushParams(clearParamUpdates({
-      ownerIds: PORTFOLIO_PARAMS.ownerIds,
-      accountGroupIds: PORTFOLIO_PARAMS.accountGroupIds,
-      accountIds: PORTFOLIO_PARAMS.accountIds,
-      includeUnclassified: PORTFOLIO_PARAMS.includeUnclassified,
-    }))
+    pushParams(clearParamUpdates(FILTER_PARAMS))
   }, [pushParams])
   const toggleAmountsHidden = useCallback(() => {
     pushParams({ [HIDE_AMOUNTS_PARAM]: amountsHidden ? null : 'true' })
   }, [amountsHidden, pushParams])
+  const retry = useCallback(() => refetch({ requestPolicy: 'network-only' }), [refetch])
 
   useEffect(() => {
     if (invalidIDError) replaceParams({
@@ -116,62 +94,45 @@ export function PortfolioPage() {
 
   const mobileHeaderActions = useMemo(() => (
     <>
+      <MobileFilterButton active={mobile.filterOpen} count={portfolioFilterCount(filters)} onClick={mobile.filterOpen ? mobile.closeFilter : mobile.openFilter} />
       <AmountVisibilityButton amountsHidden={amountsHidden} onToggle={toggleAmountsHidden} variant="mobile" />
-      <MobileFilterButton active={mobile.filterOpen} highlighted={hasPortfolioFilters(filterParams)} onClick={mobile.filterOpen ? mobile.closeFilter : mobile.openFilter} />
     </>
-  ), [amountsHidden, filterParams, mobile.closeFilter, mobile.filterOpen, mobile.openFilter, toggleAmountsHidden])
+  ), [amountsHidden, filters, mobile.closeFilter, mobile.filterOpen, mobile.openFilter, toggleAmountsHidden])
 
   useMobileHeaderActions(mobileHeaderActions)
 
   return (
-    <div className="space-y-6 lg:min-h-screen">
-      <PageHeader
-        actions={(
-          <>
-            <AnalysisViewToggle value={view} onChange={setView} />
-            <AmountVisibilityButton amountsHidden={amountsHidden} onToggle={toggleAmountsHidden} variant="toolbar" />
-            <AnalysisFilters
-              accounts={accounts}
-              accountGroupIds={accountGroupIds}
-              accountIds={accountIds}
-              checkboxVariant="highlight"
-              enableAccountConnectionToggle
-              includeUnclassified={includeUnclassified}
-              ownerIds={ownerIds}
-              owners={owners}
-              onAccountChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountIds, ids)}
-              onAccountGroupChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountGroupIds, ids)}
-              onClear={clearFilters}
-              onIncludeUnclassifiedChange={setIncludeUnclassified}
-              onOwnerChange={(ids) => setListFilter(PORTFOLIO_PARAMS.ownerIds, ids)}
-            />
-          </>
-        )}
-        title="Portfolio"
-      >
-        <div className="w-full lg:hidden">
-          <AnalysisViewToggle value={view} onChange={setView} />
-        </div>
-      </PageHeader>
-
-      <QueryGate
-        data={report}
-        empty={Boolean(report && report.slices.length === 0)}
-        emptyTitle="No public portfolio holdings yet"
-        emptyDescription="Run a balance sync after linking investment accounts to populate portfolio analysis."
-        error={invalidIDError ? undefined : error}
-        errorPrefix="Failed to load portfolio analysis"
+    <div className="lg:min-h-screen">
+      <h1 className="sr-only">Portfolio</h1>
+      <PortfolioCard
+        accounts={accounts}
+        amountsHidden={amountsHidden}
         fetching={fetching || invalidIDError}
-        loadingLabel="Loading portfolio analysis"
-        onRetry={() => refetch({ requestPolicy: 'network-only' })}
-      >
-        {report && report.slices.length > 0 ? (
-          <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <AnalysisPieChart amountsHidden={amountsHidden} selectedLabel={selectedSlice} slices={report.slices} totalValueUSD={report.totalValueUSD} onSliceClick={setSelectedSlice} />
-            <AnalysisSliceList amountsHidden={amountsHidden} selectedLabel={selectedSlice} slices={report.slices} onEditAsset={openAsset} onSelectedLabelChange={setSelectedSlice} />
-          </div>
-        ) : null}
-      </QueryGate>
+        body={(
+          <QueryGate
+            data={fetching ? undefined : report}
+            empty={Boolean(report && !fetching && report.slices.length === 0)}
+            emptyTitle="No analyzable holdings"
+            emptyDescription="Run a balance sync after linking investment accounts to populate portfolio analysis."
+            error={invalidIDError ? undefined : error}
+            errorPrefix="Failed to load portfolio analysis"
+            fetching={fetching || invalidIDError}
+            loadingLabel="Loading portfolio analysis"
+            onRetry={retry}
+          />
+        )}
+        filters={filters}
+        owners={owners}
+        report={report}
+        selectedLabel={selectedSlice}
+        view={params.view}
+        onClearFilters={clearFilters}
+        onEditAsset={openAsset}
+        onFilterChange={updateFilters}
+        onSelectLabel={setSelectedSlice}
+        onToggleAmountsHidden={toggleAmountsHidden}
+        onViewChange={setView}
+      />
       {selectedAsset ? (
         <AssetEditModal
           key={selectedAsset.id}
@@ -180,9 +141,7 @@ export function PortfolioPage() {
           basePath={`/portfolio/assets/${selectedAsset.id}`}
           tabSearch={location.search}
           onClose={closeAssetModal}
-          onUpdate={() => {
-            refetch({ requestPolicy: 'network-only' })
-          }}
+          onUpdate={retry}
         />
       ) : null}
       {mobile.filterOpen ? (
@@ -200,33 +159,22 @@ export function PortfolioPage() {
         >
           <AnalysisFilterContent
             accounts={accounts}
-            accountGroupIds={accountGroupIds}
-            accountIds={accountIds}
+            accountGroupIds={filters.accountGroupIds}
+            accountIds={filters.accountIds}
             checkboxVariant="highlight"
             enableAccountConnectionToggle
-            includeUnclassified={includeUnclassified}
-            ownerIds={ownerIds}
+            includeUnclassified={filters.includeUnclassified}
+            ownerIds={filters.ownerIds}
             owners={owners}
-            onAccountChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountIds, ids)}
-            onAccountGroupChange={(ids) => setListFilter(PORTFOLIO_PARAMS.accountGroupIds, ids)}
-            onIncludeUnclassifiedChange={setIncludeUnclassified}
-            onOwnerChange={(ids) => setListFilter(PORTFOLIO_PARAMS.ownerIds, ids)}
+            onAccountChange={(accountIds) => updateFilters({ accountIds })}
+            onAccountGroupChange={(accountGroupIds) => updateFilters({ accountGroupIds })}
+            onIncludeUnclassifiedChange={(includeUnclassified) => updateFilters({ includeUnclassified })}
+            onOwnerChange={(ownerIds) => updateFilters({ ownerIds })}
           />
         </MobileFilterDropdown>
       ) : null}
     </div>
   )
-}
-
-interface PortfolioFilterParams {
-  ownerIds: string[]
-  accountGroupIds: AccountGroupId[]
-  accountIds: string[]
-  includeUnclassified: boolean
-}
-
-function hasPortfolioFilters(filters: PortfolioFilterParams) {
-  return Boolean(filters.ownerIds.length || filters.accountGroupIds.length || filters.accountIds.length || filters.includeUnclassified)
 }
 
 function portfolioPath(search: string) {
@@ -252,7 +200,7 @@ function accountGroupIdsParam(key: string): ParamCodec<AccountGroupId[]> {
   }
 }
 
-function analysisInput(view: AnalysisView, ownerIds: string[], accountGroupIds: AccountGroupId[], accountIds: string[], includeUnclassified: boolean): AnalysisInput {
+function analysisInput(view: AnalysisView, { ownerIds, accountGroupIds, accountIds, includeUnclassified }: PortfolioFilters): AnalysisInput {
   const accountSubtypes = subtypesForAccountGroupIds(accountGroupIds)
   return {
     view,

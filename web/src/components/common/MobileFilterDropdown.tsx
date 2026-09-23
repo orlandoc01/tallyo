@@ -1,29 +1,30 @@
 import clsx from 'clsx'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { useLayoutEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Button } from './Button'
+import { FilterCountBadge } from './FiltersButton'
 import { mobileHeaderActionClass } from './mobileHeaderActionClass'
-
-const DEFAULT_MOBILE_HEADER_BOTTOM = 48
-const MOBILE_HEADER_SELECTOR = '[data-mobile-header]'
 
 interface MobileFilterButtonProps {
   active?: boolean
   ariaLabel?: string
+  count?: number
   highlighted?: boolean
   onClick: () => void
 }
 
-export function MobileFilterButton({ active = false, ariaLabel = 'Open filters', highlighted = false, onClick }: MobileFilterButtonProps) {
+export function MobileFilterButton({ active = false, ariaLabel = 'Open filters', count = 0, highlighted = false, onClick }: MobileFilterButtonProps) {
   return (
     <button
       aria-expanded={active}
-      aria-label={ariaLabel}
-      className={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5', active || highlighted)}
+      aria-label={count > 0 ? `${ariaLabel}, ${count} active` : ariaLabel}
+      className={mobileHeaderActionClass('relative w-9 touch-manipulation', active || highlighted || count > 0)}
       onClick={onClick}
       type="button"
     >
-      <SlidersHorizontal className="h-5 w-5" />
+      <SlidersHorizontal className="h-4 w-4" />
+      {count > 0 ? <FilterCountBadge className="absolute -right-1.5 -top-1.5" count={count} /> : null}
     </button>
   )
 }
@@ -33,37 +34,43 @@ interface MobileFilterDropdownProps {
   children: ReactNode
   footer?: ReactNode
   labelledBy: string
+  maxHeight?: '78%' | '84%'
+  onClear?: () => void
   onClose: () => void
-  title?: string
+  title?: string | null
 }
 
-export function MobileFilterDropdown({ bodyClassName, children, footer, labelledBy, onClose, title = 'Filters' }: MobileFilterDropdownProps) {
-  const headerBottom = useMobileHeaderBottom()
+export function MobileFilterDropdown({ bodyClassName, children, footer, labelledBy, maxHeight = '78%', onClear, onClose, title = 'Filters' }: MobileFilterDropdownProps) {
   const dialog = (
     <div
       aria-labelledby={labelledBy}
       aria-modal="true"
-      className="fixed inset-x-0 bottom-0 z-50 lg:hidden"
+      className="fixed inset-0 z-40 bg-overlay lg:hidden"
       onClick={onClose}
       role="dialog"
-      style={{ top: headerBottom }}
     >
       <div
-        className="absolute right-0 top-0 flex max-h-full min-h-0 w-[min(20rem,100vw)] flex-col overflow-hidden rounded-b-3xl border-x border-b border-neutral-200 bg-white shadow-2xl"
+        className={clsx('fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl border-t border-border-strong bg-surface shadow-sheet', maxHeight === '84%' ? 'max-h-[84%]' : 'max-h-[78%]')}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 p-4">
-          <h2 className="text-lg font-bold" id={labelledBy}>{title}</h2>
+        <span aria-hidden className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-sm bg-border-emph" />
+        {title === null ? null : (
+        <div className="flex shrink-0 items-center justify-between px-4 pb-2.5 pt-2">
+          <h2 className="text-base font-semibold text-text-1" id={labelledBy}>{title}</h2>
+          <span className="flex items-center gap-1">
+            {onClear ? <Button className="touch-manipulation" onClick={onClear} size="sm" variant="ghost">Clear filters</Button> : null}
           <button
             aria-label="Close filters"
-            className="touch-manipulation rounded-full p-1 text-neutral-600 [@media(hover:hover)]:hover:bg-neutral-100 [@media(hover:hover)]:hover:text-neutral-950"
+            className="touch-manipulation rounded-md p-1 text-text-muted [@media(hover:hover)]:hover:bg-raised [@media(hover:hover)]:hover:text-text-1"
             onClick={onClose}
             type="button"
           >
             <X className="h-5 w-5" />
           </button>
+          </span>
         </div>
-        <div className={clsx('min-h-0 flex-1 overflow-y-auto p-4', bodyClassName)}>
+        )}
+        <div className={clsx('min-h-0 flex-1 overflow-y-auto px-4', bodyClassName)}>
           {children}
         </div>
         {footer}
@@ -72,35 +79,4 @@ export function MobileFilterDropdown({ bodyClassName, children, footer, labelled
   )
 
   return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body)
-}
-
-function useMobileHeaderBottom() {
-  const [headerBottom, setHeaderBottom] = useState(DEFAULT_MOBILE_HEADER_BOTTOM)
-
-  useLayoutEffect(() => {
-    const header = document.querySelector<HTMLElement>(MOBILE_HEADER_SELECTOR)
-    if (!header) return
-    const mobileHeader = header
-
-    function updateHeaderBottom() {
-      const bottom = Math.ceil(mobileHeader.getBoundingClientRect().bottom)
-      if (bottom > 0) setHeaderBottom(bottom)
-    }
-
-    updateHeaderBottom()
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateHeaderBottom)
-    resizeObserver?.observe(mobileHeader)
-    window.addEventListener('resize', updateHeaderBottom)
-    window.visualViewport?.addEventListener('resize', updateHeaderBottom)
-    window.visualViewport?.addEventListener('scroll', updateHeaderBottom)
-
-    return () => {
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', updateHeaderBottom)
-      window.visualViewport?.removeEventListener('resize', updateHeaderBottom)
-      window.visualViewport?.removeEventListener('scroll', updateHeaderBottom)
-    }
-  }, [])
-
-  return headerBottom
 }

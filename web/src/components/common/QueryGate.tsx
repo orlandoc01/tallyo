@@ -8,6 +8,7 @@ export function QueryGate({
   children,
   data,
   empty,
+  emptyAction,
   emptyDescription,
   emptyTitle,
   error,
@@ -19,6 +20,7 @@ export function QueryGate({
   children?: ReactNode
   data?: unknown
   empty: boolean
+  emptyAction?: ReactNode
   emptyDescription?: string
   emptyTitle: string
   error?: { message: string }
@@ -29,6 +31,6 @@ export function QueryGate({
 }) {
   if (fetching && data === undefined) return <LoadingSpinner label={loadingLabel} />
   if (error) return <ErrorState message={errorPrefix ? `${errorPrefix}: ${error.message}` : error.message} onRetry={onRetry} />
-  if (empty) return <EmptyState title={emptyTitle} description={emptyDescription} />
+  if (empty) return <EmptyState action={emptyAction} title={emptyTitle} description={emptyDescription} />
   return <>{children}</>
 }

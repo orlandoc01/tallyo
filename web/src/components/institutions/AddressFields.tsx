@@ -1,8 +1,8 @@
 import type { AddressDraft, AddressField } from './addressDraft'
 
 const addressInputClass = [
-  'mt-1.5 block w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900',
-  'placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500',
+  'mt-1.5 block w-full rounded-xl border border-border-strong bg-surface px-3 py-2 text-sm text-text-1 dark:bg-bg',
+  'placeholder:text-text-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500',
 ].join(' ')
 
 const addressFields: readonly { field: AddressField; label: string; placeholder: string }[] = [
@@ -28,7 +28,7 @@ export function AddressFields({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {fields.map(({ field, label, placeholder }) => (
-        <label className="block text-sm font-semibold text-neutral-950" key={field}>
+        <label className="block text-sm font-semibold text-text-1" key={field}>
           {label}
           <input
             className={addressInputClass}

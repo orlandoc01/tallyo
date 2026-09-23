@@ -1,23 +1,24 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery } from 'urql'
-import { Plus, SlidersHorizontal } from 'lucide-react'
+import { Button } from '../components/common/Button'
+import { FiltersButton } from '../components/common/FiltersButton'
 import { Card, SearchInput } from '../components/common/FormControls'
-import { mobileHeaderActionClass } from '../components/common/mobileHeaderActionClass'
-import { PageHeader } from '../components/common/PageHeader'
+import { MobileFilterButton } from '../components/common/MobileFilterDropdown'
 import { QueryGate } from '../components/common/QueryGate'
 import { useMobileHeaderActions } from '../components/layout/useMobileHeader'
+import { SettingsTitleRow } from '../components/settings/SettingsTitleRow'
 import { CreateRuleModal } from '../components/transactions/CreateRuleModal'
 import { EditRuleModal } from '../components/transactions/EditRuleModal'
-import { RuleFiltersDropdown } from '../components/transactions/RuleFiltersDropdown'
+import { RuleFilterPanel, RuleMobileFilters } from '../components/transactions/RuleFilterPanel'
+import { RuleRow } from '../components/transactions/RuleRow'
 import { countActiveRuleFilters, type RuleFilterValues } from '../components/transactions/ruleFilterUtils'
 import { RULES_QUERY } from '../graphql/queries'
 import { useAccounts, useCategoryGroups } from '../hooks/useEntityQueries'
+import { useFilterCaretRight } from '../hooks/useFilterCaretRight'
 import { usePermissions } from '../hooks/usePermissions'
 import { useQueryParamState } from '../hooks/useQueryParamState'
 import type { Rule, RulesInput } from '../types/graphql'
-import { accountDisplayLabel } from '../utils/accounts'
-import { formatSignedCurrency } from '../utils/currency'
 
 type LocalRuleFilters = Pick<RuleFilterValues, 'accountIds' | 'amountMin' | 'amountMax'>
 
@@ -37,10 +38,16 @@ export function RulesPage() {
   const rules = useMemo(() => data?.rules.items ?? [], [data?.rules.items])
   const editingRule = ruleID && !fetching ? rules.find((rule) => rule.id === ruleID) ?? null : null
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const pageRef = useRef<HTMLDivElement>(null)
+  const filtersButtonRef = useRef<HTMLButtonElement>(null)
+  const caretRight = useFilterCaretRight(filtersOpen, filtersButtonRef, pageRef)
   const { accounts } = useAccounts()
   const { categoryGroups } = useCategoryGroups()
   const canWriteRules = canWrite('rules')
   const activeFilterCount = countActiveRuleFilters(filters)
+  const panelFilterCount = activeFilterCount - (search.trim() ? 1 : 0)
 
   const updateFilters = useCallback((updates: Partial<RuleFilterValues>) => {
     if (updates.merchantPattern !== undefined) setMerchantPattern(updates.merchantPattern)
@@ -57,40 +64,16 @@ export function RulesPage() {
     setLocalFilters(emptyLocalRuleFilters)
   }, [setMerchantPattern, setOriginalPattern, setSearch])
 
-  const mobileHeaderActions = useMemo(() => {
-    return (
-      <>
-        <RuleFiltersDropdown
-          accounts={accounts}
-          buttonAriaLabel="Open rule filters"
-          buttonClassName={mobileHeaderActionClass('touch-manipulation rounded-xl p-2.5')}
-          buttonContent={<SlidersHorizontal className="h-5 w-5" />}
-          filters={filters}
-          onChange={updateFilters}
-          onClear={clearFilters}
-        />
-        {canWriteRules ? (
-          <button
-            aria-label="Create rule"
-            className={mobileHeaderActionClass('inline-flex h-10 w-10 touch-manipulation items-center justify-center rounded-xl', showCreateModal)}
-            onClick={() => setShowCreateModal(true)}
-            type="button"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        ) : null}
-      </>
-    )
-  }, [accounts, canWriteRules, clearFilters, filters, showCreateModal, updateFilters])
-
+  const mobileHeaderActions = useMemo(() => (
+    <>
+      <MobileFilterButton active={mobileFiltersOpen} ariaLabel="Open rule filters" count={panelFilterCount} onClick={() => setMobileFiltersOpen((open) => !open)} />
+      {canWriteRules ? <Button aria-label="Create rule" onClick={() => setShowCreateModal(true)}>+ Add</Button> : null}
+    </>
+  ), [canWriteRules, mobileFiltersOpen, panelFilterCount])
   useMobileHeaderActions(mobileHeaderActions)
 
   function handleRuleUpdatedOrDeleted() {
     reexecuteQuery({ requestPolicy: 'network-only' })
-  }
-
-  function openRule(rule: Rule) {
-    navigate(`/settings/rules/${rule.id}`)
   }
 
   function closeRule() {
@@ -98,27 +81,19 @@ export function RulesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        actions={(
-          <>
-            <RuleFiltersDropdown accounts={accounts} filters={filters} onChange={updateFilters} onClear={clearFilters} />
-            {canWriteRules ? (
-              <button
-                className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white shadow-sm"
-                onClick={() => setShowCreateModal(true)}
-                type="button"
-              >
-                <Plus className="h-4 w-4" />
-                Add
-              </button>
-            ) : null}
-          </>
-        )}
-        title="Rules"
-      >
-        <SearchInput ariaLabel="Search rules" className="w-full max-w-xl" onChange={setSearch} placeholder="Search rules..." value={search} />
-      </PageHeader>
+    <div className="flex flex-col gap-3" ref={pageRef}>
+      <SettingsTitleRow action={canWriteRules ? <Button aria-label="Add rule" onClick={() => setShowCreateModal(true)}>+ Add</Button> : null} title="Rules" />
+      <div className="flex items-center gap-2">
+        <SearchInput ariaLabel="Search rules" className="w-full lg:max-w-[360px]" onChange={setSearch} placeholder="Search rules..." value={search} />
+        <div className="hidden lg:block">
+          <FiltersButton count={panelFilterCount} onClick={() => setFiltersOpen((open) => !open)} open={filtersOpen} ref={filtersButtonRef} />
+        </div>
+      </div>
+      {filtersOpen ? (
+        <div className="hidden lg:block">
+          <RuleFilterPanel accounts={accounts} caretRight={caretRight} clearable={panelFilterCount > 0} filters={filters} onChange={updateFilters} onClear={clearFilters} />
+        </div>
+      ) : null}
       <QueryGate
         data={data}
         empty={rules.length === 0}
@@ -129,42 +104,15 @@ export function RulesPage() {
         fetching={fetching}
         onRetry={() => reexecuteQuery({ requestPolicy: 'network-only' })}
       >
-        <Card>
+        <Card as="section">
           {rules.map((rule) => (
-            <div
-              className={`flex flex-col gap-4 border-b border-neutral-100 p-4 md:flex-row md:items-start md:justify-between ${canWriteRules ? 'cursor-pointer hover:bg-neutral-50' : ''}`}
-              key={rule.id}
-              onClick={canWriteRules ? () => openRule(rule) : undefined}
-              role={canWriteRules ? 'button' : undefined}
-              tabIndex={canWriteRules ? 0 : undefined}
-              onKeyDown={canWriteRules ? (e) => { if (e.key === 'Enter' || e.key === ' ') openRule(rule) } : undefined}
-            >
-              <div className="space-y-3">
-                <div>
-                  <div className="font-semibold">{rule.merchantPattern || rule.originalPattern || 'Rule'}</div>
-                  <div className="text-sm text-neutral-500">
-                    {rule.category ? `${rule.category.emoji} ${rule.category.name} · ${rule.category.groupEmoji ?? ''} ${rule.category.groupName ?? ''}` : 'No category'}
-                    {formatTags(rule) ? ` · ${formatTags(rule)}` : ''} · Priority {rule.priority}
-                    {rule.shouldHide ? ' · Hide matches' : ''}
-                    {rule.shouldBeRecurring != null ? ` · Recurring: ${rule.shouldBeRecurring ? 'Yes' : 'No'}` : ''}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <RuleDetail label="Merchant" value={rule.merchantPattern || 'Any'} />
-                  <RuleDetail label="Original name" value={rule.originalPattern || 'Any'} />
-                  <RuleDetail label="Rename merchant" value={rule.merchantName || 'No'} />
-                  <RuleDetail label="Amount" value={formatAmountRange(rule)} />
-                  <RuleDetail label="Accounts" value={formatAccounts(rule)} />
-                  <RuleDetail label="Tags" value={formatTags(rule) || 'None'} />
-                  <RuleDetail label="Hide" value={formatOptionalBoolean(rule.shouldHide)} />
-                  <RuleDetail label="Recurring" value={formatOptionalBoolean(rule.shouldBeRecurring)} />
-                  <RuleDetail label="Created" value={formatDate(rule.createdAt)} />
-                </div>
-              </div>
-            </div>
+            <RuleRow key={rule.id} onClick={canWriteRules ? () => navigate(`/settings/rules/${rule.id}`) : undefined} rule={rule} />
           ))}
         </Card>
       </QueryGate>
+      {mobileFiltersOpen ? (
+        <RuleMobileFilters accounts={accounts} filters={filters} onChange={updateFilters} onClear={clearFilters} onClose={() => setMobileFiltersOpen(false)} />
+      ) : null}
       {editingRule ? (
         <EditRuleModal
           rule={editingRule}
@@ -215,46 +163,4 @@ function optionalNumber(value: string) {
   if (!trimmed) return undefined
   const parsed = Number(trimmed)
   return Number.isFinite(parsed) ? parsed : undefined
-}
-
-interface RuleDetailProps {
-  label: string
-  value: string
-}
-
-function RuleDetail({ label, value }: RuleDetailProps) {
-  return (
-    <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-neutral-700">
-      <span className="font-semibold text-neutral-500">{label}:</span> {value}
-    </span>
-  )
-}
-
-function formatAmountRange(rule: Rule) {
-  if (rule.amountMin == null && rule.amountMax == null) return 'Any'
-  if (rule.amountMin != null && rule.amountMax != null) {
-    return rule.amountMin === rule.amountMax
-      ? formatSignedCurrency(rule.amountMin)
-      : `${formatSignedCurrency(rule.amountMin)} to ${formatSignedCurrency(rule.amountMax)}`
-  }
-  return rule.amountMin != null ? `At least ${formatSignedCurrency(rule.amountMin)}` : `Up to ${formatSignedCurrency(rule.amountMax ?? 0)}`
-}
-
-function formatAccounts(rule: Rule) {
-  if (!rule.accounts?.length) return 'Any'
-  return rule.accounts.map(accountDisplayLabel).join(', ')
-}
-
-function formatTags(rule: Rule) {
-  if (!rule.tags?.length) return ''
-  return rule.tags.map((tag) => `#${tag.name}`).join(', ')
-}
-
-function formatOptionalBoolean(value: boolean | null | undefined) {
-  if (value == null) return 'No change'
-  return value ? 'Yes' : 'No'
-}
-
-function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(dateStr))
 }

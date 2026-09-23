@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
 import type { BudgetReport, CategoryGroup } from '../../types/graphql'
 import { periodFromMonthKey, toDateInputValue } from '../../utils/dates'
+import { EmptyState } from '../common/EmptyState'
 import { BudgetSectionRow } from './BudgetSectionRow'
 
-// Monthly budget sections. Groups without budget lines yet are appended as
-// empty sections so every category group stays editable.
+// Groups without budget lines yet are appended as empty sections so every
+// category group stays editable.
 export function BudgetSectionList({
   report,
   categoryGroups,
@@ -37,11 +38,7 @@ export function BudgetSectionList({
   }, [report, categoryGroups])
 
   if (sections.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-neutral-200 px-4 py-6 text-center text-sm text-neutral-500">
-        No income or expense categories yet. Create one to start budgeting.
-      </p>
-    )
+    return <EmptyState description="Create one to start budgeting." title="No income or expense categories yet" />
   }
 
   return (

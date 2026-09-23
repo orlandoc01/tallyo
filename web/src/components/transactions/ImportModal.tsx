@@ -85,20 +85,20 @@ export function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuc
   return (
     <Modal label="Import transactions" onClose={onClose} size="lg">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-neutral-950">Import transactions</h2>
+          <h2 className="text-lg font-bold text-text-1">Import transactions</h2>
           <ModalCloseButton label="Close import dialog" onClick={onClose} />
         </div>
 
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-text-3">
           Upload a CSV with columns:{' '}
           {['account_id', 'datetime', 'amount', 'merchant_name / original_name'].map((col) => (
-            <code key={col} className="mx-0.5 rounded bg-neutral-100 px-1 text-neutral-700">
+            <code key={col} className="mx-0.5 rounded bg-raised px-1 text-text-2">
               {col}
             </code>
           ))}
           . Optional:{' '}
           {['posted_datetime', 'category', 'notes', 'is_recurring', 'is_hidden'].map((col) => (
-            <code key={col} className="mx-0.5 rounded bg-neutral-100 px-1 text-neutral-700">
+            <code key={col} className="mx-0.5 rounded bg-raised px-1 text-text-2">
               {col}
             </code>
           ))}
@@ -112,7 +112,7 @@ export function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuc
               className={`mt-4 flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-sm transition ${
                 dragging
                   ? 'border-brand-500 bg-brand-50 text-brand-700'
-                  : 'border-neutral-200 text-neutral-400 hover:border-neutral-300 hover:text-neutral-500'
+                  : 'border-border text-text-muted hover:border-border-strong hover:text-text-3'
               }`}
               onClick={() => inputRef.current?.click()}
               onDragLeave={() => setDragging(false)}
@@ -125,7 +125,7 @@ export function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuc
             >
               <Upload className="h-8 w-8" />
               {file ? (
-                <span className="font-medium text-neutral-700">{file.name}</span>
+                <span className="font-medium text-text-2">{file.name}</span>
               ) : (
                 <span>
                   Drag &amp; drop a CSV or{' '}
@@ -150,17 +150,17 @@ export function ImportModal({ onClose, onSuccess }: { onClose: () => void; onSuc
 
         {result && (
           <div className="mt-4 space-y-2">
-            <div className="rounded-xl bg-green-50 px-4 py-3 text-sm">
-              <p className="font-semibold text-green-800">
+            <div className="rounded-xl bg-positive/10 px-4 py-3 text-sm">
+              <p className="font-semibold text-positive">
                 {result.processed} imported, {result.skipped} skipped
               </p>
             </div>
             {result.errors.length > 0 && (
-              <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm">
-                <p className="mb-1 font-semibold text-amber-800">
+              <div className="rounded-xl bg-warning/[0.12] px-4 py-3 text-sm">
+                <p className="mb-1 font-semibold text-warning">
                   {result.errors.length} row{result.errors.length !== 1 ? 's' : ''} had errors
                 </p>
-                <ul className="space-y-0.5 text-amber-700">
+                <ul className="space-y-0.5 text-warning">
                   {result.errors.map((e) => (
                     <li key={`${e.row}-${e.message}`}>
                       Row {e.row}: {e.message}

@@ -1,279 +1,217 @@
 import clsx from 'clsx'
-import { BarChart3, ChevronDown, ChevronUp, PieChart as PieIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Tooltip } from 'recharts'
-import { DonutChart } from '../common/DonutChart'
-import { Card } from '../common/FormControls'
-import { SegmentedControl } from '../common/SegmentedControl'
-import type { CategorySpending, SpendingPeriod } from '../../types/domain'
-import { spendingChartColor } from '../../utils/chartStyles'
+import type { SpendingPeriod } from '../../types/domain'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
-import { type GroupBy, aggregateByGroup, topCategoriesWithEverythingElse, topNWithEverythingElse } from '../../utils/spending'
-import { CategoryBar } from './CategoryBar'
+import type { GroupBy } from '../../utils/spending'
+import { Button } from '../common/Button'
+import { ClickableRow } from '../common/ClickableRow'
+import { Donut } from '../common/Donut'
+import { DottedBar } from '../common/DottedBar'
+import { type BreakdownItem, breakdownItemCount, breakdownItems, maxVisibleFor, nonZeroSorted, pieItems } from './spendingBreakdownItems'
 
 export type ChartView = 'bar' | 'pie'
-
-interface DisplayItem {
-  categoryIds: string[]
-  id: string
-  name: string
-  emoji: string
-  total: number
-  transactionCount: number
-  percentOfTotal: number
-  color: string
-}
 
 export interface SpendingCategoryFocus {
   id: string
   categoryIds: string[]
 }
 
-export function SpendingBreakdown({
-  expanded,
-  focusedCategoryId,
-  groupBy,
-  onCategoryFocusChange,
-  onToggleExpanded,
-  onViewChange,
-  period,
-  view: viewProp,
-}: {
+const PIE_GRID = 'minmax(0,1fr) 70px 90px 110px'
+const BAR_GRID = 'minmax(160px,240px) minmax(0,1fr) 70px 110px'
+
+interface RowsProps {
+  focusedId: string | null
+  hoveredId?: string | null
+  items: BreakdownItem[]
+  onHover?: (id: string | null) => void
+  onToggle?: (item: BreakdownItem) => void
+}
+
+export function SpendingBreakdown({ expanded = false, focusedCategoryId = null, groupBy, onCategoryFocusChange, onToggleExpanded, period, view = 'bar' }: {
   expanded?: boolean
   focusedCategoryId?: string | null
   groupBy?: GroupBy
   onCategoryFocusChange?: (focus: SpendingCategoryFocus | null) => void
   onToggleExpanded?: () => void
-  onViewChange?: (view: ChartView) => void
   period?: SpendingPeriod
   view?: ChartView
 }) {
-  const [internalView, setInternalView] = useState<ChartView>('bar')
-  const view = viewProp ?? internalView
-  function setView(v: ChartView) { setInternalView(v); onViewChange?.(v) }
-  const sorted = useMemo(() => [...(period?.categories ?? [])].sort((a, b) => b.total - a.total), [period?.categories])
-  const nonZeroSorted = useMemo(() => sorted.filter((item) => item.total !== 0), [sorted])
+  const isMobile = useIsMobile()
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const categories = useMemo(() => nonZeroSorted(period?.categories ?? []), [period?.categories])
+  const items = useMemo(() => breakdownItems(categories, groupBy, expanded), [categories, groupBy, expanded])
+  const slices = useMemo(() => pieItems(items, expanded), [items, expanded])
+  const totalCount = breakdownItemCount(categories, groupBy)
 
-  const maxVisible = groupBy === 'group' ? 6 : 10
-
-  const totalCount = groupBy === 'group'
-    ? aggregateByGroup(nonZeroSorted).length
-    : nonZeroSorted.filter((c) => c.total > 0).length
-
-  const displayItems: DisplayItem[] = useMemo(() => {
-    if (groupBy === 'group') {
-      const grouped = aggregateByGroup(nonZeroSorted)
-      const { visible: topVisible, everythingElse } = expanded
-        ? { visible: grouped, everythingElse: null }
-        : topNWithEverythingElse(grouped, maxVisible)
-      const items = everythingElse ? [...topVisible] : topVisible
-      const visibleGroupIDs = new Set(topVisible.map((item) => item.id))
-      const categoryIDsByGroup = new Map<string, string[]>()
-      for (const category of nonZeroSorted) {
-        const categoryIDs = categoryIDsByGroup.get(category.category.groupName) ?? []
-        categoryIDs.push(category.category.id)
-        categoryIDsByGroup.set(category.category.groupName, categoryIDs)
-      }
-      const everythingElseCategoryIds = grouped
-        .filter((item) => !visibleGroupIDs.has(item.id))
-        .flatMap((item) => categoryIDsByGroup.get(item.id) ?? [])
-      return items.map((item) => ({
-        categoryIds: item === everythingElse ? everythingElseCategoryIds : categoryIDsByGroup.get(item.id) ?? [],
-        id: item.id,
-        name: item.name,
-        emoji: item.emoji,
-        total: item.total,
-        transactionCount: item.transactionCount,
-        percentOfTotal: item.percentOfTotal,
-        color: spendingChartColor(item.id),
-      }))
-    }
-
-    const { visible: topVisible, everythingElse } = expanded
-      ? { visible: nonZeroSorted, everythingElse: null as CategorySpending | null }
-      : topCategoriesWithEverythingElse(nonZeroSorted, maxVisible)
-    const items = everythingElse ? [...topVisible] : topVisible
-    const visibleCategoryIDs = new Set(topVisible.map((item) => item.category.id))
-    const everythingElseCategoryIds = nonZeroSorted
-      .filter((item) => !visibleCategoryIDs.has(item.category.id))
-      .map((item) => item.category.id)
-    return items.map((item) => ({
-      categoryIds: item === everythingElse ? everythingElseCategoryIds : [item.category.id],
-      id: item.category.id,
-      name: item.category.name,
-      emoji: item.category.emoji,
-      total: item.total,
-      transactionCount: item.transactionCount,
-      percentOfTotal: item.percentOfTotal,
-      color: spendingChartColor(item.category.id),
-    }))
-  }, [groupBy, nonZeroSorted, expanded, maxVisible])
-
-  const maxAbsTotal = Math.max(...displayItems.map((item) => Math.abs(item.total)), 0)
-  const hasFocus = focusedCategoryId !== undefined && focusedCategoryId !== null
-
-  function toggleCategoryFocus(id: string, categoryIds: string[]) {
-    onCategoryFocusChange?.(focusedCategoryId === id ? null : { id, categoryIds })
+  if (!period || categories.length === 0) {
+    return <p className="p-8 text-[13px] text-text-muted">No spending data for this period.</p>
   }
 
-  if (!period || nonZeroSorted.length === 0) {
-    return <div className="p-8 text-sm text-neutral-500">No spending data for this period.</div>
+  const toggle = onCategoryFocusChange ? (item: BreakdownItem) => onCategoryFocusChange(focusedCategoryId === item.id ? null : { id: item.id, categoryIds: item.categoryIds }) : undefined
+  const expandButton = onToggleExpanded && totalCount > maxVisibleFor(groupBy) ? (
+    <div className="mt-3 flex justify-center">
+      <Button onClick={onToggleExpanded} size="sm" variant="ghost">{expanded ? 'Show less' : `Show all ${totalCount} categories`}</Button>
+    </div>
+  ) : null
+
+  if (view === 'bar') {
+    return (
+      <div className={isMobile ? '-mx-4 mt-5' : 'mt-7'}>
+        {isMobile ? <MobileBarRows focusedId={focusedCategoryId} items={items} onToggle={toggle} /> : <BarRows focusedId={focusedCategoryId} items={items} onToggle={toggle} />}
+        {expandButton}
+      </div>
+    )
   }
 
-  const pieData = makePieData(displayItems, expanded)
+  const donut = (
+    <div className={clsx('relative mx-auto w-full', isMobile ? 'max-w-[190px]' : 'max-w-[280px]')}>
+      <Donut ariaLabel="Spending by category" hoveredKey={hoveredId} innerRadius={74} onHover={toggle ? setHoveredId : undefined} onSelect={toggle ? (key) => { const item = slices.find((slice) => slice.id === key); if (item) toggle(item) } : undefined} selectedKey={focusedCategoryId} slices={slices.map((item) => ({ key: item.id, label: item.name, value: item.total, color: item.color }))} />
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[13px] text-text-muted">{groupBy === 'group' ? 'All groups' : 'All categories'}</span>
+        <span className="text-xl font-semibold tracking-[-0.3px] text-text-1">{formatCurrency(period.total)}</span>
+      </div>
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <div className="mt-5">
+        {donut}
+        <div className="-mx-4 mt-4">
+          <MobilePieRows focusedId={focusedCategoryId} items={slices} onToggle={toggle} />
+        </div>
+        {expandButton}
+      </div>
+    )
+  }
 
   return (
-    <Card as="section" overflow="visible">
-      <div className="hidden flex-nowrap items-center justify-between gap-3 border-b border-neutral-100 p-5 lg:flex lg:flex-wrap">
-        <p className="text-sm text-neutral-500">{period.periodStart} to {period.periodEnd}</p>
-        <SegmentedControl
-          ariaLabel="Spending chart view"
-          options={[
-            { value: 'pie', label: <><PieIcon className="h-4 w-4" />Pie</> },
-            { value: 'bar', label: <><BarChart3 className="h-4 w-4" />Bars</> },
-          ]}
-          value={view}
-          onChange={setView}
-        />
+    <div className="mt-7 grid grid-cols-[minmax(200px,280px)_minmax(0,1fr)] items-center gap-8">
+      {donut}
+      <div>
+        <PieRows focusedId={focusedCategoryId} hoveredId={hoveredId} items={slices} onHover={setHoveredId} onToggle={toggle} />
+        {expandButton}
       </div>
-
-      {view === 'bar' ? (
-        <div className="space-y-3 p-5">
-          {displayItems.map((item) => (
-            <CategoryBar
-              dimmed={hasFocus && focusedCategoryId !== item.id}
-              focused={focusedCategoryId === item.id}
-              item={{ category: { id: item.id, name: item.name, emoji: item.emoji }, total: item.total }}
-              key={item.id}
-              maxAbsTotal={maxAbsTotal}
-              onClick={onCategoryFocusChange ? () => toggleCategoryFocus(item.id, item.categoryIds) : undefined}
-            />
-          ))}
-          <ExpandButton expanded={expanded} maxVisible={maxVisible} onToggleExpanded={onToggleExpanded} totalCount={totalCount} />
-        </div>
-      ) : (
-        <div className="grid gap-8 p-5 lg:grid-cols-[minmax(20rem,0.9fr)_1fr]">
-          <div className="h-[360px]">
-            <DonutChart
-              innerRadius="58%"
-              outerRadius="88%"
-              paddingAngle={1}
-              slices={pieData.map((item) => {
-                const focused = focusedCategoryId === item.categoryId
-
-                return {
-                  key: item.name,
-                  label: item.name,
-                  value: item.value,
-                  color: item.color,
-                  dimmed: hasFocus && !focused,
-                  selected: focused,
-                }
-              })}
-            >
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-            </DonutChart>
-            <div className="pointer-events-none -mt-52 text-center">
-              <div className="text-xl font-bold">{formatCurrency(period.total)}</div>
-              <div className="text-sm text-neutral-500">Total</div>
-            </div>
-          </div>
-          <div className="grid content-center gap-4 sm:grid-cols-2">
-            {pieData.map((item) => (
-              <button
-                aria-pressed={focusedCategoryId === item.categoryId}
-                className={clsx(
-                  'flex items-start gap-3 rounded-xl p-2 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-400',
-                  focusedCategoryId === item.categoryId ? 'bg-brand-50' : 'hover:bg-neutral-50',
-                  hasFocus && focusedCategoryId !== item.categoryId && 'opacity-55 grayscale',
-                )}
-                key={item.name}
-                onClick={() => toggleCategoryFocus(item.categoryId, item.categoryIds)}
-                type="button"
-              >
-                <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                <div>
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-sm font-semibold tabular-nums">{formatSignedCurrency(item.signedValue)} ({item.percent.toFixed(1)}%)</div>
-                </div>
-              </button>
-            ))}
-            <div className="sm:col-span-2">
-              <ExpandButton expanded={expanded} maxVisible={maxVisible} onToggleExpanded={onToggleExpanded} totalCount={totalCount} />
-            </div>
-          </div>
-        </div>
-      )}
-    </Card>
+    </div>
   )
 }
 
-function makePieData(items: DisplayItem[], expanded?: boolean) {
-  const positiveTotal = items.reduce((total, item) => total + Math.max(0, item.total), 0)
-  const visible = expanded
-    ? items.filter((item) => positiveTotal === 0 || item.total > 0)
-    : items.filter((item) => positiveTotal === 0 || (Math.max(0, item.total) / positiveTotal) * 100 >= 1.5)
-  const hidden = items.filter((item) => !visible.includes(item))
-  const existingEverythingElse = visible.find((item) => item.id === 'everything-else')
-  const hiddenTotal = hidden.reduce((total, item) => total + Math.max(0, item.total), 0)
-  const hiddenCategoryIds = hidden
-    .filter((item) => item.total > 0)
-    .flatMap((item) => item.categoryIds)
-
-  const visibleData = visible.map((item) => ({
-    categoryId: item.id,
-    categoryIds: item === existingEverythingElse ? [...item.categoryIds, ...hiddenCategoryIds] : item.categoryIds,
-    name: item.name,
-    value: Math.max(0, item.total) + (item === existingEverythingElse ? hiddenTotal : 0),
-    signedValue: item.total + (item === existingEverythingElse ? hiddenTotal : 0),
-    percent: positiveTotal > 0 ? ((Math.max(0, item.total) + (item === existingEverythingElse ? hiddenTotal : 0)) / positiveTotal) * 100 : 0,
-    color: item.color,
-  }))
-
-  if (hidden.length === 0 || hiddenTotal === 0 || existingEverythingElse) {
-    return visibleData
-  }
-
-  return [
-    ...visibleData,
-    {
-      categoryId: 'everything-else',
-      categoryIds: hiddenCategoryIds,
-      name: 'Everything else',
-      value: hiddenTotal,
-      signedValue: hiddenTotal,
-      percent: positiveTotal > 0 ? (hiddenTotal / positiveTotal) * 100 : 0,
-      color: spendingChartColor('everything-else'),
-    },
-  ]
+function rowLabel(item: BreakdownItem) {
+  return `${item.emoji} ${item.name} ${formatSignedCurrency(item.total)}`
 }
 
-function ExpandButton({
-  expanded,
-  maxVisible,
-  onToggleExpanded,
-  totalCount,
-}: {
-  expanded?: boolean
-  maxVisible: number
-  onToggleExpanded?: () => void
-  totalCount: number
-}) {
-  if (!onToggleExpanded || totalCount <= maxVisible) {
-    return null
-  }
+function Dot({ color }: { color: string }) {
+  return <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+}
 
+function PieRows({ focusedId, hoveredId, items, onHover, onToggle }: RowsProps) {
   return (
-    <button
-      className="flex w-full items-center justify-center gap-1 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
-      onClick={onToggleExpanded}
-      type="button"
-    >
-      {expanded ? (
-        <>Show less <ChevronUp className="h-4 w-4" /></>
-      ) : (
-        <>Show all {totalCount} categories <ChevronDown className="h-4 w-4" /></>
-      )}
-    </button>
+    <div>
+      <div className="grid gap-3 border-b border-border pb-2 text-xs text-text-muted" style={{ gridTemplateColumns: PIE_GRID }}>
+        <span>Category</span>
+        <span className="text-right">Txns</span>
+        <span className="text-right">% of Spend</span>
+        <span className="text-right">Amount</span>
+      </div>
+      {items.map((item) => (
+        <ClickableRow
+          ariaLabel={rowLabel(item)}
+          className={clsx('grid h-[34px] w-full items-center gap-3 text-left text-[13px] transition-colors duration-150', onToggle && 'hover:bg-raised', (focusedId === item.id || hoveredId === item.id) && 'bg-raised')}
+          key={item.id}
+          onClick={onToggle ? () => onToggle(item) : undefined}
+          onHoverChange={onHover ? (hovered) => onHover(hovered ? item.id : null) : undefined}
+          pressed={onToggle ? focusedId === item.id : undefined}
+          style={{ gridTemplateColumns: PIE_GRID }}
+        >
+          <span className="flex min-w-0 items-center gap-2 text-text-1"><Dot color={item.color} /><span className="truncate">{item.emoji} {item.name}</span></span>
+          <span className="text-right tabular-nums text-text-3">{item.transactionCount}</span>
+          <span className="text-right tabular-nums text-text-3">{item.percentOfTotal.toFixed(1)}%</span>
+          <span className="text-right tabular-nums text-text-3">{formatSignedCurrency(item.total)}</span>
+        </ClickableRow>
+      ))}
+    </div>
+  )
+}
+
+function BarRows({ focusedId, items, onToggle }: RowsProps) {
+  const maxAbsTotal = Math.max(...items.map((item) => Math.abs(item.total)), 0)
+  return (
+    <div>
+      <div className="grid gap-4 border-b border-border pb-2 text-xs text-text-muted" style={{ gridTemplateColumns: BAR_GRID }}>
+        <span>Category</span>
+        <span>Weight</span>
+        <span className="text-right">% of Spend</span>
+        <span className="text-right">Amount</span>
+      </div>
+      {items.map((item) => (
+        <ClickableRow
+          ariaLabel={rowLabel(item)}
+          className={clsx('grid h-9 w-full items-center gap-4 text-left text-[13px] transition-colors duration-150', onToggle && 'hover:bg-raised', focusedId === item.id && 'bg-raised')}
+          key={item.id}
+          onClick={onToggle ? () => onToggle(item) : undefined}
+          pressed={onToggle ? focusedId === item.id : undefined}
+          style={{ gridTemplateColumns: BAR_GRID }}
+        >
+          <span className="truncate text-text-1">{item.emoji} {item.name}</span>
+          <DottedBar color={item.color} height={6} percent={maxAbsTotal > 0 ? (Math.abs(item.total) / maxAbsTotal) * 100 : 0} />
+          <span className="text-right tabular-nums text-text-3">{item.percentOfTotal.toFixed(1)}%</span>
+          <span className="text-right tabular-nums text-text-1">{formatSignedCurrency(item.total)}</span>
+        </ClickableRow>
+      ))}
+    </div>
+  )
+}
+
+function MobilePieRows({ focusedId, items, onToggle }: RowsProps) {
+  return (
+    <div>
+      <div className="flex justify-between px-4 pb-2 text-xs text-text-muted">
+        <span>Category</span>
+        <span>Amount · Share</span>
+      </div>
+      {items.map((item) => (
+        <ClickableRow
+          ariaLabel={rowLabel(item)}
+          className={clsx('flex min-h-[46px] w-full items-center gap-3 border-t border-border px-4 py-1 text-left', focusedId === item.id && 'bg-raised')}
+          key={item.id}
+          onClick={onToggle ? () => onToggle(item) : undefined}
+          pressed={onToggle ? focusedId === item.id : undefined}
+        >
+          <Dot color={item.color} />
+          <span className="min-w-0 flex-1 truncate text-sm text-text-1">{item.emoji} {item.name}</span>
+          <span className="text-right">
+            <span className="block text-sm tabular-nums text-text-1">{formatSignedCurrency(item.total)}</span>
+            <span className="block text-[11px] tabular-nums text-text-muted">{item.percentOfTotal.toFixed(1)}% · {item.transactionCount} txns</span>
+          </span>
+        </ClickableRow>
+      ))}
+    </div>
+  )
+}
+
+function MobileBarRows({ focusedId, items, onToggle }: RowsProps) {
+  const maxAbsTotal = Math.max(...items.map((item) => Math.abs(item.total)), 0)
+  return (
+    <div>
+      {items.map((item) => (
+        <ClickableRow
+          ariaLabel={rowLabel(item)}
+          className={clsx('block w-full border-t border-border px-4 py-2.5 text-left', focusedId === item.id && 'bg-raised')}
+          key={item.id}
+          onClick={onToggle ? () => onToggle(item) : undefined}
+          pressed={onToggle ? focusedId === item.id : undefined}
+        >
+          <span className="flex items-center justify-between gap-3 text-[13px]">
+            <span className="truncate text-text-1">{item.emoji} {item.name}</span>
+            <span className="tabular-nums text-text-1">{formatSignedCurrency(item.total)}</span>
+          </span>
+          <span className="mt-1.5 flex items-center gap-2">
+            <DottedBar color={item.color} height={6} percent={maxAbsTotal > 0 ? (Math.abs(item.total) / maxAbsTotal) * 100 : 0} />
+            <span className="min-w-[40px] text-right text-[11px] tabular-nums text-text-muted">{item.percentOfTotal.toFixed(1)}%</span>
+          </span>
+        </ClickableRow>
+      ))}
+    </div>
   )
 }

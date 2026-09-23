@@ -6,18 +6,27 @@ import { useMutation } from 'urql'
 import { CREATE_PLAID_CREDENTIAL_MUTATION, CREATE_SIMPLE_FIN_ACCESS_TOKEN_MUTATION } from '../../graphql/mutations'
 import { useOwners } from '../../hooks/useEntityQueries'
 import type { CreatePlaidCredentialInput, CreateSimpleFinAccessTokenInput, CreateSimpleFinAccessTokenPayload, PlaidCredential, PlaidEnvironment } from '../../types/graphql'
-import { FormError, TextAreaField } from '../../components/common/FormControls'
+import { Button } from '../../components/common/Button'
 import { CenteredSpinner } from '../../components/common/LoadingSpinner'
+import { SegmentedControl } from '../../components/common/SegmentedControl'
 import { OwnerSelect } from '../../components/institutions/OwnerSelect'
 import { useLinkOwners } from '../../components/institutions/useLinkOwners'
-import { SetupActions, SetupHeading, SetupTextField, primaryButtonClass, secondaryButtonClass } from './SetupLayout'
+import { withDataProvider } from './setupState'
+import { useSetup } from './useSetup'
+import { setupControlClass, setupLabelClass } from './setupClasses'
+import { SetupActions, SetupFieldGrid, SetupHeading, SetupMessage, SetupTextField } from './SetupLayout'
 
 type ProviderTab = 'plaid' | 'simplefin'
 
-const TABS: { value: ProviderTab; label: string }[] = [
+const TABS = [
   { value: 'plaid', label: 'Plaid' },
   { value: 'simplefin', label: 'SimpleFIN' },
-]
+] as const
+
+const ENVIRONMENTS = [
+  { value: 'SANDBOX', label: 'sandbox' },
+  { value: 'PRODUCTION', label: 'production' },
+] as const
 
 export function ConnectionsStep() {
   const navigate = useNavigate()
@@ -30,41 +39,33 @@ export function ConnectionsStep() {
 
   return (
     <div>
-      <SetupHeading eyebrow="Data providers" title="Connect your data provider" />
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">Configure Plaid or SimpleFIN to start syncing transactions. You can skip this for now and add credentials later in Settings.</p>
-
-      <div className="mt-8 inline-flex rounded-full bg-brand-100 p-1" role="tablist" aria-label="Connection providers">
-        {TABS.map((tab) => (
-          <button
-            aria-selected={activeTab === tab.value}
-            className={clsx(
-              'rounded-full px-4 py-2 text-sm font-bold transition',
-              activeTab === tab.value ? 'bg-white text-neutral-900 ring-2 ring-brand-600 shadow-sm' : 'text-brand-800 hover:bg-brand-50',
-            )}
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            role="tab"
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <SetupHeading subtitle="Configure Plaid or SimpleFIN to start syncing transactions. You can skip this and add credentials later in Settings." title="Data providers" />
+        <SegmentedControl ariaLabel="Connection providers" onChange={setActiveTab} options={TABS} semantics="tab" value={activeTab} />
       </div>
 
-      <div className="mt-8">
-        {activeTab === 'plaid' ? <PlaidForm /> : <SimpleFinForm />}
-      </div>
+      {activeTab === 'plaid' ? <PlaidForm /> : <SimpleFinForm />}
 
       <SetupActions>
-        <button className={secondaryButtonClass} onClick={() => navigate(-1)} type="button">Back</button>
-        <button className={secondaryButtonClass} onClick={() => navigate('/setup/complete')} type="button">Skip for now</button>
-        <button className={primaryButtonClass} onClick={() => navigate('/setup/complete')} type="button">Continue</button>
+        <Button onClick={() => navigate(-1)} variant="secondary">Back</Button>
+        <Button onClick={() => navigate('/setup/complete')} variant="ghost">Skip for now</Button>
+        <Button onClick={() => navigate('/setup/complete')}>Continue</Button>
       </SetupActions>
     </div>
   )
 }
 
+function ProviderLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent hover:text-accent-hover" href={href} rel="noreferrer" target="_blank">
+      {label}
+      <ExternalLink aria-hidden className="h-3 w-3" />
+    </a>
+  )
+}
+
 function PlaidForm() {
+  const setup = useSetup()
   const [clientId, setClientId] = useState('')
   const [secret, setSecret] = useState('')
   const [label, setLabel] = useState('')
@@ -74,55 +75,39 @@ function PlaidForm() {
 
   async function save() {
     const response = await createCredential({ input: { clientId: clientId.trim(), secret, environment, label: label.trim() || null } })
-    if (!response.error) setSaved(true)
+    if (response.error) return
+    setSaved(true)
+    setup.updateSetup({ dataProviderSummary: withDataProvider(setup.dataProviderSummary, 'Plaid', `Plaid (${environment.toLowerCase()})`) })
   }
 
   return (
     <div>
-      <a className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-800" href="https://support.plaid.com/hc/en-us/articles/39994173227159-What-is-the-Plaid-Trial-plan" rel="noreferrer" target="_blank">
-        Plaid Free Trial Signup
-        <ExternalLink className="h-4 w-4" />
-      </a>
+      <ProviderLink href="https://support.plaid.com/hc/en-us/articles/39994173227159-What-is-the-Plaid-Trial-plan" label="Plaid free trial signup" />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <SetupTextField label="Client ID" value={clientId} onChange={setClientId} />
+      <SetupFieldGrid className="mt-3">
+        <SetupTextField label="Client ID" mono value={clientId} onChange={setClientId} />
         <SetupTextField label="Secret" type="password" value={secret} onChange={setSecret} />
         <SetupTextField label="Label" placeholder="Primary" value={label} onChange={setLabel} />
         <div>
-          <span className="text-sm font-bold text-neutral-900">Environment</span>
-          <div className="mt-1 grid grid-cols-2 gap-2 rounded-full bg-brand-100 p-1">
-            {(['SANDBOX', 'PRODUCTION'] as PlaidEnvironment[]).map((env) => (
-              <button
-                className={`rounded-full px-3 py-3 text-sm font-bold transition ${environment === env ? 'bg-white text-neutral-900 ring-2 ring-brand-600 shadow-sm' : 'text-brand-800 hover:bg-brand-50'}`}
-                key={env}
-                onClick={() => setEnvironment(env)}
-                type="button"
-              >
-                {env.toLowerCase()}
-              </button>
-            ))}
-          </div>
+          <span className={clsx('mb-1.5 block', setupLabelClass)}>Environment</span>
+          <SegmentedControl ariaLabel="Environment" fullWidth="always" onChange={setEnvironment} options={ENVIRONMENTS} value={environment} />
         </div>
-      </div>
+      </SetupFieldGrid>
 
-      {saved ? <p className="mt-5 rounded-2xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">Plaid credentials saved.</p> : null}
-      {result.error ? <FormError className="mt-5 font-semibold">{result.error.message}</FormError> : null}
+      {saved ? <SetupMessage tone="positive">Plaid credentials saved.</SetupMessage> : null}
+      {result.error ? <SetupMessage tone="negative">{result.error.message}</SetupMessage> : null}
 
-      <div className="mt-6">
-        <button
-          className={primaryButtonClass}
-          disabled={result.fetching || !clientId.trim() || !secret}
-          onClick={() => void save()}
-          type="button"
-        >
+      <div className="mt-4">
+        <Button disabled={result.fetching || !clientId.trim() || !secret} onClick={() => void save()}>
           {result.fetching ? 'Saving...' : 'Save credentials'}
-        </button>
+        </Button>
       </div>
     </div>
   )
 }
 
 function SimpleFinForm() {
+  const setup = useSetup()
   const { owners, ownersFetching, selectedOwner, setSelectedOwner, handleOwnerCreated } = useLinkOwners()
   const [setupToken, setSetupToken] = useState('')
   const [label, setLabel] = useState('')
@@ -137,37 +122,34 @@ function SimpleFinForm() {
     const response = await createAccessToken({ input: { setupToken: setupToken.trim(), ownerId: selectedOwner, label: label.trim() || null } })
     const payload = response.data?.createSimpleFinAccessToken
     if (!response.error && payload) {
-      setSaved({ count: payload.connections.length })
+      const count = payload.connections.length
+      setSaved({ count })
       setSetupToken('')
       setLabel('')
+      setup.updateSetup({ dataProviderSummary: withDataProvider(setup.dataProviderSummary, 'SimpleFIN', `SimpleFIN · ${count} connection${count === 1 ? '' : 's'}`) })
     }
   }
 
   const canSave = setupToken.trim() && selectedOwner && !result.fetching
 
-  if (result.fetching) {
-    return (
-      <CenteredSpinner />
-    )
-  }
+  if (result.fetching) return <CenteredSpinner />
 
-  if (saved) {
-    return <p className="mt-5 rounded-2xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">SimpleFIN token saved with {saved.count} connection{saved.count === 1 ? '' : 's'}.</p>
-  }
+  if (saved) return <SetupMessage tone="positive">SimpleFIN token saved with {saved.count} connection{saved.count === 1 ? '' : 's'}.</SetupMessage>
 
   return (
     <div>
-      <a className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-800" href="https://bridge.simplefin.org/simplefin/create" rel="noreferrer" target="_blank">
-        Open SimpleFIN Bridge
-        <ExternalLink className="h-4 w-4" />
-      </a>
+      <ProviderLink href="https://bridge.simplefin.org/simplefin/create" label="Open SimpleFIN Bridge" />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <TextAreaField className="lg:col-span-2" controlClassName="font-mono" label="Setup Token" labelClassName="font-bold text-neutral-900" minHeight="min-h-24" onChange={setSetupToken} placeholder="Paste the base64 setup token from SimpleFIN Bridge" value={setupToken} />
+      <label className="mt-3 block">
+        <span className={clsx('mb-1.5 block', setupLabelClass)}>Setup token</span>
+        <textarea className={clsx(setupControlClass, 'min-h-[88px] resize-y py-2 font-mono text-xs leading-[18px]')} onChange={(event) => setSetupToken(event.target.value)} placeholder="Paste the base64 setup token from SimpleFIN Bridge" value={setupToken} />
+      </label>
+
+      <SetupFieldGrid className="mt-3">
         <SetupTextField label="Label" placeholder="SimpleFIN Bridge" value={label} onChange={setLabel} />
         {!ownersFetching ? (
-          <label className="block text-sm font-bold text-neutral-900">
-            Owner
+          <label className="block">
+            <span className={clsx('block', setupLabelClass)}>Owner</span>
             <OwnerSelect
               canCreate
               onChange={setSelectedOwner}
@@ -177,14 +159,14 @@ function SimpleFinForm() {
             />
           </label>
         ) : null}
-      </div>
+      </SetupFieldGrid>
 
-      {result.error ? <FormError className="mt-5 font-semibold">{result.error.message}</FormError> : null}
+      {result.error ? <SetupMessage tone="negative">{result.error.message}</SetupMessage> : null}
 
-      <div className="mt-6">
-        <button className={primaryButtonClass} disabled={!canSave} onClick={() => void save()} type="button">
+      <div className="mt-4">
+        <Button disabled={!canSave} onClick={() => void save()}>
           {result.fetching ? 'Saving...' : 'Save token'}
-        </button>
+        </Button>
       </div>
     </div>
   )

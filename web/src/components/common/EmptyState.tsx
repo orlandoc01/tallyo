@@ -1,8 +1,16 @@
-export function EmptyState({ title, description }: { title: string; description?: string }) {
+import { Check } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Card } from './FormControls'
+
+export function EmptyState({ action, title, description }: { action?: ReactNode; title: string; description?: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-8 text-center">
-      <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
-      {description ? <p className="mt-2 text-sm text-neutral-500">{description}</p> : null}
-    </div>
+    <Card variant="dashed">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-raised">
+        <Check aria-hidden className="h-4 w-4 text-accent" />
+      </span>
+      <h2 className="mt-3 text-[15px] font-semibold text-text-1">{title}</h2>
+      {description ? <p className="mx-auto mt-1 max-w-[420px] text-[13px] text-text-muted [text-wrap:pretty]">{description}</p> : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </Card>
   )
 }

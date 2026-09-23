@@ -15,6 +15,7 @@ export interface AuthContextValue {
   disableWealthTracking: boolean
   hideOwners: boolean
   setupComplete: boolean
+  authConfigLoaded: boolean
   login: () => void
   loginWithPasskey: () => Promise<void>
   loginWithMasterPassword: (password: string) => void

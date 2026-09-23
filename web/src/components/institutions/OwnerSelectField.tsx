@@ -16,8 +16,8 @@ export function OwnerSelectField({ owners, ownersFetching, ownersError, canCreat
   if (ownersFetching || ownersError || (owners.length === 0 && !canCreateOwner)) return null
 
   return (
-    <label className="block text-sm font-semibold text-neutral-950">
-      Owner <span className="text-red-500">*</span>
+    <label className="block text-sm font-semibold text-text-1">
+      Owner <span className="text-negative">*</span>
       <OwnerSelect canCreate={canCreateOwner} onChange={setSelectedOwner} onOwnerCreated={onOwnerCreated} owners={owners} value={selectedOwner} />
     </label>
   )

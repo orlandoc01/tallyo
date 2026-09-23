@@ -46,8 +46,8 @@ export function AssetInfoFields({
 
       {classifierLocked ? (
         <label className="block">
-          <span className="text-sm font-medium text-neutral-700">Asset Class</span>
-          <p className="mt-1 text-sm text-neutral-500">
+          <span className="text-xs text-text-muted">Asset Class</span>
+          <p className="mt-1 text-[13px] text-text-3">
             {CLASSIFIER_LABELS[draft.classifier]}{lockedClassifierNote ? ` (${lockedClassifierNote})` : ''}
           </p>
         </label>
@@ -94,11 +94,11 @@ export function AssetSecurityFields({
 
   return (
     <>
-      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+      <div className="rounded-md border border-border bg-surface-2 p-3">
         <div className="flex items-center justify-between gap-4">
           <span>
-            <span className="block text-sm font-medium text-neutral-700">Custom Tracking</span>
-            <span className="block text-xs text-neutral-500" id={descriptionId}>
+            <span className="block text-sm font-medium text-text-1">Custom Tracking</span>
+            <span className="block text-xs text-text-muted" id={descriptionId}>
               Price this asset from a different ticker via Yahoo Finance and use it for Portfolio classification of public securities.
             </span>
           </span>
@@ -125,20 +125,20 @@ export function AssetSecurityFields({
               trackingTicker={draft.trackingTicker}
               verifyDisabled={isQuoting || !canEdit || !draft.trackingTicker.trim()}
             />
-            {tickerError ? <p className="text-xs text-red-600" role="alert">{tickerError}</p> : null}
+            {tickerError ? <p className="text-xs text-negative" role="alert">{tickerError}</p> : null}
           </div>
         ) : null}
       </div>
-      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+      <div className="rounded-md border border-border bg-surface-2 p-3">
         <div className="flex items-center justify-between gap-4">
           <span>
-            <span className="block text-sm font-medium text-neutral-700">Force Price</span>
-            <span className="block text-xs text-neutral-500">Override pricing with a fixed USD unit price.</span>
+            <span className="block text-sm font-medium text-text-1">Force Price</span>
+            <span className="block text-xs text-text-muted">Override pricing with a fixed USD unit price.</span>
           </span>
           <ToggleSwitch checked={draft.forcePrice} disabled={!canEdit} label="Override pricing with fixed price" onChange={(forcePrice) => updateDraft({ forcePrice })} />
         </div>
         {draft.forcePrice ? (
-          <TextField className="mt-3 max-w-40" controlClassName="rounded-xl" disabled={!canEdit} label="USD price per unit" min="0" onChange={(forcedUsdPrice) => updateDraft({ forcedUsdPrice })} step="0.01" type="number" value={draft.forcedUsdPrice} />
+          <TextField className="mt-3 max-w-40" disabled={!canEdit} label="USD price per unit" min="0" onChange={(forcedUsdPrice) => updateDraft({ forcedUsdPrice })} step="0.01" type="number" value={draft.forcedUsdPrice} />
         ) : null}
       </div>
     </>

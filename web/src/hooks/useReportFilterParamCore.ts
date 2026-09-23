@@ -5,6 +5,7 @@ import { dateRangeParamUpdates, enumParam, listParam, paramUpdate, paramUpdates,
 import { useSearchParamWriters } from './useSearchParamWriters'
 
 export const GRANULARITIES: readonly Granularity[] = ['MONTHLY', 'QUARTERLY', 'YEARLY']
+export const GRANULARITY_OPTIONS = GRANULARITIES.map((value) => ({ value, label: value[0] + value.slice(1).toLowerCase() }))
 
 type DateParamKeys = { from: string; to: string }
 type DateRangeValue = { dateFrom: string; dateTo: string }

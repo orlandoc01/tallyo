@@ -25,19 +25,19 @@ export function CategorySelect({
   const selectedCategory = useMemo(() => categories.find((category) => String(category.id) === value) ?? null, [categories, value])
 
   return (
-    <div className="block text-sm font-semibold text-neutral-950">
-      <div className={hideLabel ? 'sr-only' : undefined} id={labelId}>{label}</div>
+    <div className="block">
+      <div className={hideLabel ? 'sr-only' : 'text-xs text-text-muted'} id={labelId}>{label}</div>
       <button
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-labelledby={`${labelId} ${valueId}`}
-        className={`${hideLabel ? '' : 'mt-2 '}flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-200 px-3 py-2 text-left text-sm outline-none transition focus:border-brand-500 disabled:cursor-not-allowed disabled:opacity-50`}
+        className={`${hideLabel ? '' : 'mt-1 '}flex h-9 w-full items-center justify-between gap-3 rounded-md border border-border-strong bg-surface px-3 text-left text-[13px] outline-none transition focus:border-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-bg lg:h-8`}
         disabled={categories.length === 0}
         onClick={() => setIsOpen((current) => !current)}
         ref={buttonRef}
         type="button"
       >
-        <span className={`flex min-w-0 items-center gap-2 ${selectedCategory ? 'text-neutral-950' : 'text-neutral-500'}`} id={valueId}>
+        <span className={`flex min-w-0 items-center gap-2 ${selectedCategory ? 'text-text-1' : 'text-text-faint'}`} id={valueId}>
           {selectedCategory ? (
             <>
               <span>{selectedCategory.emoji}</span>
@@ -47,7 +47,7 @@ export function CategorySelect({
             <span>{placeholder}</span>
           )}
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-neutral-500 transition ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-text-muted transition ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       <CategoryDropdown
         anchorRef={buttonRef}

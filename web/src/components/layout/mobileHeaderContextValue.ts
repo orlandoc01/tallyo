@@ -7,8 +7,6 @@ export interface MobileHeaderContextValue {
   openFilter: () => void
   closeFilter: () => void
   setFiltersActive: (active: boolean) => void
-  headerLeading: ReactNode | null
-  setHeaderLeading: (leading: ReactNode | null) => void
   headerActions: ReactNode | null
   setHeaderActions: (actions: ReactNode | null) => void
 }

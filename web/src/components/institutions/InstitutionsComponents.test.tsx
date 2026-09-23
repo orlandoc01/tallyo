@@ -54,9 +54,9 @@ describe('AccountsPage', () => {
 
     expect(await screen.findByRole('button', { name: /link connection/i })).toBeInTheDocument()
     expect(await screen.findByText('American Express')).toBeInTheDocument()
-    expect(await screen.findAllByText('5 accounts')).toHaveLength(4)
+    expect(await screen.findAllByText(/^5 accounts/)).toHaveLength(4)
     expect(screen.getByRole('button', { name: /link connection/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^add$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^add account$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /refresh all/i })).not.toBeInTheDocument()
   })
 
@@ -72,7 +72,7 @@ describe('AccountsPage', () => {
 
     await screen.findByText('American Express')
     const mobileActions = within(screen.getByTestId('mobile-header-actions'))
-    await user.click(mobileActions.getByRole('button', { name: 'Link account' }))
+    await user.click(screen.getByRole('button', { name: 'Link account' }))
     expect(screen.getByRole('heading', { name: 'Link Connection' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close' }))
 
@@ -223,6 +223,7 @@ describe('AccountsPage', () => {
     render(
       <InstitutionRow
         connection={inactiveConn}
+        accounts={inactivePlaid.accounts}
         plaidItem={inactivePlaid}
         onAccountClick={vi.fn()}
         onUpdateLogin={vi.fn()}
@@ -334,7 +335,7 @@ describe('AccountsPage', () => {
 
     renderAccountsPage()
 
-    await user.click(await screen.findByRole('button', { name: /^add$/i }))
+    await user.click(await screen.findByRole('button', { name: /^add account$/i }))
     await user.click(screen.getByRole('button', { name: /add home/i }))
     await user.type(screen.getByLabelText(/street/i), '673 Guerrero St')
     await user.type(screen.getByLabelText(/city/i), 'San Francisco')
@@ -353,7 +354,7 @@ describe('AccountsPage', () => {
 
     renderAccountsPage()
 
-    await user.click(await screen.findByRole('button', { name: /^add$/i }))
+    await user.click(await screen.findByRole('button', { name: /^add account$/i }))
     await user.click(screen.getByRole('button', { name: /add manual account/i }))
 
     expect(await screen.findByRole('dialog', { name: /add manual account/i })).toBeInTheDocument()
@@ -378,7 +379,7 @@ describe('AccountsPage', () => {
 
     renderAccountsPage()
 
-    expect(await screen.findByText('Primary home')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Primary home' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /open home actions/i }))
     await user.click(screen.getByRole('button', { name: /update value/i }))
     await user.type(screen.getByLabelText(/manual valuation/i), '1500000')
@@ -424,6 +425,7 @@ describe('AccountsPage', () => {
     render(
       <InstitutionRow
         connection={conn}
+        accounts={plaidItem.accounts}
         plaidItem={plaidItem}
         onAccountClick={onAccountClick}
         onUpdateLogin={onUpdateLogin}
@@ -451,6 +453,7 @@ describe('AccountsPage', () => {
     render(
       <InstitutionRow
         connection={conn}
+        accounts={plaidItem.accounts}
         plaidItem={plaidItem}
         onAccountClick={onAccountClick}
         onUpdateLogin={vi.fn()}
@@ -458,8 +461,9 @@ describe('AccountsPage', () => {
       />,
     )
 
-    expect(screen.getByText('(CLOSED)')).toBeInTheDocument()
-    expect(screen.queryByText('-$1,234.56')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /\(CLOSED\)/ })).toBeInTheDocument()
+    expect(screen.getByText('Closed')).toBeInTheDocument()
+    expect(screen.getByText('$1,234.56')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /checking/i }))
     expect(onAccountClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'acct-1', closed: true }))
@@ -472,6 +476,7 @@ describe('AccountsPage', () => {
     render(
       <InstitutionRow
         connection={conn}
+        accounts={plaidItem.accounts}
         plaidItem={plaidItem}
         onAccountClick={vi.fn()}
         onUpdateLogin={vi.fn()}
@@ -481,8 +486,8 @@ describe('AccountsPage', () => {
 
     const accountLabels = screen
       .getAllByRole('button')
-      .map((button) => button.textContent)
-      .filter((text) => text?.includes('••••'))
+      .map((button) => button.getAttribute('aria-label'))
+      .filter((label) => label?.includes('(...'))
 
     expect(accountLabels).toEqual([
       expect.stringContaining('Checking'),
@@ -799,14 +804,14 @@ describe('AccountsPage', () => {
 
     expect(await screen.findByText('American Express')).toBeInTheDocument()
     expect(screen.getByTitle('0x1234567890abcdef1234567890abcdef12345678')).toBeInTheDocument()
-    expect(screen.getByText('Primary home')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Primary home' })).toBeInTheDocument()
     expect(screen.getByText('Cash Wallet')).toBeInTheDocument()
-    expect(screen.queryByText('$250.00')).not.toBeInTheDocument()
-    expect(screen.queryByText('$750,000.00')).not.toBeInTheDocument()
+    expect(screen.getByText('$250.00')).toBeInTheDocument()
+    expect(screen.getByText('$750,000.00')).toBeInTheDocument()
     expect(screen.getAllByLabelText('Manual account')).toHaveLength(1)
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
-    expect(headings).toEqual(['American Express', '0x1234567890abcdef1234567890abcdef12345678', 'Primary home', 'Cash Wallet'])
+    expect(headings).toEqual(['American Express', '0x1234567890abcdef1234567890abcdef12345678', 'Primary home', 'Manual accounts'])
   })
 
   it('removes a manual account from the details modal', async () => {
@@ -940,7 +945,7 @@ describe('AccountsPage', () => {
 
     render(<RealEstateRow account={{ ...accounts[0], name: 'Primary home', latestSnapshot: { __typename: 'AccountSnapshot', id: 'snapshot-home', accountId: accounts[0].id, date: '2026-06-01', balanceUSD: 1450000, netContributionUSD: 1450000, holdings: [], flagged: false } }} accountWealthProperty={accountWealthProperty} connectionId="real-estate-1" onUnlink={onUnlink} onUpdated={onUpdated} />, { wrapper: InstitutionProvider })
 
-    expect(screen.queryByText('$1,450,000.00')).not.toBeInTheDocument()
+    expect(screen.getByText('$1,450,000.00')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /open home actions/i }))
     await user.click(screen.getByRole('button', { name: /update value/i }))
     await user.type(screen.getByLabelText(/manual valuation/i), '1500000')

@@ -1,15 +1,18 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from 'urql'
-import { Card, FormError } from '../components/common/FormControls'
+import { Button } from '../components/common/Button'
+import { DataGridHeader } from '../components/common/DataGrid'
+import { Card, FormError, TextField } from '../components/common/FormControls'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
 import { InviteUserForm } from '../components/settings/InviteUserForm'
-import { UserAccessRow } from '../components/settings/UserAccessRow'
+import { ListCardHeader } from '../components/settings/ListCardHeader'
+import { USER_GRID_COLUMNS, UserAccessRow } from '../components/settings/UserAccessRow'
 import { CREATE_INVITE_LINK_MUTATION } from '../graphql/mutations'
 import { USERS_QUERY } from '../graphql/queries'
 import { usePermissions } from '../hooks/usePermissions'
 import type { CreateInviteLinkPayload, User } from '../types/graphql'
 
-export function AccessPage() {
+export function AccessPage({ headerActions }: { headerActions?: ReactNode }) {
   const [{ data, fetching }, reexecuteQuery] = useQuery<{ users: { items: User[] } }>({ query: USERS_QUERY })
   const [, createInviteLink] = useMutation<{ createInviteLink: CreateInviteLinkPayload }, { input: { userId: string } }>(CREATE_INVITE_LINK_MUTATION)
   const { canWrite } = usePermissions()
@@ -41,46 +44,14 @@ export function AccessPage() {
   if (fetching) return <LoadingSpinner />
 
   return (
-    <div className="space-y-4">
-        <Card>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-100 text-neutral-500">
-                <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold">Role</th>
-                <th className="px-4 py-3 font-semibold">Added</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <UserAccessRow
-                  key={user.id}
-                  canCreateInviteLinks={canCreateInviteLinks}
-                  canManageUsers={canManageUsers}
-                  inviteLinkLoading={inviteLinkLoading === user.id}
-                  user={user}
-                  onChanged={refreshUsers}
-                  onInviteLink={() => void handleInviteLink(user.id)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        {inviteLinkError ? <FormError className="font-semibold">{inviteLinkError}</FormError> : null}
-        {inviteLink ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-bold">One-time invite link</p>
-            <p className="mt-1">Expires {formatDateTime(inviteLink.expiresAt)}. The invitee stays signed in on that browser to finish passkey setup; generate a new link if they switch devices later.</p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input className="min-w-0 flex-1 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs" readOnly value={inviteLink.url} />
-              <button className="rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white" onClick={() => void navigator.clipboard?.writeText(inviteLink.url)} type="button">Copy</button>
-              <button className="rounded-xl border border-amber-300 px-4 py-2 text-sm font-semibold" onClick={() => setInviteLink(null)} type="button">Close</button>
-            </div>
-          </div>
-        ) : null}
-        {canManageUsers ? (
-          showForm ? (
+    <div className="space-y-3">
+      <Card as="section">
+        <ListCardHeader
+          actions={<>{canManageUsers && !showForm ? <Button onClick={() => setShowForm(true)} size="sm" variant="secondary">+ Add user</Button> : null}{headerActions}</>}
+          title="Users"
+        />
+        {canManageUsers && showForm ? (
+          <div className="border-t border-border px-4 py-3">
             <InviteUserForm
               onAdded={() => {
                 setShowForm(false)
@@ -88,16 +59,44 @@ export function AccessPage() {
               }}
               onCancel={() => setShowForm(false)}
             />
-          ) : (
-            <button
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold shadow-card"
-              onClick={() => setShowForm(true)}
-              type="button"
-            >
-              + Add user
-            </button>
-          )
+          </div>
         ) : null}
+        <div className="overflow-x-auto">
+          <div className="min-w-[640px]">
+            <div className="border-t border-border pt-1.5">
+              <DataGridHeader gridTemplateColumns={USER_GRID_COLUMNS}>
+                <span>Email</span>
+                <span>Role</span>
+                <span>Added</span>
+                <span />
+              </DataGridHeader>
+            </div>
+            {users.map((user) => (
+              <UserAccessRow
+                key={user.id}
+                canCreateInviteLinks={canCreateInviteLinks}
+                canManageUsers={canManageUsers}
+                inviteLinkLoading={inviteLinkLoading === user.id}
+                user={user}
+                onChanged={refreshUsers}
+                onInviteLink={() => void handleInviteLink(user.id)}
+              />
+            ))}
+          </div>
+        </div>
+      </Card>
+      {inviteLinkError ? <FormError className="font-semibold">{inviteLinkError}</FormError> : null}
+      {inviteLink ? (
+        <div className="rounded-lg border border-warning/35 bg-warning/10 p-4 text-[13px] text-text-1">
+          <p className="font-semibold">One-time invite link</p>
+          <p className="mt-1 text-text-2">Expires {formatDateTime(inviteLink.expiresAt)}. The invitee stays signed in on that browser to finish passkey setup; generate a new link if they switch devices later.</p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <TextField className="min-w-0 flex-1" hideLabel label="Invite link" mono onChange={() => undefined} readOnly value={inviteLink.url} />
+            <Button onClick={() => void navigator.clipboard?.writeText(inviteLink.url)}>Copy</Button>
+            <Button onClick={() => setInviteLink(null)} variant="secondary">Close</Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

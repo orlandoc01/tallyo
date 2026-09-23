@@ -1,11 +1,5 @@
 import type { TransactionSort } from '../../types/graphql'
-
-const sortOptions: Array<{ label: string; value: string; sort: TransactionSort }> = [
-  { label: 'Date new to old', value: 'DATE:DESC', sort: { field: 'DATE', direction: 'DESC' } },
-  { label: 'Date old to new', value: 'DATE:ASC', sort: { field: 'DATE', direction: 'ASC' } },
-  { label: 'Amount high to low', value: 'AMOUNT:DESC', sort: { field: 'AMOUNT', direction: 'DESC' } },
-  { label: 'Amount low to high', value: 'AMOUNT:ASC', sort: { field: 'AMOUNT', direction: 'ASC' } },
-]
+import { SORT_OPTIONS, sortFromId, sortId } from './transactionFilterPresets'
 
 export function TransactionSortSelect({
   ariaLabel,
@@ -19,15 +13,12 @@ export function TransactionSortSelect({
   return (
     <select
       aria-label={ariaLabel}
-      className="rounded-xl border border-neutral-200 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
-      onChange={(event) => {
-        const option = sortOptions.find((item) => item.value === event.target.value) ?? sortOptions[0]
-        onSortChange(option.sort)
-      }}
-      value={sort ? `${sort.field}:${sort.direction}` : sortOptions[0].value}
+      className="h-8 rounded-md border border-border-strong bg-surface px-2 text-[13px] text-text-1 outline-none focus:border-brand-600 dark:bg-bg"
+      onChange={(event) => onSortChange(sortFromId(event.target.value))}
+      value={sort ? sortId(sort) : SORT_OPTIONS[0].id}
     >
-      {sortOptions.map((option) => (
-        <option key={option.value} value={option.value}>{option.label}</option>
+      {SORT_OPTIONS.map((option) => (
+        <option key={option.id} value={option.id}>{option.label}</option>
       ))}
     </select>
   )

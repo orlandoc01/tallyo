@@ -1,35 +1,20 @@
-import clsx from 'clsx'
-import { OneLevelGroupRow } from '../common/OneLevelGroup'
+import { DataGridChildRow, MobileChildRow } from '../common/DataGrid'
 import { displayAmount } from '../wealth/amountDisplay'
+import { CLASSIFIER_LABELS } from '../wealth/assetFormOptions'
 import type { AnalysisHolding, Asset } from '../../types/graphql'
 import { formatCurrency } from '../../utils/currency'
 
-export function AnalysisHoldingRow({ holding, amountsHidden, onEditAsset, rowClassName }: { holding: AnalysisHolding; amountsHidden: boolean; onEditAsset?: (asset: Asset) => void; rowClassName?: string }) {
-  const className = clsx('flex min-w-0 items-start justify-between gap-4', rowClassName)
-  const content = (
-    <>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{holding.asset.name ?? holding.asset.identifier}</p>
-        {holding.asset.name ? <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{holding.asset.identifier}</p> : null}
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-sm font-semibold text-neutral-950 dark:text-neutral-50">{displayAmount(amountsHidden, formatCurrency(holding.valueUSD))}</p>
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">{holding.percent.toFixed(1)}%</p>
-      </div>
-    </>
-  )
+export const HOLDING_GRID_COLUMNS = 'minmax(150px,1fr) minmax(70px,120px) minmax(100px,160px)'
 
-  if (!onEditAsset) {
-    return <OneLevelGroupRow className={className}>{content}</OneLevelGroupRow>
+export function AnalysisHoldingRow({ holding, amountsHidden, variant, onEditAsset }: { holding: AnalysisHolding; amountsHidden: boolean; variant: 'desktop' | 'mobile'; onEditAsset: (asset: Asset) => void }) {
+  const name = holding.asset.name ?? holding.asset.identifier
+  const props = {
+    chip: holding.asset.assetType === 'REAL_ESTATE' ? 'RE' : holding.asset.identifier,
+    name,
+    meta: CLASSIFIER_LABELS[holding.asset.classifier],
+    pct: `${holding.percent.toFixed(1)}%`,
+    value: displayAmount(amountsHidden, formatCurrency(holding.valueUSD)),
+    onClick: () => onEditAsset(holding.asset),
   }
-
-  return (
-    <OneLevelGroupRow
-      ariaLabel={`Edit ${holding.asset.name ?? holding.asset.identifier}`}
-      className={className}
-      onClick={() => onEditAsset(holding.asset)}
-    >
-      {content}
-    </OneLevelGroupRow>
-  )
+  return variant === 'desktop' ? <DataGridChildRow {...props} gridTemplateColumns={HOLDING_GRID_COLUMNS} /> : <MobileChildRow {...props} />
 }

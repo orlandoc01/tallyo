@@ -64,19 +64,19 @@ export function CategoryPlaidCodes({
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-neutral-200 p-3">
+    <section className="space-y-3 rounded-2xl border border-border p-3">
       <div>
-        <h3 className="text-sm font-semibold text-neutral-800">Plaid Auto-Categorize</h3>
-        <p className="mt-1 text-xs text-neutral-500">Assign PFC2 detailed codes that should default to this category.</p>
+        <h3 className="text-sm font-semibold text-text-1">Plaid Auto-Categorize</h3>
+        <p className="mt-1 text-xs text-text-3">Assign PFC2 detailed codes that should default to this category.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {plaidCodes.length ? plaidCodes.map((code) => (
-          <span key={code} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700">
+          <span key={code} className="inline-flex items-center gap-1 rounded-full bg-raised px-2.5 py-1 text-xs font-medium text-text-2">
             {code}
             <button
               aria-label={`Remove ${code}`}
-              className="rounded-full p-0.5 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 disabled:opacity-50"
+              className="rounded-full p-0.5 text-text-3 hover:bg-hover hover:text-text-1 disabled:opacity-50"
               disabled={savingPFC2}
               onClick={() => updatePlaidCodes(plaidCodes.filter((item) => item !== code))}
               type="button"
@@ -84,15 +84,15 @@ export function CategoryPlaidCodes({
               <X className="h-3 w-3" />
             </button>
           </span>
-        )) : <p className="text-xs text-neutral-500">No Plaid codes assigned.</p>}
+        )) : <p className="text-xs text-text-3">No Plaid codes assigned.</p>}
       </div>
 
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-neutral-600" htmlFor="pfc2-filter">
+        <label className="block text-xs font-medium text-text-2" htmlFor="pfc2-filter">
           Add PFC2 code
         </label>
         <input
-          className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-3 py-2 text-sm"
           id="pfc2-filter"
           onChange={(e) => setCodeFilter(e.target.value)}
           placeholder="Search Plaid codes"
@@ -101,7 +101,7 @@ export function CategoryPlaidCodes({
         <div className="flex gap-2">
           <select
             aria-label="Plaid PFC2 code"
-            className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+            className="min-w-0 flex-1 rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-3 py-2 text-sm"
             onChange={(e) => setSelectedCode(e.target.value)}
             value={selectedCode}
           >
@@ -117,7 +117,7 @@ export function CategoryPlaidCodes({
             })}
           </select>
           <button
-            className="rounded-xl border border-neutral-200 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-xl border border-border px-3 py-2 text-sm font-medium disabled:opacity-50"
             disabled={!selectedCode || savingPFC2}
             onClick={addSelectedCode}
             type="button"

@@ -53,14 +53,14 @@ export function SignInPanel({
     <AuthPageShell>
       <div className="mb-8 text-center">
         {eyebrow ? <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">{eyebrow}</p> : null}
-        <h1 className={`${eyebrow ? 'mt-3 text-3xl' : 'text-4xl'} font-bold tracking-tight text-neutral-950`}>{title}</h1>
-        {appVersion ? <p className="mt-1 text-xs text-neutral-400">{appVersion}</p> : null}
-        {subtitle ? <p className="mt-3 text-sm leading-6 text-neutral-500">{subtitle}</p> : null}
+        <h1 className={`${eyebrow ? 'mt-3 text-3xl' : 'text-4xl'} font-bold tracking-tight text-text-1`}>{title}</h1>
+        {appVersion ? <p className="mt-1 text-xs text-text-muted">{appVersion}</p> : null}
+        {subtitle ? <p className="mt-3 text-sm leading-6 text-text-3">{subtitle}</p> : null}
       </div>
 
       {displayError ? <FormError className="mb-4">{displayError}</FormError> : null}
 
-      {!displayError && loadingMessage ? <p className="text-sm text-neutral-500">{loadingMessage}</p> : null}
+      {!displayError && loadingMessage ? <p className="text-sm text-text-3">{loadingMessage}</p> : null}
 
       {!loadingMessage ? (
         <div className="space-y-3">
@@ -80,7 +80,7 @@ export function SignInPanel({
             </SignInButton>
           ) : null}
           {children}
-          {!displayError && !googleEnabled && !emailEnabled && !showPasskey && !children ? <p className="text-sm text-neutral-500">No supported sign-in methods are enabled.</p> : null}
+          {!displayError && !googleEnabled && !emailEnabled && !showPasskey && !children ? <p className="text-sm text-text-3">No supported sign-in methods are enabled.</p> : null}
         </div>
       ) : null}
     </AuthPageShell>
@@ -90,7 +90,7 @@ export function SignInPanel({
 export function AuthPageShell({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper px-4">
-      <section className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-8 shadow-card">{children}</section>
+      <section className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">{children}</section>
     </main>
   )
 }

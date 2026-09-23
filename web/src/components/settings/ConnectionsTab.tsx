@@ -1,15 +1,15 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
-import { UnderlineTabs, type UnderlineTabItem } from '../common/UnderlineTabs'
+import { SegmentedControl } from '../common/SegmentedControl'
 import { PlaidTab } from './PlaidTab'
 import { SimpleFinTab } from './SimpleFinTab'
 
 type ProviderTab = 'plaid' | 'simplefin'
 
-const TABS: UnderlineTabItem<ProviderTab>[] = [
-  { value: 'plaid', children: 'Plaid' },
-  { value: 'simplefin', children: 'SimpleFIN' },
-]
+const PROVIDER_OPTIONS = [
+  { value: 'plaid', label: 'Plaid' },
+  { value: 'simplefin', label: 'SimpleFIN' },
+] as const
 
 const DEFAULT_PROVIDER_TAB: ProviderTab = 'plaid'
 
@@ -31,14 +31,10 @@ export function ConnectionsTab() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-neutral-950">Connections</h1>
-        <p className="mt-1 text-sm text-neutral-500">Manage bank data providers and their linked institutions.</p>
+    <div className="space-y-3">
+      <div className="flex">
+        <SegmentedControl ariaLabel="Connection providers" onChange={handleTabChange} options={PROVIDER_OPTIONS} value={activeTab} />
       </div>
-
-      <UnderlineTabs ariaLabel="Connection providers" items={TABS} value={activeTab} onChange={handleTabChange} />
-
       {activeTab === 'plaid' ? <PlaidTab /> : <SimpleFinTab />}
     </div>
   )

@@ -96,10 +96,28 @@ describe('common UI states', () => {
     expect(screen.getByRole('button', { name: 'Primary' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Secondary' })).toBeInTheDocument()
     const danger = screen.getByRole('button', { name: 'Danger' })
-    expect(danger).toHaveClass('text-red-600', 'border-red-300')
-    expect(danger).not.toHaveClass('bg-red-600')
-    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('bg-red-600', 'text-white')
+    expect(danger).toHaveClass('text-negative', 'border-negative/35')
+    expect(danger).not.toHaveClass('bg-negative')
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveClass('bg-negative', 'text-white', 'dark:text-bg')
     expect(screen.getByRole('button', { name: 'Ghost' })).toBeInTheDocument()
+  })
+
+  it('renders active, outline-accent and xs buttons', () => {
+    render(
+      <>
+        <Button active variant="secondary">Active</Button>
+        <Button variant="outline-accent">Create rule</Button>
+        <Button size="xs">Preset</Button>
+      </>,
+    )
+
+    const active = screen.getByRole('button', { name: 'Active' })
+    expect(active).toHaveClass('border-brand-600', 'bg-border-strong', 'text-text-1')
+    expect(active).not.toHaveClass('bg-raised')
+    expect(screen.getByRole('button', { name: 'Create rule' })).toHaveClass('border-brand-600', 'text-accent')
+    const preset = screen.getByRole('button', { name: 'Preset' })
+    expect(preset).toHaveClass('h-[26px]', 'rounded-[13px]')
+    expect(preset).not.toHaveClass('rounded-md')
   })
 
   it('highlights active collapsible filter section headers', () => {
@@ -110,9 +128,8 @@ describe('common UI states', () => {
     )
 
     const header = screen.getByRole('button', { name: /accounts/i })
-    expect(header).toHaveClass('border-brand-200')
-    expect(header).toHaveClass('bg-brand-50/70')
-    expect(header).toHaveClass('ring-brand-200')
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('2 selected')).toHaveClass('text-accent')
     expect(screen.queryByText('Account filters')).not.toBeInTheDocument()
   })
 })

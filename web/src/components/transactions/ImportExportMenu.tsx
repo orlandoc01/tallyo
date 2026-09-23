@@ -3,8 +3,10 @@ import { ChevronDown, Download, Upload } from 'lucide-react'
 import type { TransactionsFilter } from '../../types/graphql'
 import { useDismiss } from '../../hooks/useDismiss'
 import { downloadTransactionsCsv } from '../../utils/export'
-import { PageToolbarButton } from '../common/PageToolbar'
+import { Button } from '../common/Button'
 import { ImportModal } from './ImportModal'
+
+const menuItemClass = 'flex w-full items-center gap-2.5 rounded-[5px] px-2 py-2 text-[13px] text-text-1 hover:bg-hover'
 
 export function ImportExportMenu({
   canImport,
@@ -39,15 +41,11 @@ export function ImportExportMenu({
   if (!canImport) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <PageToolbarButton
-          disabled={exporting}
-          onClick={handleExport}
-          type="button"
-        >
-          <Download className="h-4 w-4 text-neutral-400" />
+        <Button disabled={exporting} onClick={handleExport} variant="secondary">
+          <Download aria-hidden className="h-3.5 w-3.5 text-text-muted" />
           {exporting ? 'Exporting…' : 'Export'}
-        </PageToolbarButton>
-        {exportError && <p className="text-xs text-red-600">{exportError}</p>}
+        </Button>
+        {exportError && <p className="text-xs text-negative">{exportError}</p>}
       </div>
     )
   }
@@ -56,39 +54,24 @@ export function ImportExportMenu({
     <>
       <div className="flex flex-col items-end gap-1">
         <div className="relative" ref={menuRef}>
-          <PageToolbarButton
-            disabled={exporting}
-            onClick={() => setOpen((v) => !v)}
-            type="button"
-          >
+          <Button aria-expanded={open} disabled={exporting} onClick={() => setOpen((v) => !v)} variant="secondary">
             {exporting ? 'Exporting…' : 'Import / Export'}
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
-          </PageToolbarButton>
+            <ChevronDown aria-hidden className="h-3 w-3 text-text-muted" />
+          </Button>
           {open && (
-            <div className="absolute right-0 z-20 mt-1 w-40 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg">
-              <button
-                className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                onClick={() => {
-                  setOpen(false)
-                  setShowImport(true)
-                }}
-                type="button"
-              >
-                <Upload className="h-4 w-4 text-neutral-400" />
+            <div className="absolute right-0 z-30 mt-1 w-40 rounded-lg border border-border-strong bg-raised p-1 shadow-dropdown">
+              <button className={menuItemClass} onClick={() => { setOpen(false); setShowImport(true) }} type="button">
+                <Upload aria-hidden className="h-3.5 w-3.5 text-text-muted" />
                 Import
               </button>
-              <button
-                className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                onClick={handleExport}
-                type="button"
-              >
-                <Download className="h-4 w-4 text-neutral-400" />
+              <button className={menuItemClass} onClick={handleExport} type="button">
+                <Download aria-hidden className="h-3.5 w-3.5 text-text-muted" />
                 Export
               </button>
             </div>
           )}
         </div>
-        {exportError && <p className="text-xs text-red-600">{exportError}</p>}
+        {exportError && <p className="text-xs text-negative">{exportError}</p>}
       </div>
 
       {showImport && (

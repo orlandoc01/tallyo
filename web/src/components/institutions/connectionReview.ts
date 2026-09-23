@@ -1,18 +1,22 @@
-import type { Account, Connection } from '../../types/graphql'
+import type { Account, Connection, PlaidItem, SimpleFinConnection } from '../../types/graphql'
 
 export function accountNeedsReview(account: Account) {
   return account.needsReview && !account.closed && !account.hidden
 }
 
-export function needsConnectionReview(connection: Connection) {
-  if (!connection.isActive) return false
-
+export function reviewProvider(connection: Connection): PlaidItem | SimpleFinConnection | null {
   const provider = connection.provider
-  if (!provider) return false
+  if (!connection.isActive || !provider) return null
+  if (provider.__typename === 'PlaidItem' && (provider.healthState !== 'HEALTHY' || provider.accounts.some(accountNeedsReview))) return provider
+  if (provider.__typename === 'SimpleFinConnection' && provider.accounts.some(accountNeedsReview)) return provider
+  return null
+}
 
-  if (provider.__typename === 'PlaidItem') {
-    return provider.healthState !== 'HEALTHY' || provider.accounts.some(accountNeedsReview)
-  }
-  if (provider.__typename === 'SimpleFinConnection') return provider.accounts.some(accountNeedsReview)
-  return false
+export function needsConnectionReview(connection: Connection) {
+  return reviewProvider(connection) !== null
+}
+
+export function healthMessage(item: PlaidItem) {
+  if (item.healthState === 'LINK_UPDATE_REQUIRED') return 'Plaid needs this institution to be reconnected.'
+  return item.healthErrorMessage || item.healthErrorCode || 'Plaid sync is currently failing.'
 }

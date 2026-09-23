@@ -79,7 +79,7 @@ function overflowSpendingReport(): SpendingByCategoryReport {
 }
 
 async function openTransactionFilters(user: { click: (element: Element) => Promise<void> }) {
-  await user.click(screen.getByRole('button', { name: /^filters$/i }))
+  await user.click(screen.getByRole('button', { name: /^filters/i }))
 }
 
 async function renderReportsPage() {
@@ -146,7 +146,27 @@ describe('App integration', () => {
     await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password')
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
-    expect(await screen.findByRole('heading', { name: 'Who owns the accounts?' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Household owners' })).toBeInTheDocument()
+  })
+
+  it('redirects completed installs away from the setup wizard once the auth config loads', async () => {
+    setMasterPassword('test-master-password')
+    window.history.pushState({}, '', '/setup/welcome')
+
+    render(<App />)
+
+    expect(await screen.findByRole('tab', { name: 'Breakdown' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Welcome to Tallyo' })).not.toBeInTheDocument()
+  })
+
+  it('falls back to the sign-in gate on setup paths when the auth config request fails', async () => {
+    server.use(http.get('/auth/config', () => HttpResponse.error()))
+    window.history.pushState({}, '', '/setup/welcome')
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Tallyo' })).toBeInTheDocument()
+    expect(screen.queryByText('Signing in...')).not.toBeInTheDocument()
   })
 
   it('shows uncategorized and categorized transactions on review page', async () => {
@@ -173,9 +193,38 @@ describe('App integration', () => {
 
     await screen.findByRole('tab', { name: 'Breakdown' })
 
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    // Sign out lives in Settings › Access now, not the rail
+    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
+    await user.click(screen.getAllByRole('link', { name: /settings/i })[0])
+    await user.click(await screen.findByRole('link', { name: /^access$/i }))
+
+    await user.click(await screen.findByRole('button', { name: /sign out/i }))
 
     await waitFor(() => expect(screen.getByRole('button', { name: /sign in with google/i })).toBeInTheDocument())
+  })
+
+  it('shows a back chevron in the mobile header on settings tabs', async () => {
+    const user = userEvent.setup()
+    setTokens(writerToken, 'test-refresh-token')
+    window.history.pushState({}, '', '/settings/access')
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: /back to settings/i }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/general'))
+    expect(screen.getByRole('button', { name: /back to settings/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /open menu/i })).not.toBeInTheDocument()
+    window.history.pushState({}, '', '/')
+  })
+
+  it('shows the hamburger, not the back chevron, outside settings tabs', async () => {
+    setTokens(writerToken, 'test-refresh-token')
+    window.history.pushState({}, '', '/expenses')
+    render(<App />)
+
+    expect(await screen.findByRole('button', { name: /open menu/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /back to settings/i })).not.toBeInTheDocument()
+    window.history.pushState({}, '', '/')
   })
 
   it('shows auth callback page and error on invalid callback', async () => {
@@ -259,9 +308,9 @@ describe('App integration', () => {
     expect(await screen.findAllByText('Target')).not.toHaveLength(0)
 
     await openReportCategoryFilters(user)
-    await user.click(screen.getByLabelText(/Restaurants & Bars/))
-    await waitFor(() => expect(screen.getByRole('button', { name: /filters: 1 selected/i })).toBeInTheDocument())
-    await user.click(screen.getByRole('button', { name: /filters: 1 selected/i }))
+    await user.click(screen.getByRole('checkbox', { name: /Restaurants & Bars/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /^filters, 1 active/i })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /^filters, 1 active/i }))
 
     expect(await screen.findByRole('button', { name: /Restaurants & Bars.*\$150\.00/ })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Target')).not.toBeInTheDocument())
@@ -277,10 +326,10 @@ describe('App integration', () => {
 
     await openReportCategoryFilters(user)
     await user.click(screen.getByLabelText(/select all/i))
-    expect(screen.getByRole('button', { name: /filters: 9 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^filters, 9 active/i })).toBeInTheDocument()
 
     await user.click(screen.getByLabelText(/Food/i))
-    expect(screen.getByRole('button', { name: /filters: 7 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^filters, 7 active/i })).toBeInTheDocument()
   }, 10000)
 
   it('filters categories inside the reports dropdown search without narrowing select-all', async () => {
@@ -289,11 +338,11 @@ describe('App integration', () => {
     await openReportCategoryFilters(user)
     await user.type(screen.getByLabelText(/category search/i), 'bars')
 
-    expect(screen.getByLabelText(/restaurants & bars/i)).toBeInTheDocument()
-    expect(screen.queryByLabelText(/groceries/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /restaurants & bars/i })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /groceries/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByLabelText(/select all/i))
-    expect(screen.getByRole('button', { name: /filters: 9 selected/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^filters, 9 active/i })).toBeInTheDocument()
   })
 
   it('switches report tabs and group-by mode', async () => {
@@ -307,7 +356,8 @@ describe('App integration', () => {
     await user.click(screen.getByRole('radio', { name: /By category/i }))
     expect(await screen.findAllByText(/Restaurants & Bars/)).not.toHaveLength(0)
 
-    await user.click(screen.getByRole('button', { name: /^filters$/i }))
+    await user.click(screen.getByRole('button', { name: /^filters/i }))
+    await user.click(screen.getByRole('button', { name: /^date/i }))
     fireEvent.change(screen.getByLabelText(/start date/i, { selector: 'input' }), { target: { value: '2026-05-01' } })
 
     const mobileQuarterlyButton = screen.getAllByRole('radio', { name: 'Quarterly' }).at(-1)
@@ -317,8 +367,8 @@ describe('App integration', () => {
   })
 
   async function openReportCategoryFilters(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: /^filters$/i }))
-    await user.click(screen.getByRole('button', { name: /categories all/i }))
+    await user.click(screen.getByRole('button', { name: /^filters/i }))
+    await user.click(screen.getByRole('button', { name: /^category/i }))
   }
 
   it('navigates through the main app pages', async () => {
@@ -330,7 +380,7 @@ describe('App integration', () => {
     await screen.findByRole('tab', { name: 'Breakdown' })
 
     await user.click(screen.getAllByRole('link', { name: /portfolio/i })[0])
-    expect(await screen.findByRole('heading', { name: 'Allocation' })).toBeInTheDocument()
+    expect(await screen.findByText('Total analyzed')).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('link', { name: /cash flow/i })[0])
     expect(await screen.findAllByText('Income')).not.toHaveLength(0)
@@ -340,16 +390,15 @@ describe('App integration', () => {
     expect(await screen.findAllByText('Target')).not.toHaveLength(0)
 
     await user.click(screen.getAllByRole('link', { name: /review/i })[0])
-    expect(await screen.findByRole('link', { current: 'page', name: 'Transactions' })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: /^Transactions/, selected: true })).toBeInTheDocument()
     expect(await screen.findAllByText('Cloudflare')).not.toHaveLength(0)
 
     await user.click(screen.getAllByRole('link', { name: /recurring/i })[0])
-    expect(await screen.findByText('Netflix')).toBeInTheDocument()
-    expect(await screen.findByText('Netflix')).toBeInTheDocument()
+    expect(await screen.findAllByText('Netflix')).not.toHaveLength(0)
 
     await user.click(screen.getAllByRole('link', { name: /settings/i })[0])
     await user.click(await screen.findByRole('link', { name: /rules/i }))
-    expect(await screen.findAllByRole('button', { name: /^add$/i })).not.toHaveLength(0)
+    expect(await screen.findAllByRole('button', { name: /^add rule$/i })).not.toHaveLength(0)
 
     await user.click(screen.getAllByRole('link', { name: /accounts/i })[0])
     expect(await screen.findByRole('button', { name: /link connection/i })).toBeInTheDocument()
@@ -363,7 +412,7 @@ describe('App integration', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('Technology')).toBeInTheDocument()
+    expect((await screen.findAllByText('Technology')).length).toBeGreaterThan(0)
 
     await user.click(screen.getAllByRole('button', { name: 'Hide amounts' })[0])
 
@@ -428,16 +477,15 @@ describe('App integration', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('shows next expected date on the recurring page', async () => {
+  it('shows the next-7-days stat on the recurring page', async () => {
     const user = userEvent.setup()
     setTokens(writerToken, 'test-refresh-token')
 
     render(<App />)
 
     await user.click(screen.getAllByRole('link', { name: /recurring/i })[0])
-    expect(await screen.findByText('Netflix')).toBeInTheDocument()
-    expect(await screen.findByText('Netflix')).toBeInTheDocument()
-    expect(screen.getByText(/Next expected/)).toBeInTheDocument()
+    expect(await screen.findAllByText('Netflix')).not.toHaveLength(0)
+    expect(screen.getAllByText('Next 7 days')).not.toHaveLength(0)
   })
 
   it('filters and sorts the transactions page', async () => {
@@ -446,11 +494,12 @@ describe('App integration', () => {
     expect(screen.queryByText('+$52.12')).not.toBeInTheDocument()
 
     await openTransactionFilters(user)
-    await user.click(screen.getByRole('switch', { name: /include hidden/i }))
+    await user.click(screen.getByRole('switch', { name: /show hidden/i }))
 
     expect((await screen.findAllByText('+$52.12'))[0]).toBeInTheDocument()
 
-    await user.selectOptions(screen.getAllByLabelText(/sort/i)[0], 'AMOUNT:ASC')
+    await user.click(screen.getByRole('button', { name: /^more/i }))
+    await user.click(screen.getByRole('radio', { name: 'Smallest first' }))
 
     await waitFor(() => {
       const credit = screen.getAllByText('+$52.12')[0]
@@ -459,11 +508,11 @@ describe('App integration', () => {
       expect(credit.compareDocumentPosition(debit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Date range' }))
-    fireEvent.change(screen.getByLabelText(/start date/i, { selector: 'input' }), { target: { value: '2026-05-16' } })
-    fireEvent.change(screen.getByLabelText(/end date/i, { selector: 'input' }), { target: { value: '2026-05-31' } })
+    await user.click(screen.getByRole('button', { name: /^date/i }))
+    fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-05-16' } })
+    fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-05-31' } })
 
-    expect((await screen.findAllByText('No transactions found'))[0]).toBeInTheDocument()
+    expect((await screen.findAllByText('No transactions match'))[0]).toBeInTheDocument()
     expect(screen.getAllByText('Import / Export')).not.toHaveLength(0)
   })
 
@@ -504,7 +553,7 @@ describe('App integration', () => {
     await user.click(screen.getByRole('button', { name: /open filters/i }))
     dialog = screen.getByRole('dialog', { name: /filters/i })
 
-    await user.click(within(dialog).getByRole('button', { name: /^clear all$/i }))
+    await user.click(within(dialog).getByRole('button', { name: /^clear filters$/i }))
     expect(screen.queryByRole('button', { name: /close filters/i })).not.toBeInTheDocument()
     await waitFor(() => expect(window.location.search).toBe(''))
 
@@ -590,7 +639,7 @@ describe('App integration', () => {
     expect(searchInput).toHaveValue('ACME')
 
     await openTransactionFilters(user)
-    await user.click(screen.getByRole('button', { name: /clear filters/i }))
+    await user.click(screen.getAllByRole('button', { name: /clear filters/i })[0])
 
     expect(searchInput).toHaveValue('')
     expect(window.location.search).toBe('')
@@ -604,7 +653,7 @@ describe('App integration', () => {
     const historyLengthBeforeSearch = window.history.length
 
     await openTransactionFilters(user)
-    await user.click(screen.getByRole('button', { name: 'Text' }))
+    await user.click(screen.getByRole('button', { name: /^more/i }))
     fireEvent.change(screen.getByPlaceholderText(/merchant name/i), { target: { value: 'Cloud' } })
 
     await waitFor(() => {
@@ -631,14 +680,14 @@ describe('App integration', () => {
     const historyLengthBeforeSearch = window.history.length
 
     await openTransactionFilters(user)
-    await user.click(screen.getByRole('button', { name: 'Text' }))
-    await user.click(screen.getByRole('button', { name: 'Owner' }))
+    await user.click(screen.getByRole('button', { name: /^more/i }))
     await user.type(screen.getByPlaceholderText(/merchant name/i), 'Tar')
     await waitFor(() => {
       expect(window.location.search).toBe('?merchant_prefix=Tar')
     })
     expect(window.history.length).toBe(historyLengthBeforeSearch + 1)
 
+    await user.click(screen.getByRole('button', { name: /^owner/i }))
     await user.click(screen.getByRole('checkbox', { name: 'sam' }))
 
     await waitFor(() => {

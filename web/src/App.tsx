@@ -60,8 +60,8 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
     if (this.state.error) {
       return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-paper p-8 text-center">
-          <p className="text-lg font-semibold text-neutral-800">Something went wrong.</p>
-          <p className="text-sm text-neutral-500">{this.state.error.message}</p>
+          <p className="text-lg font-semibold text-text-1">Something went wrong.</p>
+          <p className="text-sm text-text-3">{this.state.error.message}</p>
           <Button onClick={() => window.location.reload()} type="button">
             Reload page
           </Button>
@@ -87,12 +87,12 @@ export function App() {
 function AppRoutes() {
   useTheme()
   const location = useLocation()
-  const { isAuthenticated, isLoading, masterPasswordStatus, emailAuthEnabled, googleAuthEnabled, webauthnEnabled, disableAllAuth, disableTransactionTracking, disableWealthTracking, setupComplete, login, loginWithEmail, loginWithPasskey, loginWithMasterPassword } = useAuth()
+  const { isAuthenticated, isLoading, masterPasswordStatus, emailAuthEnabled, googleAuthEnabled, webauthnEnabled, disableAllAuth, disableTransactionTracking, disableWealthTracking, setupComplete, authConfigLoaded, login, loginWithEmail, loginWithPasskey, loginWithMasterPassword } = useAuth()
   const { canRead, canWrite } = usePermissions()
   const masterPasswordEnabled = masterPasswordStatus !== 'DISABLED'
   const setupPath = location.pathname.startsWith('/setup')
   const passkeyOnly = webauthnEnabled && !emailAuthEnabled && !googleAuthEnabled
-  const signingIn = <main className="flex min-h-screen items-center justify-center bg-paper text-neutral-500">Signing in...</main>
+  const signingIn = <main className="flex min-h-screen items-center justify-center bg-paper text-text-3">Signing in...</main>
   const authGate = <AuthGate onLogin={login} onLoginWithEmail={loginWithEmail} onLoginWithPasskey={loginWithPasskey} onLoginWithMasterPassword={loginWithMasterPassword} masterPasswordEnabled={masterPasswordEnabled} emailAuthEnabled={emailAuthEnabled} googleAuthEnabled={googleAuthEnabled} webauthnEnabled={webauthnEnabled} />
 
   useEffect(() => {
@@ -148,12 +148,12 @@ function AppRoutes() {
     )
   }
 
-  if (setupPath) {
-    return <Navigate replace to="/" />
-  }
-
   if (isLoading) {
     return signingIn
+  }
+
+  if (setupPath) {
+    return authConfigLoaded ? <Navigate replace to="/" /> : signingIn
   }
 
   if (!isAuthenticated) {
@@ -258,7 +258,7 @@ function AuthCallback() {
 
   return (
     <AuthPageShell>
-      <p className="text-neutral-600">{error ?? 'Completing sign-in...'}</p>
+      <p className="text-text-2">{error ?? 'Completing sign-in...'}</p>
     </AuthPageShell>
   )
 }

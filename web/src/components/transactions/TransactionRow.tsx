@@ -1,15 +1,22 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { useAuth } from '../../auth/useAuth'
 import type { Category, Transaction } from '../../types/graphql'
-import { formatDatetimeAsLocalDate } from '../../utils/dates'
-import { formatTransactionAmount, transactionAmountClassName } from '../../utils/currency'
-import { ownerBadgeClassName } from '../../utils/colors'
 import { accountDisplayLabel } from '../../utils/accounts'
+import { formatAccountType } from '../../utils/accountSubtypes'
+import { categoryTint } from '../../utils/categoryTint'
+import { formatDatetimeAsLocalDate } from '../../utils/dates'
+import { Avatar, EmojiAvatar } from '../common/Avatar'
+import { checkboxClass } from '../common/FormControls'
+import { OwnerDot } from '../common/OwnerDot'
+import { TransactionAmount } from '../common/TransactionAmount'
+import { CategoryTag, Tag } from '../common/Tag'
 import { CategoryDropdown } from './CategoryDropdown'
 
 export interface TransactionRowProps {
+  action?: ReactNode
   categories?: Category[]
+  hasActionColumn?: boolean
   isBulkMode?: boolean
   isSelected?: boolean
   isUpdatingCategory?: boolean
@@ -20,217 +27,146 @@ export interface TransactionRowProps {
   transaction: Transaction
 }
 
-function useTransactionRowBase(transaction: Transaction) {
+const DESKTOP_GRID = '[grid-template-columns:32px_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.6fr)_24px_110px]'
+const DESKTOP_GRID_WITH_ACTION = '[grid-template-columns:32px_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.6fr)_24px_110px_auto]'
+
+function useTransactionRow({ isBulkMode = false, onDetailsOpen, onToggleSelect, transaction }: TransactionRowProps) {
   const { hideOwners } = useAuth()
-  const merchant = transaction.merchantName || transaction.originalName || 'Unknown merchant'
-  const owner = transaction.account.owner.name.toLowerCase()
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const categoryButtonRef = useRef<HTMLButtonElement>(null)
+  const merchant = transaction.merchantName || transaction.originalName || 'Unknown merchant'
 
-  return { categoryButtonRef, hideOwners, isCategoryOpen, merchant, owner, ownerColor: ownerBadgeClassName(owner), setIsCategoryOpen }
+  function activate() {
+    if (isBulkMode && onToggleSelect) onToggleSelect(transaction.id)
+    else onDetailsOpen?.(transaction)
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.currentTarget === event.target && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      activate()
+    }
+  }
+
+  return {
+    activate,
+    categoryButtonRef,
+    hideOwners,
+    isCategoryOpen,
+    merchant,
+    onKeyDown,
+    rowAriaLabel: isBulkMode ? `Select transaction for ${merchant}` : `View details for ${merchant}`,
+    setIsCategoryOpen,
+  }
 }
 
-export function TransactionRow({
-  categories,
-  isBulkMode = false,
-  isSelected = false,
-  isUpdatingCategory = false,
-  onCategoryChange,
-  onDetailsOpen,
-  onToggleSelect,
-  showDate = false,
-  transaction,
-}: TransactionRowProps) {
-  const [brokenLogoUrl, setBrokenLogoUrl] = useState<string | null>(null)
-  const { categoryButtonRef, hideOwners, isCategoryOpen, merchant, owner, ownerColor, setIsCategoryOpen } = useTransactionRowBase(transaction)
-  const logoUrl = transaction.logoUrl
-
+function SelectCheckbox({ checked, merchant, onToggle }: { checked: boolean; merchant: string; onToggle?: () => void }) {
   return (
-    <tr
-      className={clsx('cursor-pointer border-b border-neutral-100 bg-white text-sm hover:bg-neutral-50', transaction.isHidden && 'opacity-60')}
-      onClick={() => {
-        if (isBulkMode && onToggleSelect) {
-          onToggleSelect(transaction.id)
-        } else {
-          onDetailsOpen?.(transaction)
-        }
-      }}
-    >
-      {isBulkMode ? (
-        <td className="w-10 px-2 py-3">
-          <input
-            aria-label={`Select transaction for ${merchant}`}
-            checked={isSelected}
-            className="h-4 w-4 rounded accent-brand-600"
-            onChange={() => onToggleSelect?.(transaction.id)}
-            onClick={(event) => event.stopPropagation()}
-            type="checkbox"
-          />
-        </td>
-      ) : null}
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          {logoUrl && brokenLogoUrl !== logoUrl ? (
-            <img alt={merchant} className="h-8 w-8 rounded-full object-contain" onError={() => setBrokenLogoUrl(logoUrl)} src={logoUrl} />
-          ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-xs font-bold">{merchant.charAt(0)}</span>
-          )}
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-neutral-950">{merchant}</span>
-              {transaction.isHidden && (
-                <span className="rounded-full border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-500">
-                  Hidden
-                </span>
-              )}
-            </div>
-            {showDate ? <span className="text-xs text-neutral-400">{formatDatetimeAsLocalDate(transaction.datetime)}</span> : null}
-          </div>
-        </div>
-      </td>
-      <td className="relative w-48 px-4 py-3 text-neutral-700">
-        {categories && onCategoryChange ? (
-          <button
-            className="inline-flex items-center gap-1 rounded-xl px-2 py-1 whitespace-nowrap hover:bg-neutral-100"
-            disabled={isUpdatingCategory}
-            onClick={(event) => {
-              event.stopPropagation()
-              setIsCategoryOpen((open) => !open)
-            }}
-            ref={categoryButtonRef}
-            type="button"
-          >
-            {isUpdatingCategory ? (
-              <span className="text-neutral-400">Saving...</span>
-            ) : (
-              <>
-                <span>{transaction.category.emoji}</span>
-                <span className="whitespace-nowrap">{transaction.category.name}</span>
-              </>
-            )}
-          </button>
-        ) : (
-          `${transaction.category.emoji} ${transaction.category.name}`
-        )}
-        {categories && (
-          <CategoryDropdown
-            anchorRef={categoryButtonRef}
-            categories={categories}
-            isOpen={isCategoryOpen}
-            onClose={() => setIsCategoryOpen(false)}
-            onSelect={(category) => onCategoryChange?.(transaction, category)}
-          />
-        )}
-      </td>
-      <td className="hidden px-4 py-3 text-neutral-700 md:table-cell">
-        <span className={transaction.account.closed ? 'text-neutral-400' : ''}>
-          {accountDisplayLabel(transaction.account)}
-        </span>
-      </td>
-      <td className="hidden px-4 py-3 md:table-cell">
-        {!hideOwners ? <span className={clsx('rounded-full px-2 py-1 text-xs font-bold text-white', ownerColor)}>{owner.charAt(0)}</span> : null}
-      </td>
-      <td className="px-4 py-3 text-right font-semibold">
-        <span className={clsx(transactionAmountClassName(transaction.amount), transaction.pending && 'italic')}>{formatTransactionAmount(transaction.amount)}</span>
-      </td>
-    </tr>
+    <input
+      aria-label={`Select transaction for ${merchant}`}
+      checked={checked}
+      className={clsx(checkboxClass, 'h-4 w-4')}
+      onChange={onToggle}
+      onClick={(event) => event.stopPropagation()}
+      type="checkbox"
+    />
   )
 }
 
-export function MobileTransactionRow({
-  categories,
-  isBulkMode = false,
-  isSelected = false,
-  isUpdatingCategory = false,
-  onCategoryChange,
-  onDetailsOpen,
-  onToggleSelect,
-  showDate = false,
-  transaction,
-}: TransactionRowProps) {
-  const { categoryButtonRef, hideOwners, isCategoryOpen, merchant, owner, ownerColor, setIsCategoryOpen } = useTransactionRowBase(transaction)
+export function TransactionRow(props: TransactionRowProps) {
+  const { action, categories, hasActionColumn = false, isBulkMode = false, isSelected = false, isUpdatingCategory = false, onCategoryChange, onToggleSelect, showDate = false, transaction } = props
+  const row = useTransactionRow(props)
+  const account = transaction.account
 
   return (
     <div
-      aria-label={isBulkMode ? `Select transaction for ${merchant}` : `View details for ${merchant}`}
-      className={clsx(
-        'flex w-full cursor-pointer items-center gap-3 border-b border-neutral-100 bg-white px-4 py-3',
-        transaction.isHidden && 'opacity-60',
-      )}
-      onClick={() => {
-        if (isBulkMode && onToggleSelect) {
-          onToggleSelect(transaction.id)
-        } else {
-          onDetailsOpen?.(transaction)
-        }
-      }}
+      aria-label={row.rowAriaLabel}
+      className={clsx('grid h-12 w-full cursor-pointer items-center gap-3.5 border-b border-border px-5 text-left transition-colors duration-150 hover:bg-raised', hasActionColumn ? DESKTOP_GRID_WITH_ACTION : DESKTOP_GRID, transaction.isHidden && 'opacity-60')}
+      onClick={row.activate}
+      onKeyDown={row.onKeyDown}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.currentTarget === e.target && (e.key === 'Enter' || e.key === ' ')) {
-          if (isBulkMode && onToggleSelect) {
-            onToggleSelect(transaction.id)
-          } else {
-            onDetailsOpen?.(transaction)
-          }
-        }
-      }}
+    >
+      <div className="flex items-center">
+        {isBulkMode
+          ? <SelectCheckbox checked={isSelected} merchant={row.merchant} onToggle={() => onToggleSelect?.(transaction.id)} />
+          : <Avatar name={row.merchant} src={transaction.logoUrl} tint={categoryTint(transaction.category)} />}
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-medium text-text-1">{row.merchant}</span>
+        {transaction.isHidden ? <Tag>Hidden</Tag> : null}
+        {transaction.pending ? <Tag tint="amber">Pending</Tag> : null}
+        {showDate ? <span className="shrink-0 text-xs text-text-muted">{formatDatetimeAsLocalDate(transaction.datetime)}</span> : null}
+      </div>
+      <div className="relative flex min-w-0 items-center">
+        {categories && onCategoryChange ? (
+          <CategoryTag
+            category={transaction.category}
+            disabled={isUpdatingCategory}
+            label={isUpdatingCategory ? 'Saving...' : undefined}
+            onClick={(event) => { event.stopPropagation(); row.setIsCategoryOpen((open) => !open) }}
+            ref={row.categoryButtonRef}
+          />
+        ) : <CategoryTag category={transaction.category} />}
+        {categories ? (
+          <CategoryDropdown anchorRef={row.categoryButtonRef} categories={categories} isOpen={row.isCategoryOpen} onClose={() => row.setIsCategoryOpen(false)} onSelect={(category) => onCategoryChange?.(transaction, category)} />
+        ) : null}
+      </div>
+      <div className={clsx('truncate text-[13px]', account.closed ? 'text-text-faint' : 'text-text-3')}>
+        <span>{accountDisplayLabel(account)}</span>
+        <span className="text-text-faint"> · {formatAccountType(account.type)}</span>
+      </div>
+      <div className="flex items-center">{!row.hideOwners ? <OwnerDot name={account.owner.name} /> : null}</div>
+      <div className="text-right"><TransactionAmount amount={transaction.amount} italic /></div>
+      {hasActionColumn ? <div className="flex min-w-[76px] items-center justify-end">{action}</div> : null}
+    </div>
+  )
+}
+
+export function MobileTransactionRow(props: TransactionRowProps) {
+  const { action, categories, hasActionColumn = false, isBulkMode = false, isSelected = false, isUpdatingCategory = false, onCategoryChange, onToggleSelect, showDate = false, transaction } = props
+  const row = useTransactionRow(props)
+
+  return (
+    <div
+      aria-label={row.rowAriaLabel}
+      className={clsx('flex h-[58px] w-full cursor-pointer items-center gap-3 border-b border-border px-4', transaction.isHidden && 'opacity-60')}
+      onClick={row.activate}
+      onKeyDown={row.onKeyDown}
+      role="button"
+      tabIndex={0}
     >
       {isBulkMode ? (
-        <input
-          aria-label={`Select transaction for ${merchant}`}
-          checked={isSelected}
-          className="h-4 w-4 shrink-0 rounded accent-brand-600"
-          onChange={() => onToggleSelect?.(transaction.id)}
-          onClick={(e) => e.stopPropagation()}
-          type="checkbox"
-        />
-      ) : null}
-      <div className="relative shrink-0">
-        <button
-          aria-label={`Change category for ${merchant}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-base disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={!categories || !onCategoryChange || isUpdatingCategory}
-          onClick={(event) => {
-            event.stopPropagation()
-            setIsCategoryOpen((open) => !open)
-          }}
-          ref={categoryButtonRef}
-          type="button"
-        >
-          {isUpdatingCategory ? <span className="text-xs text-neutral-400">...</span> : transaction.category.emoji}
-        </button>
-        {categories ? (
-          <CategoryDropdown
-            anchorRef={categoryButtonRef}
-            categories={categories}
-            isOpen={isCategoryOpen}
-            onClose={() => setIsCategoryOpen(false)}
-            onSelect={(category) => onCategoryChange?.(transaction, category)}
-          />
-        ) : null}
-      </div>
+        <SelectCheckbox checked={isSelected} merchant={row.merchant} onToggle={() => onToggleSelect?.(transaction.id)} />
+      ) : (
+        <div className="relative shrink-0">
+          <button
+            aria-label={`Change category for ${row.merchant}`}
+            className="rounded-full disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!categories || !onCategoryChange || isUpdatingCategory}
+            onClick={(event) => { event.stopPropagation(); row.setIsCategoryOpen((open) => !open) }}
+            ref={row.categoryButtonRef}
+            type="button"
+          >
+            <EmojiAvatar emoji={isUpdatingCategory ? '…' : transaction.category.emoji} tint={categoryTint(transaction.category)} />
+          </button>
+          {categories ? (
+            <CategoryDropdown anchorRef={row.categoryButtonRef} categories={categories} isOpen={row.isCategoryOpen} onClose={() => row.setIsCategoryOpen(false)} onSelect={(category) => onCategoryChange?.(transaction, category)} />
+          ) : null}
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-neutral-950">{merchant}</span>
-          {transaction.isHidden && (
-            <span className="shrink-0 rounded-full border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-500">
-              Hidden
-            </span>
-          )}
+          <span className="truncate text-sm font-medium text-text-1">{row.merchant}</span>
+          {transaction.isHidden ? <Tag className="shrink-0">Hidden</Tag> : null}
         </div>
-        {showDate ? <div className="text-xs text-neutral-400">{transaction.datetime?.slice(0, 10)}</div> : null}
+        <div className="truncate text-xs text-text-muted">
+          {showDate ? `${formatDatetimeAsLocalDate(transaction.datetime)} · ` : ''}{accountDisplayLabel(transaction.account)}
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {!hideOwners ? (
-          <span className={clsx('rounded-full px-2 py-0.5 text-xs font-bold text-white', ownerColor)}>
-            {owner.charAt(0).toUpperCase()}
-          </span>
-        ) : null}
-        <span className={clsx('text-sm font-semibold tabular-nums', transactionAmountClassName(transaction.amount), transaction.pending && 'italic')}>
-          {formatTransactionAmount(transaction.amount)}
-        </span>
-      </div>
+      {!row.hideOwners ? <OwnerDot name={transaction.account.owner.name} /> : null}
+      <div className="min-w-[64px] text-right"><TransactionAmount amount={transaction.amount} italic /></div>
+      {hasActionColumn ? <div className="flex min-w-[76px] items-center justify-end">{action}</div> : null}
     </div>
   )
 }

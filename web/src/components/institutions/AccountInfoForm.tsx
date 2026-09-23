@@ -174,7 +174,7 @@ export function AccountInfoForm({
   }
 
   return (
-    <form aria-describedby={formErrorId} className="mt-4 space-y-3 border-t border-neutral-100 pt-4" onSubmit={handleSave}>
+    <form aria-describedby={formErrorId} className="mt-4 space-y-3 border-t border-border pt-4" onSubmit={handleSave}>
       <AccountInfoFields
         account={account}
         canWriteAccounts={canWriteAccounts}

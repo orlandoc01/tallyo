@@ -19,10 +19,11 @@ export function emptyList<T>() {
 export function useListQuery<T, Variables extends AnyVariables = void>(
   args: UseQueryArgs<Variables, ListQueryData<T>>,
   field: string,
-): QueryBase & { items: T[] } {
+): QueryBase & { items: T[]; data: ListQueryData<T> | undefined } {
   const [result, refetch] = useQuery<ListQueryData<T>, Variables>(args)
 
   return {
+    data: result.data,
     items: result.data?.[field]?.items ?? emptyList<T>(),
     fetching: result.fetching,
     error: result.error,

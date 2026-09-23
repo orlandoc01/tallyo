@@ -39,6 +39,7 @@ function GeneralTrackingForm({ canWriteSettings, initialState }: { canWriteSetti
   const dirty = state.disableTransactionTracking !== initialState.disableTransactionTracking
     || state.disableWealthTracking !== initialState.disableWealthTracking
     || state.hideOwners !== initialState.hideOwners
+  const disabled = !canWriteSettings || mutationResult.fetching
 
   async function save() {
     const result = await updateConfiguration({ input: { general: state } })
@@ -46,43 +47,37 @@ function GeneralTrackingForm({ canWriteSettings, initialState }: { canWriteSetti
   }
 
   return (
-    <section className="space-y-3">
-      <div>
-        <SectionLabel>Runtime controls</SectionLabel>
-      </div>
+    <div>
+      <SectionLabel className="mb-2">Runtime controls</SectionLabel>
 
       {mutationResult.error ? <ErrorState message={mutationResult.error.message} /> : null}
 
-      <div className="max-w-xl rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="space-y-4">
-          <SettingsToggleInput
-            checked={state.disableTransactionTracking}
-            dirty={state.disableTransactionTracking !== initialState.disableTransactionTracking}
-            disabled={!canWriteSettings || mutationResult.fetching}
-            label="Disable transaction tracking"
-            onChange={(value) => setState((current) => ({ ...current, disableTransactionTracking: value }))}
-          />
-          <SettingsToggleInput
-            checked={state.disableWealthTracking}
-            dirty={state.disableWealthTracking !== initialState.disableWealthTracking}
-            disabled={!canWriteSettings || mutationResult.fetching}
-            label="Disable wealth tracking"
-            onChange={(value) => setState((current) => ({ ...current, disableWealthTracking: value }))}
-          />
-          <SettingsToggleInput
-            checked={state.hideOwners}
-            dirty={state.hideOwners !== initialState.hideOwners}
-            disabled={!canWriteSettings || mutationResult.fetching}
-            label="Hide owners"
-            onChange={(value) => setState((current) => ({ ...current, hideOwners: value }))}
-          />
+      <SettingsToggleInput
+        checked={state.disableTransactionTracking}
+        dirty={state.disableTransactionTracking !== initialState.disableTransactionTracking}
+        disabled={disabled}
+        label="Disable transaction tracking"
+        onChange={(value) => setState((current) => ({ ...current, disableTransactionTracking: value }))}
+      />
+      <SettingsToggleInput
+        checked={state.disableWealthTracking}
+        dirty={state.disableWealthTracking !== initialState.disableWealthTracking}
+        disabled={disabled}
+        label="Disable wealth tracking"
+        onChange={(value) => setState((current) => ({ ...current, disableWealthTracking: value }))}
+      />
+      <SettingsToggleInput
+        checked={state.hideOwners}
+        dirty={state.hideOwners !== initialState.hideOwners}
+        disabled={disabled}
+        label="Hide owners"
+        onChange={(value) => setState((current) => ({ ...current, hideOwners: value }))}
+      />
+      {dirty ? (
+        <div className="flex justify-end border-t border-border pt-3">
+          <Button disabled={disabled} onClick={() => { void save() }}>save</Button>
         </div>
-        {dirty ? (
-          <div className="mt-4 flex justify-end border-t border-neutral-100 pt-4">
-            <Button disabled={!canWriteSettings || mutationResult.fetching} onClick={() => { void save() }}>save</Button>
-          </div>
-        ) : null}
-      </div>
-    </section>
+      ) : null}
+    </div>
   )
 }

@@ -1,15 +1,15 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { graphql, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { accounts, categories, categoryGroups, normalizeAccountForGraphql, normalizeTransactionForGraphql, owners, tags, transactions, uncategorizedCategory } from '../../mocks/fixtures'
+import { accounts, categories, normalizeTransactionForGraphql, tags, transactions, uncategorizedCategory } from '../../mocks/fixtures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { configuration } from '../../mocks/handlers'
 import { allowAllPermissionResult } from '../../test/permissions'
 import { captureMutation, captureQuery, mockGraphqlError, mockMutation, mockQuery } from '../../test/msw'
 import { GraphqlTestProvider } from '../../test/renderWithProviders'
 import { transactionConnection } from '../../test/transactionConnection'
-import type { Account, Transaction, TransactionsFilter } from '../../types/graphql'
+import type { Transaction } from '../../types/graphql'
 import { formatDatetimeAsLocalDate, formatTransactionDatetime } from '../../utils/dates'
 import { server } from '../../mocks/server'
 import { AccountCheckboxList } from './AccountCheckboxList'
@@ -18,11 +18,15 @@ import { CategoryDropdown } from './CategoryDropdown'
 import { CategoryPicker } from './CategoryPicker'
 import { CreateTransactionModal } from './CreateTransactionModal'
 import { TransactionDetailsPane } from './TransactionDetailsPane'
-import { TransactionFilters } from './TransactionFilters'
 import { TransactionList } from './TransactionList'
 import { UncategorizedQueue } from './UncategorizedQueue'
 
 const mockAuth = vi.hoisted(() => ({ hideOwners: false }))
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+
+vi.mock('../../hooks/useIsMobile', () => ({
+  useIsMobile: () => mockViewport.isMobile,
+}))
 
 vi.mock('../../auth/useAuth', () => ({
   useAuth: () => mockAuth,
@@ -33,6 +37,7 @@ vi.mock('../../hooks/usePermissions', async () => (await import('../../test/perm
 afterEach(() => {
   vi.mocked(usePermissions).mockReturnValue(allowAllPermissionResult)
   mockAuth.hideOwners = false
+  mockViewport.isMobile = false
 })
 
 function makeCloudflareReviewTransaction(): Transaction {
@@ -44,15 +49,6 @@ function makeCloudflareReviewTransaction(): Transaction {
     category: uncategorizedCategory,
     isReviewed: false,
   }
-}
-
-function renderTransactionFilters(filter: TransactionsFilter = {}) {
-  const onChange = vi.fn()
-  const view = (nextFilter: TransactionsFilter) => (
-    <TransactionFilters accounts={accounts} categoryGroups={categoryGroups} filter={nextFilter} onChange={onChange} owners={owners} />
-  )
-  const { rerender } = render(view(filter))
-  return { onChange, rerenderFilters: (nextFilter: TransactionsFilter) => rerender(view(nextFilter)) }
 }
 
 function renderReviewQueue() {
@@ -96,189 +92,6 @@ describe('transaction components', () => {
     expect(onSelect).toHaveBeenCalledWith(categories[1])
   })
 
-  it('updates transaction filters and clears them', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    const onSortChange = vi.fn()
-
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{}}
-        onChange={onChange}
-        onSortChange={onSortChange}
-        owners={owners}
-        sort={{ field: 'DATE', direction: 'DESC' }}
-      />,
-    )
-
-    await user.selectOptions(screen.getByLabelText(/sort/i), 'AMOUNT:ASC')
-    expect(onSortChange).toHaveBeenCalledWith({ field: 'AMOUNT', direction: 'ASC' })
-
-    await user.click(screen.getByRole('button', { name: 'Text' }))
-    await user.click(screen.getByRole('button', { name: 'Amount' }))
-    await user.click(screen.getByRole('button', { name: 'Date range' }))
-    await user.click(screen.getByRole('button', { name: 'Owner' }))
-    await user.click(screen.getByRole('button', { name: 'Accounts' }))
-    await user.click(screen.getByRole('button', { name: 'Categories' }))
-
-    await user.type(screen.getByPlaceholderText(/merchant name/i), 'Target')
-    expect(onChange).toHaveBeenCalledWith({ merchantPrefix: 'T' })
-
-    await user.type(screen.getByPlaceholderText(/original name/i), 'TARGET')
-    expect(onChange).toHaveBeenCalledWith({ originalPrefix: 'T' })
-
-    await user.type(screen.getByLabelText(/amount min/i), '10')
-    expect(onChange).toHaveBeenCalledWith({ amountMin: 1 })
-
-    await user.type(screen.getByLabelText(/amount max/i), '100')
-    expect(onChange).toHaveBeenCalledWith({ amountMax: 1 })
-
-    await user.type(screen.getByLabelText(/exact amount/i), '62.3')
-    expect(onChange).toHaveBeenCalledWith({ exactAmount: 6 })
-
-    fireEvent.change(screen.getByLabelText(/start date/i, { selector: 'input' }), { target: { value: '2026-05-01' } })
-    expect(onChange).toHaveBeenCalledWith({ datetimeRange: { from: new Date(2026, 4, 1).toISOString(), to: undefined } })
-
-    fireEvent.change(screen.getByLabelText(/end date/i, { selector: 'input' }), { target: { value: '2026-05-31' } })
-    expect(onChange).toHaveBeenCalledWith({ datetimeRange: { from: undefined, to: new Date(2026, 5, 1).toISOString() } })
-
-    await user.click(screen.getByRole('checkbox', { name: 'sam' }))
-    expect(onChange).toHaveBeenCalledWith({ ownerIds: ['owner-2'] })
-
-    await user.click(screen.getByLabelText('Checking (...9625)'))
-    expect(onChange).toHaveBeenCalledWith({ accountIds: [accounts[0].id] })
-
-    await user.click(screen.getByLabelText(/groceries/i))
-    expect(onChange).toHaveBeenCalledWith({ categoryIds: [categories[0].id] })
-
-    await user.click(screen.getByRole('button', { name: /clear filters/i }))
-    expect(onChange).toHaveBeenCalledWith({ isHidden: false })
-  })
-
-  it('hides owner filter options when owners are hidden', () => {
-    mockAuth.hideOwners = true
-
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{}}
-        onChange={() => {}}
-        owners={owners}
-      />,
-    )
-
-    expect(screen.queryByRole('button', { name: 'Owner' })).not.toBeInTheDocument()
-  })
-
-  it('shows compact transaction date range pills that open date pickers', () => {
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{
-          datetimeRange: {
-            from: new Date(2026, 4, 1).toISOString(),
-            to: new Date(2026, 5, 1).toISOString(),
-          },
-        }}
-        onChange={() => {}}
-        owners={owners}
-      />,
-    )
-
-    expect(screen.getByText('05-01-26')).toBeInTheDocument()
-    expect(screen.getByText('05-31-26')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open start date picker/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /open end date picker/i })).toBeInTheDocument()
-  })
-
-  it('selects and deselects all categories from transaction filters', async () => {
-    const user = userEvent.setup()
-    const allCategoryIds = categoryGroups.flatMap((group) => group.categories.map((category) => category.id))
-    const { onChange, rerenderFilters } = renderTransactionFilters()
-
-    await user.click(screen.getByRole('button', { name: 'Categories' }))
-    await user.click(screen.getByLabelText(/select all/i))
-    expect(onChange).toHaveBeenCalledWith({ categoryIds: allCategoryIds })
-
-    rerenderFilters({ categoryIds: allCategoryIds })
-
-    await user.click(screen.getByLabelText(/select all/i))
-    expect(onChange).toHaveBeenLastCalledWith({ categoryIds: undefined })
-  })
-
-  it('toggles transaction filter category groups', async () => {
-    const user = userEvent.setup()
-    const foodCategoryIds = categoryGroups[0].categories.map((category) => category.id)
-    const allCategoryIds = categoryGroups.flatMap((group) => group.categories.map((category) => category.id))
-    const nonFoodCategoryIds = allCategoryIds.filter((categoryId) => !foodCategoryIds.includes(categoryId))
-    const { onChange, rerenderFilters } = renderTransactionFilters()
-
-    await user.click(screen.getByRole('button', { name: 'Categories' }))
-    await user.click(screen.getByLabelText(/Food/i))
-    expect(onChange).toHaveBeenCalledWith({ categoryIds: foodCategoryIds })
-
-    rerenderFilters({ categoryIds: allCategoryIds })
-
-    await user.click(screen.getByLabelText(/Food/i))
-    expect(onChange).toHaveBeenLastCalledWith({ categoryIds: nonFoodCategoryIds })
-  })
-
-  it('filters transaction categories by search without narrowing select-all or group toggles', async () => {
-    const user = userEvent.setup()
-    const allCategoryIds = categoryGroups.flatMap((group) => group.categories.map((category) => category.id))
-    const selectedCategoryId = categories[1].id
-    const { onChange } = renderTransactionFilters({ categoryIds: [selectedCategoryId] })
-
-    await user.type(screen.getByLabelText(/category search/i), 'bars')
-
-    expect(screen.getByLabelText(/select all/i)).not.toBeChecked()
-    expect(screen.getByLabelText('Food')).not.toBeChecked()
-    expect(screen.getByLabelText(/restaurants & bars/i)).toBeChecked()
-    expect(screen.queryByLabelText(/groceries/i)).not.toBeInTheDocument()
-
-    await user.click(screen.getByLabelText(/select all/i))
-    expect(onChange).toHaveBeenLastCalledWith({
-      categoryIds: [selectedCategoryId, ...allCategoryIds.filter((id) => id !== selectedCategoryId)],
-    })
-  })
-
-  it('selects and deselects all accounts from transaction filters', async () => {
-    const user = userEvent.setup()
-    const visibleAccountIds = accounts.filter((account) => !account.hidden).map((account) => account.id)
-    const { onChange, rerenderFilters } = renderTransactionFilters()
-
-    await user.click(screen.getByRole('button', { name: 'Accounts' }))
-    await user.click(screen.getByLabelText(/select all accounts/i))
-    expect(onChange).toHaveBeenCalledWith({ accountIds: visibleAccountIds })
-
-    rerenderFilters({ accountIds: visibleAccountIds })
-
-    await user.click(screen.getByLabelText(/select all accounts/i))
-    expect(onChange).toHaveBeenLastCalledWith({ accountIds: undefined })
-  })
-
-  it('filters transaction accounts by search without narrowing select-all', async () => {
-    const user = userEvent.setup()
-    const visibleAccountIds = accounts.filter((account) => !account.hidden).map((account) => account.id)
-    const vacationSavings = accounts.find((account) => account.name === 'Vacation Savings')
-    if (!vacationSavings) throw new Error('Vacation Savings fixture missing')
-    const { onChange } = renderTransactionFilters({ accountIds: [accounts[0].id] })
-
-    await user.type(screen.getByLabelText(/account search/i), 'vacation')
-
-    expect(screen.getByLabelText('Vacation Savings (...2007)')).not.toBeChecked()
-    expect(screen.queryByLabelText('Checking (...9625)')).not.toBeInTheDocument()
-
-    await user.click(screen.getByLabelText(/select all accounts/i))
-    expect(onChange).toHaveBeenLastCalledWith({
-      accountIds: [accounts[0].id, ...visibleAccountIds.filter((id) => id !== accounts[0].id)],
-    })
-  })
-
   it('filters account groups by search without narrowing group toggles', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -305,216 +118,6 @@ describe('transaction components', () => {
     expect(onChange).toHaveBeenLastCalledWith(americanExpressAccountIds)
   })
 
-  it('toggles include hidden and resets it when clearing filters', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{ isHidden: false }}
-        onChange={onChange}
-        owners={owners}
-        sort={{ field: 'DATE', direction: 'DESC' }}
-      />,
-    )
-
-    const toggle = screen.getByRole('switch', { name: /include hidden/i })
-    expect(toggle).not.toBeChecked()
-
-    await user.click(toggle)
-    expect(onChange).toHaveBeenCalledWith({ isHidden: undefined })
-
-    await user.click(screen.getByRole('button', { name: /clear filters/i }))
-    expect(onChange).toHaveBeenLastCalledWith({ isHidden: false })
-  })
-
-  it('hides hidden accounts and shows (CLOSED) label on closed accounts in filter', async () => {
-    const user = userEvent.setup()
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{}}
-        onChange={vi.fn()}
-        onSortChange={vi.fn()}
-        owners={owners}
-        sort={{ field: 'DATE', direction: 'DESC' }}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Accounts' }))
-    expect(screen.getByText('American Express')).toBeInTheDocument()
-    expect(screen.getByText('Chase')).toBeInTheDocument()
-    expect(screen.getByText('Fidelity')).toBeInTheDocument()
-    expect(screen.getByText('Capital One')).toBeInTheDocument()
-    expect(screen.getByLabelText('Checking (...9625)')).toBeInTheDocument()
-    expect(screen.getByLabelText('Savings (...1234) (CLOSED)')).toBeInTheDocument()
-    expect(screen.queryByLabelText(/Secret Fund/)).not.toBeInTheDocument()
-  })
-
-  it('puts manual institution accounts at the bottom of account selectors', () => {
-    const manualAccount: Account = {
-      ...accounts[0],
-      id: 'manual-cash',
-      name: 'Cash Wallet',
-      mask: null,
-      connection: null,
-      manual: true,
-    }
-
-    render(
-      <AccountCheckboxList
-        accounts={[manualAccount, accounts[0], accounts[1]]}
-        onChange={vi.fn()}
-      />,
-    )
-
-    expect(screen.getAllByText(/American Express|Manual/).map((node) => node.textContent)).toEqual(['American Express', 'Manual'])
-  })
-
-  it('handles connected accounts when provider details are not loaded', () => {
-    const accountWithoutProvider: Account = {
-      ...accounts[0],
-      connection: {
-        id: 'conn-without-provider',
-        name: 'Connected accounts',
-        owner: { id: 'owner-1', name: 'alex' },
-        isActive: true,
-        provider: { __typename: 'EVMWallet', address: '0x0', chainIds: ['eth'] },
-      },
-    }
-
-    render(
-      <AccountCheckboxList
-        accounts={[accountWithoutProvider]}
-        onChange={vi.fn()}
-      />,
-    )
-
-    expect(screen.getByText('Connected accounts')).toBeInTheDocument()
-    expect(screen.getByLabelText('Checking (...9625)')).toBeInTheDocument()
-  })
-
-  it('creates a rule from matching filters', async () => {
-    const user = userEvent.setup()
-    const onRuleCreated = vi.fn()
-    const createRule = captureMutation('CreateRule', {
-      createRule: {
-        __typename: 'CreateRulePayload',
-        retroactivelyUpdated: 2,
-        rule: {
-          __typename: 'Rule',
-          id: '9',
-          merchantPattern: 'Target',
-          originalPattern: 'TARGET STORE',
-          merchantName: null,
-          category: categories[0],
-          tags: [tags[0], tags[1]],
-          shouldHide: null,
-          shouldBeRecurring: null,
-          accounts: [normalizeAccountForGraphql(accounts[0]), normalizeAccountForGraphql(accounts[1])],
-          amountMin: 62.3,
-          amountMax: 62.3,
-          priority: 10,
-          createdAt: '2026-05-21T00:00:00Z',
-        },
-      },
-    })
-
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{ accountIds: [accounts[0].id, accounts[1].id], exactAmount: 62.3, merchantPrefix: 'Target', originalPrefix: 'TARGET STORE' }}
-        onChange={vi.fn()}
-        onRuleCreated={onRuleCreated}
-        owners={owners}
-      />,
-      { wrapper: GraphqlTestProvider },
-    )
-
-    await user.click(screen.getByRole('button', { name: /create rule/i }))
-
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByLabelText(/merchant pattern/i)).toHaveValue('Target')
-    expect(within(dialog).getByLabelText(/original name pattern/i)).toHaveValue('TARGET STORE')
-    expect(within(dialog).getByLabelText(/amount min/i)).toHaveValue(62.3)
-    expect(within(dialog).getByLabelText(/amount max/i)).toHaveValue(62.3)
-
-    await user.click(within(dialog).getByRole('button', { name: /category/i }))
-    await user.click(screen.getByRole('button', { name: new RegExp(categories[0].name, 'i') }))
-    await user.click(within(dialog).getByRole('checkbox', { name: /work/i }))
-    await user.click(within(dialog).getByRole('checkbox', { name: /travel/i }))
-    await user.click(within(dialog).getByLabelText(/apply retroactively/i))
-    await user.click(within(dialog).getByRole('button', { name: /submit rule/i }))
-
-    await waitFor(() => expect(createRule.variables).toEqual({
-      input: {
-        merchantPattern: 'Target',
-        originalPattern: 'TARGET STORE',
-        changes: { categoryId: categories[0].id, tagIds: [tags[0].id, tags[1].id] },
-        applyRetroactively: true,
-        accountIds: [accounts[0].id, accounts[1].id],
-        amountMin: 62.3,
-        amountMax: 62.3,
-      },
-    }))
-    await waitFor(() => expect(onRuleCreated).toHaveBeenCalled())
-  })
-
-  it('creates a rule without a merchant pattern', async () => {
-    const user = userEvent.setup()
-    const createRule = captureMutation('CreateRule', {
-      createRule: {
-        __typename: 'CreateRulePayload',
-        retroactivelyUpdated: 0,
-        rule: {
-          __typename: 'Rule',
-          id: '10',
-          merchantPattern: null,
-          originalPattern: null,
-          merchantName: null,
-          category: categories[1],
-          tags: [],
-          shouldHide: null,
-          shouldBeRecurring: null,
-          accounts: [],
-          amountMin: null,
-          amountMax: null,
-          priority: 10,
-          createdAt: '2026-05-21T00:00:00Z',
-        },
-      },
-    })
-
-    render(
-      <TransactionFilters
-        accounts={accounts}
-        categoryGroups={categoryGroups}
-        filter={{}}
-        onChange={vi.fn()}
-        owners={owners}
-      />,
-      { wrapper: GraphqlTestProvider },
-    )
-
-    await user.click(screen.getByRole('button', { name: /create rule/i }))
-    const dialog = screen.getByRole('dialog')
-
-    await user.click(within(dialog).getByRole('button', { name: /category/i }))
-    await user.click(screen.getByRole('button', { name: new RegExp(categories[1].name, 'i') }))
-    await user.click(within(dialog).getByRole('button', { name: /submit rule/i }))
-
-    await waitFor(() => expect(createRule.variables).toEqual({
-      input: {
-        changes: { categoryId: categories[1].id },
-        applyRetroactively: false,
-      },
-    }))
-  })
-
   it('renders grouped transactions with day totals', () => {
     render(<TransactionList transactions={transactions} />, { wrapper: GraphqlTestProvider })
 
@@ -537,15 +140,14 @@ describe('transaction components', () => {
       { wrapper: GraphqlTestProvider },
     )
 
-    const dataRows = container.querySelectorAll('tbody tr')
-    expect(dataRows).toHaveLength(2)
+    const dataRows = screen.getAllByRole('button', { name: /view details for/i })
+    expect(dataRows).toHaveLength(4) // 2 desktop rows + 2 mobile rows
     expect(dataRows[0]).toHaveTextContent('High')
     expect(dataRows[0]).toHaveTextContent(formatDatetimeAsLocalDate(mixedTransactions[0].datetime))
     expect(dataRows[1]).toHaveTextContent('Low')
     expect(dataRows[1]).toHaveTextContent(formatDatetimeAsLocalDate(mixedTransactions[1].datetime))
 
-    const dateHeaders = container.querySelectorAll('tbody tr.bg-neutral-100')
-    expect(dateHeaders).toHaveLength(0)
+    expect(container.querySelectorAll('[data-date-group]')).toHaveLength(0)
   })
 
   it('renders sort dropdown when onSortChange is provided and calls it on change', async () => {
@@ -584,9 +186,9 @@ describe('transaction components', () => {
       { wrapper: GraphqlTestProvider },
     )
 
-    expect(screen.getByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { name: 'Transactions' })).toHaveLength(2)
     expect(screen.getAllByText('No transactions found')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: 'Import / Export' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Import / Export' })).toHaveLength(2)
   })
 
   it('renders amount-sorted view when sort is AMOUNT:DESC with onSortChange', () => {
@@ -605,8 +207,7 @@ describe('transaction components', () => {
     expect(selects.length).toBeGreaterThanOrEqual(1)
     expect(selects[0]).toHaveValue('AMOUNT:DESC')
 
-    const dateHeaders = container.querySelectorAll('tbody tr.bg-neutral-100')
-    expect(dateHeaders).toHaveLength(0)
+    expect(container.querySelectorAll('[data-date-group]')).toHaveLength(0)
   })
 
   it('shows hidden badge for hidden transactions in the list', async () => {
@@ -634,8 +235,8 @@ describe('transaction components', () => {
     await user.click(screen.getAllByText('Target')[0])
 
     expect(screen.getAllByRole('region', { name: /details for target/i })[0]).toBeInTheDocument()
-    expect(screen.getAllByText('Merchant')[0]).toBeInTheDocument()
-    expect(screen.getAllByText('Target')).toHaveLength(4) // 2 desktop rows + 2 mobile rows
+    expect(screen.getAllByLabelText(/^merchant name$/i)[0]).toHaveValue('Target')
+    expect(screen.getAllByText('Target')).toHaveLength(5) // 2 desktop rows + 2 mobile rows + modal title
     expect(screen.getAllByLabelText(/notes/i)[0]).toBeInTheDocument()
   })
 
@@ -722,6 +323,7 @@ describe('transaction components', () => {
     expect((await screen.findAllByRole('region', { name: /details for cloudflare/i }))[0]).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: /close details for cloudflare/i })[0])
+    await user.click(screen.getAllByRole('button', { name: /^uncategorized$/i })[0])
     await user.click(screen.getAllByRole('button', { name: /groceries/i })[0])
 
     await waitFor(() => expect(updateTransaction.variables).toEqual({ input: { id: cloudflareTransaction.id, updates: { categoryId: categories[0].id } } }))
@@ -738,14 +340,104 @@ describe('transaction components', () => {
 
     expect(await screen.findByRole('button', { name: 'Reprocess All' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Reprocess All' })).toHaveAttribute('title', 'LLM Categorization must be enabled in AI settings')
-    expect(screen.getByRole('link', { name: 'Open LLM categorization settings' })).toHaveAttribute('href', '/settings/ai-integration')
   })
 
-  it('does not focus a category picker when the review queue loads', async () => {
+  it('does not open a category picker when the review queue loads', async () => {
     renderReviewQueue()
 
     await screen.findAllByText('Cloudflare')
-    expect(screen.getByPlaceholderText('Search categories...')).not.toHaveFocus()
+    expect(screen.queryByPlaceholderText('Search categories...')).not.toBeInTheDocument()
+  })
+
+  it('approves auto-categorized transactions individually and in bulk', async () => {
+    const user = userEvent.setup()
+    const groceries = { ...makeCloudflareReviewTransaction(), id: 'txn-groceries', merchantName: 'Whole Foods', category: categories[0] }
+    const restaurants = { ...makeCloudflareReviewTransaction(), id: 'txn-restaurants', merchantName: 'Pizza Hut', category: categories[1] }
+    const transactionsQuery = captureQuery('Transactions', () => ({ transactions: transactionConnection([makeCloudflareReviewTransaction(), groceries, restaurants]) }))
+    const updateTransaction = captureMutation('UpdateTransaction', {
+      updateTransaction: { __typename: 'UpdateTransactionPayload', transaction: normalizeTransactionForGraphql({ ...groceries, isReviewed: true }) },
+    })
+    const bulkUpdate = captureMutation('BulkUpdateTransactions', {
+      bulkUpdateTransactions: { __typename: 'BulkUpdateTransactionsPayload', updatedCount: 1, transactions: [] },
+    })
+    render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    expect(await screen.findAllByRole('button', { name: 'Approve' })).toHaveLength(4)
+    expect(screen.getByText('3 to review')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'Approve' })[0])
+    await waitFor(() => expect(updateTransaction.variables).toEqual({ input: { id: 'txn-groceries', updates: { categoryId: categories[0].id } } }))
+    await waitFor(() => expect(transactionsQuery.calls).toBeGreaterThan(1))
+    expect(screen.queryByRole('region', { name: /details for/i })).not.toBeInTheDocument()
+
+    const callsBeforeBulk = transactionsQuery.calls
+    await user.click(screen.getByRole('button', { name: 'Approve all' }))
+    await waitFor(() => expect(bulkUpdate.calls).toBe(2))
+    expect(bulkUpdate.variables).toEqual({ input: { transactionIds: ['txn-restaurants'], updates: { categoryId: categories[1].id } } })
+    await waitFor(() => expect(transactionsQuery.calls).toBe(callsBeforeBulk + 1))
+  })
+
+  it('hides bulk approval with a single approvable row and labels a partial page', async () => {
+    const groceries = { ...makeCloudflareReviewTransaction(), id: 'txn-groceries', merchantName: 'Whole Foods', category: categories[0] }
+    mockQuery('Transactions', { transactions: transactionConnection([makeCloudflareReviewTransaction(), groceries]) })
+    const { unmount } = render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    expect(await screen.findAllByRole('button', { name: 'Approve' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^Approve all|loaded$/ })).not.toBeInTheDocument()
+    unmount()
+
+    const restaurants = { ...groceries, id: 'txn-restaurants', category: categories[1] }
+    mockQuery('Transactions', { transactions: transactionConnection([groceries, restaurants], {}, 80) })
+    render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    expect(await screen.findByRole('button', { name: 'Approve 2 loaded' })).toBeInTheDocument()
+    expect(screen.getByText('80 to review')).toBeInTheDocument()
+  })
+
+  it('shows categorization failures without refetching and re-enables the row', async () => {
+    const user = userEvent.setup()
+    const groceries = { ...makeCloudflareReviewTransaction(), id: 'txn-groceries', merchantName: 'Whole Foods', category: categories[0] }
+    const transactionsQuery = captureQuery('Transactions', () => ({ transactions: transactionConnection([groceries]) }))
+    mockGraphqlError('UpdateTransaction', 'Could not update transaction', { kind: 'mutation' })
+    render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    const approve = (await screen.findAllByRole('button', { name: 'Approve' }))[0]
+    await user.click(approve)
+
+    expect(await screen.findByText(/Could not update transaction/)).toBeInTheDocument()
+    expect(approve).toBeEnabled()
+    expect(transactionsQuery.calls).toBe(1)
+  })
+
+  it('shows a retryable error instead of the empty state when the queue fails to load', async () => {
+    mockGraphqlError('Transactions', 'queue unavailable')
+    render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    expect(await screen.findByText(/queue unavailable/)).toBeInTheDocument()
+    expect(screen.queryByText('Review queue is clear')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
+  it('reserves the action slot on mobile rows without an approve button', async () => {
+    const groceries = { ...makeCloudflareReviewTransaction(), id: 'txn-groceries', merchantName: 'Whole Foods', category: categories[0] }
+    mockQuery('Transactions', { transactions: transactionConnection([makeCloudflareReviewTransaction(), groceries]) })
+    render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
+
+    const rows = await screen.findAllByRole('button', { name: /view details for cloudflare/i })
+    expect(rows).toHaveLength(2)
+    rows.forEach((row) => expect(row.lastElementChild).toHaveClass('min-w-[76px]'))
+    expect(rows.every((row) => row.lastElementChild?.querySelector('button') === null)).toBe(true)
+  })
+
+  it('opens the details sheet on mobile', async () => {
+    mockViewport.isMobile = true
+    const user = userEvent.setup()
+    renderReviewQueue()
+
+    await user.click((await screen.findAllByText('Cloudflare'))[0])
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getAllByRole('region', { name: /details for cloudflare/i })).toHaveLength(1)
   })
 
   it('reprocesses the queue when LLM categorization is enabled', async () => {
@@ -757,7 +449,6 @@ describe('transaction components', () => {
 
     const button = await screen.findByRole('button', { name: 'Reprocess All' })
     expect(button).toBeEnabled()
-    expect(screen.getByRole('link', { name: 'Open LLM categorization settings' })).toHaveAttribute('href', '/settings/ai-integration')
 
     emptyQueue()
     await user.click(button)
@@ -820,16 +511,14 @@ describe('transaction components', () => {
 
     await screen.findAllByText('Cloudflare')
     expect(screen.queryByRole('button', { name: 'Reprocess All' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Open LLM categorization settings' })).not.toBeInTheDocument()
   })
 
-  it('hides reprocessing but keeps the settings link when the review queue is empty', async () => {
+  it('hides reprocessing when the review queue is empty', async () => {
     mockQuery('Transactions', { transactions: transactionConnection([]) })
     render(<UncategorizedQueue />, { wrapper: GraphqlTestProvider })
 
     expect(await screen.findByText('Review queue is clear')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reprocess All' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open LLM categorization settings' })).toHaveAttribute('href', '/settings/ai-integration')
     expect(screen.queryByText(/Processing \d+ Transactions/)).not.toBeInTheDocument()
   })
 
@@ -837,7 +526,7 @@ describe('transaction components', () => {
     const user = userEvent.setup()
     const { cloudflareTransaction, updateTransaction } = renderReviewQueue()
 
-    await user.click(await screen.findByRole('button', { name: /pick category for cloudflare/i }))
+    await user.click((await screen.findAllByRole('button', { name: /change category for cloudflare/i }))[0])
     await user.click(screen.getAllByRole('button', { name: /groceries/i })[0])
 
     await waitFor(() => expect(updateTransaction.variables).toEqual({ input: { id: cloudflareTransaction.id, updates: { categoryId: categories[0].id } } }))
@@ -866,23 +555,32 @@ describe('TransactionDetailsPane', () => {
     render(<TransactionDetailsPane categories={categories} onClose={onClose} transaction={transactions[0]} />, { wrapper: GraphqlTestProvider })
 
     expect(screen.getByRole('region', { name: /details for target/i })).toBeInTheDocument()
-    expect(screen.getByText('Merchant')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Target' })).toBeInTheDocument()
     expect(screen.getByLabelText(/^merchant name$/i)).toHaveValue('Target')
-    expect(screen.getByText('Amount')).toBeInTheDocument()
-    expect(screen.getByText('$62.30')).toBeInTheDocument()
-    expect(screen.getByText('Authorized')).toBeInTheDocument()
-    expect(screen.getByText(formatTransactionDatetime(transactions[0].datetime))).toBeInTheDocument()
+    expect(screen.getByText('$62.30')).toHaveClass('italic')
+    expect(screen.getByText('Transaction date')).toBeInTheDocument()
+    expect(screen.getByText(formatTransactionDatetime(transactions[0].datetime, 'long'))).toBeInTheDocument()
     expect(screen.getByText('Account')).toBeInTheDocument()
     expect(screen.getByText('Checking (...9625)')).toBeInTheDocument()
+    expect(screen.getByText('Original name')).toBeInTheDocument()
+    expect(screen.getByText('TARGET STORE')).toBeInTheDocument()
     expect(screen.getByText('Owner')).toBeInTheDocument()
     expect(screen.getByText('alex')).toBeInTheDocument()
     expect(screen.getByText('Category')).toBeInTheDocument()
-    expect(screen.getByText('Status')).toBeInTheDocument()
-    expect(screen.getByText('Reviewed')).toBeInTheDocument()
-    const transactionId = screen.getByText(transactions[0].id)
-    expect(transactionId).toHaveClass('truncate')
-    expect(transactionId).toHaveAttribute('title', transactions[0].id)
+    expect(screen.getByRole('button', { name: /groceries/i })).toBeInTheDocument()
+    expect(screen.queryByText('Show transactions for this merchant →')).not.toBeInTheDocument()
     expect(screen.getByLabelText(/notes/i)).toHaveValue('')
+  })
+
+  it('offers to show transactions for the merchant', async () => {
+    const user = userEvent.setup()
+    const onShowMerchant = vi.fn()
+
+    render(<TransactionDetailsPane categories={categories} onClose={vi.fn()} onShowMerchant={onShowMerchant} transaction={transactions[0]} />, { wrapper: GraphqlTestProvider })
+
+    await user.click(screen.getByRole('button', { name: 'Show transactions for this merchant →' }))
+
+    expect(onShowMerchant).toHaveBeenCalledWith('Target')
   })
 
   it('closes when the X button is clicked', async () => {
@@ -1045,7 +743,7 @@ describe('TransactionDetailsPane', () => {
     await user.click(screen.getByRole('button', { name: /tags/i }))
     expect(await screen.findByRole('button', { name: new RegExp(tags[0].name, 'i') })).toBeInTheDocument()
 
-    await user.click(screen.getByText('Merchant'))
+    await user.click(screen.getByText('Owner'))
     expect(screen.queryByRole('button', { name: new RegExp(tags[0].name, 'i') })).not.toBeInTheDocument()
   })
 

@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery } from 'urql'
+import { Button } from '../common/Button'
+import { DataGridRow, dataGridTextCell } from '../common/DataGrid'
+import { Card, FormError } from '../common/FormControls'
 import { QueryGate } from '../common/QueryGate'
+import { Tag } from '../common/Tag'
 import { ASSETS_QUERY } from '../../graphql/queries'
 import { UPDATE_ASSET_MUTATION } from '../../graphql/mutations'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { useNormalizeTabParam } from '../../hooks/useNormalizeTabParam'
 import { usePermissions } from '../../hooks/usePermissions'
 import type { Asset, AssetList, ConnectivityStatus } from '../../types/graphql'
@@ -18,6 +23,7 @@ type AssetUpdateInput = {
 
 export function AssetReviewQueue() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const { asset_id: selectedAssetId, asset_tab: selectedAssetTabParam } = useParams()
   const [{ data, fetching, error }, reexecuteQuery] = useQuery<{ assets: AssetList }>({ query: ASSETS_QUERY, variables: { input: {} } })
   const [, updateAsset] = useMutation(UPDATE_ASSET_MUTATION)
@@ -56,7 +62,7 @@ export function AssetReviewQueue() {
     <QueryGate
       data={data}
       empty={assets.length === 0}
-      emptyTitle="All asset tickers are resolving correctly."
+      emptyTitle="All asset tickers are resolving"
       emptyDescription="Assets with Yahoo Finance lookup failures will appear here."
       error={error}
       errorPrefix="Failed to load asset review queue"
@@ -65,34 +71,38 @@ export function AssetReviewQueue() {
       onRetry={() => reexecuteQuery({ requestPolicy: 'network-only' })}
     >
       <div className="space-y-4">
-        {actionError ? <p className="text-sm text-red-600">{actionError}</p> : null}
-        <div className="divide-y divide-neutral-100 rounded-2xl border border-neutral-200 bg-white">
+        {actionError ? <FormError>{actionError}</FormError> : null}
+        <Card>
           {assets.map((asset) => {
             const busy = updatingAssetId === asset.id
-            return (
-              <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between" key={asset.id}>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-neutral-950">{asset.name ?? asset.identifier}</p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{reasonLabel(asset)}</span>
-                  </div>
-                  <p className="mt-1 truncate text-sm text-neutral-500">{asset.identifier}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50" onClick={() => navigate(`/review/assets/${asset.id}/info`)} type="button">
-                    Edit
-                  </button>
-                  <button className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50" disabled={!canUpdate || busy} onClick={() => setStatus(asset, 'HEALTHY')} type="button">
-                    Retry
-                  </button>
-                  <button className="rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-200 disabled:opacity-50" disabled={!canUpdate || busy} onClick={() => setStatus(asset, 'IGNORE')} type="button">
-                    Dismiss
-                  </button>
-                </div>
+            const title = (
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="min-w-0 truncate font-medium text-text-1">{asset.name ?? asset.identifier}</span>
+                <Tag className="shrink-0" tint="amber">{reasonLabel(asset)}</Tag>
               </div>
             )
+            const actions = (
+              <div className={isMobile ? 'mt-2 flex flex-wrap gap-2' : 'flex items-center gap-2'}>
+                <Button onClick={() => navigate(`/review/assets/${asset.id}/info`)} size="sm" variant="secondary">Edit</Button>
+                <Button disabled={!canUpdate || busy} onClick={() => setStatus(asset, 'HEALTHY')} size="sm" variant="secondary">Retry</Button>
+                <Button disabled={!canUpdate || busy} onClick={() => setStatus(asset, 'IGNORE')} size="sm" variant="danger">Dismiss</Button>
+              </div>
+            )
+            return isMobile ? (
+              <div className="min-h-[52px] border-t border-border px-4 py-2.5" key={asset.id}>
+                {title}
+                <div className="truncate font-mono text-xs text-text-3">{asset.identifier}</div>
+                {actions}
+              </div>
+            ) : (
+              <DataGridRow gridTemplateColumns="minmax(0,1.6fr) minmax(0,1fr) auto" key={asset.id}>
+                {title}
+                <div className={`${dataGridTextCell} font-mono text-xs text-text-3`}>{asset.identifier}</div>
+                {actions}
+              </DataGridRow>
+            )
           })}
-        </div>
+        </Card>
         {selectedAsset ? (
           <AssetEditModal
             key={selectedAsset.id}

@@ -1,5 +1,6 @@
 import { useReducer, type FormEvent } from 'react'
 import { useMutation } from 'urql'
+import { FormError } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
 import { ModalTitleRow } from '../common/ModalHeader'
 import { SegmentedNavTabs } from '../common/SegmentedNavTabs'
@@ -205,20 +206,20 @@ export function AssetEditModal({
       <form className="space-y-5" onSubmit={handleSave}>
         <ModalTitleRow onClose={onClose} title="Edit Asset" />
 
-        <div className="space-y-1 text-sm text-neutral-500">
+        <div className="space-y-1 text-[13px] text-text-3">
           <p>
-            <span className="font-medium text-neutral-700">Type:</span> {asset.assetType}
-            &middot; <span className="text-neutral-400">{asset.classifier}</span>
+            <span className="text-text-muted">Type:</span> {asset.assetType}
+            &middot; <span className="text-text-faint">{asset.classifier}</span>
           </p>
           {asset.currentPrice != null ? (
             <p>
-              <span className="font-medium text-neutral-700">Price:</span> {formatUnitPrice(asset.currentPrice)}
+              <span className="text-text-muted">Price:</span> {formatUnitPrice(asset.currentPrice)}
             </p>
           ) : null}
         </div>
 
         {hasConnectivityIssue ? (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-md bg-warning/10 px-4 py-3 text-[13px] text-warning">
             This ticker can&apos;t be found on Yahoo Finance. Update the tracking ticker or identifier to fix pricing.
           </div>
         ) : null}
@@ -236,7 +237,7 @@ export function AssetEditModal({
         {currentTab === 'info' ? (
           <div className="space-y-4">
             {isRealEstate ? (
-              <p className="text-sm text-neutral-500">
+              <p className="text-[13px] text-text-muted">
                 Real estate assets are managed through the Accounts page.
               </p>
             ) : (
@@ -255,7 +256,7 @@ export function AssetEditModal({
           </div>
         ) : null}
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <FormError>{error}</FormError> : null}
 
         {canEdit && !isRealEstate ? <ModalActions busy={isSaving} busyLabel="Saving…" disabled={!canSave} onCancel={onClose} /> : null}
       </form>

@@ -91,6 +91,15 @@ export function accountIdsForAccountGroupIds(accounts: Account[], groupIds: Acco
     .map((account) => account.id)
 }
 
+export function visibleAccountCountsByGroup(accounts: Account[]): Map<AccountGroupId, number> {
+  const visible = accounts.filter((account) => !account.hidden)
+  return new Map(ASSET_ACCOUNT_GROUPS.map((group) => [group.id, visible.filter((account) => accountMatchesAccountGroup(account, group.id)).length]))
+}
+
+export function visibleAccountCountsByOwner(accounts: Account[]): Map<string, number> {
+  return accounts.filter((account) => !account.hidden).reduce((counts, account) => counts.set(account.owner.id, (counts.get(account.owner.id) ?? 0) + 1), new Map<string, number>())
+}
+
 export function accountMatchesAccountGroup(account: Account, groupId: AccountGroupId): boolean {
   switch (groupId) {
     case 'DEPOSITS':

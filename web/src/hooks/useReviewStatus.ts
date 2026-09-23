@@ -29,7 +29,7 @@ export function useReviewStatus(options: boolean | ReviewStatusOptions = true) {
     query: BALANCE_REVIEWS_QUERY,
     pause: !enabled.balances,
   })
-  const [{ data: transactionData }] = useQuery<{ transactions: TransactionConnection }, { input: TransactionsInput }>({
+  const [{ data: transactionData }, refetchTransactions] = useQuery<{ transactions: TransactionConnection }, { input: TransactionsInput }>({
     query: TRANSACTIONS_QUERY,
     variables: { input: unreviewedTransactionsInput },
     pause: !enabled.transactions,
@@ -46,5 +46,6 @@ export function useReviewStatus(options: boolean | ReviewStatusOptions = true) {
   return {
     counts,
     hasReviewItems: Object.values(counts).some((count) => count > 0),
+    refetchTransactions: () => refetchTransactions({ requestPolicy: 'network-only' }),
   }
 }

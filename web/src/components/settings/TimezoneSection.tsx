@@ -34,23 +34,24 @@ export function TimezoneSection({ canWriteSettings }: { canWriteSettings: boolea
   }
 
   return (
-    <section className="space-y-3">
-      <div>
-        <SectionLabel>Timezone</SectionLabel>
-        <p className="mt-1 text-sm text-neutral-500">Used by reports, budgets, and daily balance snapshots.</p>
-      </div>
+    <div>
+      <SectionLabel>Timezone</SectionLabel>
+      <p className="mt-0.5 text-xs text-text-muted">Used by reports, budgets, and daily balance snapshots.</p>
 
       {queryResult.error ? <ErrorState message={queryResult.error.message} /> : null}
       {mutationResult.error ? <ErrorState message={mutationResult.error.message} /> : null}
 
       {canWriteSettings ? (
-        <SelectField className="max-w-md" disabled={queryResult.fetching || mutationResult.fetching} label="Instance timezone" onChange={(nextTimezone) => { void changeTimezone(nextTimezone) }} options={timezones} value={timezone} />
+        <SelectField className="mt-3.5 max-w-[360px]" disabled={queryResult.fetching || mutationResult.fetching} label="Instance timezone" onChange={(nextTimezone) => { void changeTimezone(nextTimezone) }} options={timezones} value={timezone} />
       ) : (
-        <div className="max-w-md rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-700 shadow-sm">
-          {queryResult.fetching ? 'Loading timezone...' : timezone}
+        <div className="mt-3.5 max-w-[360px]">
+          <span className="text-xs text-text-muted">Instance timezone</span>
+          <div className="mt-1 flex h-9 items-center rounded-md border border-border-strong bg-surface px-3 text-[13px] text-text-1 dark:bg-bg lg:h-8">
+            {queryResult.fetching ? 'Loading timezone...' : timezone}
+          </div>
         </div>
       )}
-    </section>
+    </div>
   )
 }
 

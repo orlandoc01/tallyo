@@ -1,93 +1,89 @@
+import { ArrowUpRight } from 'lucide-react'
 import { Navigate, useParams } from 'react-router'
-import { SegmentedNavTabs, type SegmentedNavTab } from '../components/common/SegmentedNavTabs'
-import { PageHeader } from '../components/common/PageHeader'
+import { ButtonLink } from '../components/common/Button'
+import { Card } from '../components/common/FormControls'
+import { PillTabs, type PillTab } from '../components/common/PillTabs'
 import { ConnectionReviewQueue } from '../components/institutions/ConnectionReviewQueue'
 import { UncategorizedQueue } from '../components/transactions/UncategorizedQueue'
 import { AssetReviewQueue } from '../components/wealth/AssetReviewQueue'
 import { BalanceReviewQueue } from '../components/wealth/BalanceReviewQueue'
 import { useAuth } from '../auth/useAuth'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { usePermissions } from '../hooks/usePermissions'
 import { useReviewStatus } from '../hooks/useReviewStatus'
 
 type ReviewTab = 'accounts' | 'assets' | 'balances' | 'transactions'
-const reviewTabs = ['transactions', 'accounts', 'balances', 'assets'] satisfies ReviewTab[]
+
+const tabLabels: Record<ReviewTab, string> = { transactions: 'Transactions', accounts: 'Accounts', balances: 'Balances', assets: 'Assets' }
+const reviewTabs = Object.keys(tabLabels) as ReviewTab[]
 
 export function ReviewPage() {
   const { tab: tabParam, asset_id: assetId } = useParams()
   const { disableTransactionTracking, disableWealthTracking } = useAuth()
-  const { canWrite } = usePermissions()
-  const canWriteTransactions = canWrite('transactions')
+  const { canRead, canWrite } = usePermissions()
+  const isMobile = useIsMobile()
+  const canReviewTransactions = canWrite('transactions') && !disableTransactionTracking
   const canWriteAccounts = canWrite('accounts')
-  const canWriteWealth = canWrite('wealth')
-  const canWriteAssets = canWrite('assets')
-  const canReviewBalances = canWriteWealth && !disableWealthTracking
-  const canReviewAssets = canWriteAssets && !disableWealthTracking
-  const { counts } = useReviewStatus({
-    transactions: canWriteTransactions && !disableTransactionTracking,
+  const canReviewBalances = canWrite('wealth') && !disableWealthTracking
+  const canReviewAssets = canWrite('assets') && !disableWealthTracking
+  const enabledTabs: Record<ReviewTab, boolean> = {
+    transactions: canReviewTransactions,
+    accounts: canWriteAccounts,
+    balances: canReviewBalances,
+    assets: canReviewAssets,
+  }
+  const { counts, refetchTransactions } = useReviewStatus({
+    transactions: canReviewTransactions,
     accounts: canWriteAccounts,
     balances: canReviewBalances,
     assets: canReviewAssets,
   })
-  const visibleTabs = reviewTabs.filter((candidate) => {
-    if (candidate === 'transactions') return canWriteTransactions && !disableTransactionTracking
-    if (candidate === 'assets') return canReviewAssets
-    if (candidate === 'balances') return canReviewBalances
-    return canWriteAccounts
-  })
+  const badges: Record<ReviewTab, number> = {
+    transactions: counts.transactions,
+    accounts: counts.connections,
+    balances: counts.balances,
+    assets: counts.assets,
+  }
+  const visibleTabs = reviewTabs.filter((candidate) => enabledTabs[candidate])
   const requestedTab = tabParam ?? (assetId ? 'assets' : undefined)
   const tab = visibleTabs.find((candidate) => candidate === requestedTab)
 
-  if (visibleTabs.length === 0) {
-    return <Navigate replace to="/" />
-  }
+  if (visibleTabs.length === 0) return <Navigate replace to="/" />
+  if (!tab) return <Navigate replace to={`/review/${visibleTabs[0]}`} />
 
-  if (!tab) {
-    return <Navigate replace to={`/review/${visibleTabs[0]}`} />
-  }
-
-  const tabItems: SegmentedNavTab[] = []
-  if (canWriteTransactions && !disableTransactionTracking) {
-    tabItems.push({
-      to: '/review/transactions',
-      children: <>Transactions{counts.transactions > 0 ? <ReviewBadge /> : null}</>,
-    })
-  }
-  if (canWriteAccounts) {
-    tabItems.push({
-      to: '/review/accounts',
-      children: <>Accounts{counts.connections > 0 ? <ReviewBadge count={counts.connections} /> : null}</>,
-    })
-  }
-  if (canReviewBalances) {
-    tabItems.push({
-      to: '/review/balances',
-      children: <>Balances{counts.balances > 0 ? <ReviewBadge count={counts.balances} /> : null}</>,
-    })
-  }
-  if (canReviewAssets) {
-    tabItems.push({
-      to: '/review/assets',
-      children: <>Assets{counts.assets > 0 ? <ReviewBadge count={counts.assets} /> : null}</>,
-    })
-  }
+  const tabs: PillTab<ReviewTab>[] = visibleTabs.map((value) => ({
+    value,
+    to: `/review/${value}`,
+    label: isMobile ? <span className="truncate text-xs">{tabLabels[value]}</span> : tabLabels[value],
+    badge: badges[value] > 0 ? badges[value] : undefined,
+  }))
+  const configureLlm = tab === 'transactions' && canRead('settings') ? (
+    <ButtonLink aria-label="Open LLM categorization settings" size={isMobile ? 'sm' : 'md'} to="/settings/ai-integration" variant="secondary">
+      Configure LLM
+      <ArrowUpRight aria-hidden className="h-3.5 w-3.5" />
+    </ButtonLink>
+  ) : null
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Review">
-        <SegmentedNavTabs ariaLabel="Review sections" items={tabItems} />
-      </PageHeader>
-      {tab === 'assets' ? <AssetReviewQueue /> : null}
-      {tab === 'balances' ? <BalanceReviewQueue /> : null}
-      {tab === 'accounts' ? <ConnectionReviewQueue /> : null}
-      {tab === 'transactions' ? <UncategorizedQueue /> : null}
-    </div>
-  )
-}
-
-function ReviewBadge({ count }: { count?: number }) {
-  return (
-    <span aria-hidden className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-bold text-amber-800">
-      {count ?? '!'}
-    </span>
+    <Card padded>
+      <h1 className="sr-only">Review</h1>
+      {isMobile ? (
+        <>
+          <PillTabs ariaLabel="Review sections" fitContent tabs={tabs} value={tab} variant="track" />
+          {configureLlm ? <div className="mt-3 flex justify-end">{configureLlm}</div> : null}
+        </>
+      ) : (
+        <div className="flex items-center justify-between gap-4">
+          <PillTabs ariaLabel="Review sections" tabs={tabs} value={tab} />
+          {configureLlm}
+        </div>
+      )}
+      <div className="mt-4 lg:mt-5">
+        {tab === 'assets' ? <AssetReviewQueue /> : null}
+        {tab === 'balances' ? <BalanceReviewQueue /> : null}
+        {tab === 'accounts' ? <ConnectionReviewQueue /> : null}
+        {tab === 'transactions' ? <UncategorizedQueue onReviewed={refetchTransactions} /> : null}
+      </div>
+    </Card>
   )
 }

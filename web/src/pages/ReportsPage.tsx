@@ -1,259 +1,205 @@
-import { useMemo, useState } from 'react'
-import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
-import { CollapsibleFilterSection } from '../components/common/CollapsibleFilterSection'
-import { filterSummary } from '../components/common/filterSummary'
-import { ErrorState } from '../components/common/ErrorState'
-import { FilterListPicker } from '../components/common/FilterListPicker'
-import { LoadingSpinner } from '../components/common/LoadingSpinner'
-import { PageHeader } from '../components/common/PageHeader'
+import { AlignLeft, PieChart } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { useLocation, useParams } from 'react-router'
+import { useQuery } from 'urql'
+import { Button } from '../components/common/Button'
+import { MobileFilterButton } from '../components/common/MobileFilterDropdown'
+import { QueryGate } from '../components/common/QueryGate'
 import { SegmentedControl } from '../components/common/SegmentedControl'
-import { UnderlineTabs, type UnderlineTabItem } from '../components/common/UnderlineTabs'
-import { SpendingBreakdown, type SpendingCategoryFocus } from '../components/reports/SpendingBreakdown'
-import { CategoryChecklist } from '../components/reports/CategoryFilter'
-import { DateRangeInputs } from '../components/reports/DateRangeSelector'
-import { ReportFilterDropdown, ReportFilterSection } from '../components/reports/ReportFilterDropdown'
-import { ReportsMobileFilters, type ReportsPendingFilter } from '../components/reports/ReportsMobileFilters'
+import { EXPENSE_TABS } from '../components/reports/expenseTabs'
+import { ExpensesHeaderCard } from '../components/reports/ExpensesHeaderCard'
+import { ExpensesFilterPanel } from '../components/reports/ExpensesFilterPanel'
+import { ExpensesMobileFilters } from '../components/reports/ExpensesMobileFilters'
+import { activeSpendingFilterCount, isAllTime, spendingFilterFromTransactionsFilter, spendingFilterToTransactionsFilter } from '../components/reports/expensesFilter'
+import { previousRange } from '../components/reports/expensesStats'
 import { ReportsTransactionList } from '../components/reports/ReportsTransactionList'
+import { SpendingBreakdown, type SpendingCategoryFocus } from '../components/reports/SpendingBreakdown'
 import { SpendingComparison } from '../components/reports/SpendingComparison'
 import { SpendingTrends } from '../components/reports/SpendingTrends'
-import { OwnerFilterSection } from '../components/reports/OwnerFilterDropdown'
-import { useMobileHeader } from '../components/layout/useMobileHeader'
-import { useCategories, useCategoryGroups } from '../hooks/useEntityQueries'
-import { useFiltersActive } from '../hooks/useFiltersActive'
+import { TransactionActivePills } from '../components/transactions/TransactionActivePills'
+import { useMobileHeader, useMobileHeaderActions } from '../components/layout/useMobileHeader'
+import { SPENDING_TOTALS_QUERY } from '../graphql/queries'
+import { useAccounts, useCategories, useCategoryGroups, useOwners } from '../hooks/useEntityQueries'
+import { useNormalizeTabParam } from '../hooks/useNormalizeTabParam'
 import { usePermissions } from '../hooks/usePermissions'
+import { GRANULARITY_OPTIONS } from '../hooks/useReportFilterParamCore'
 import { useSpendingByCategory } from '../hooks/useSpending'
-import { defaultDateRangeForSpendingTab, useSpendingFilterParams } from '../hooks/useSpendingFilterParams'
+import { defaultDateRangeForSpendingTab, type SpendingFilterTab, useSpendingFilterParams } from '../hooks/useSpendingFilterParams'
+import { useTransactionsSummary } from '../hooks/useTransactionsSummary'
 import { isOneOf } from '../hooks/urlParams'
-import type { TransactionsFilter } from '../types/graphql'
+import type { Category, SpendingByCategoryReport, SpendingFilter, TransactionsFilter } from '../types/graphql'
+import { localDateRangeToUtcDateTimeRange } from '../utils/dates'
 
-type ExpenseTab = 'breakdown' | 'trends' | 'comparison'
+const EXPENSE_TAB_VALUES = EXPENSE_TABS.map((tab) => tab.value)
+const isExpenseTab = (value: string): value is SpendingFilterTab => isOneOf(EXPENSE_TAB_VALUES, value)
 
-const expenseTabs: UnderlineTabItem<ExpenseTab>[] = [
-  { value: 'breakdown', children: 'Breakdown' },
-  { value: 'trends', children: 'Trends' },
-  { value: 'comparison', children: 'Comparison' },
-]
-const expenseTabValues = expenseTabs.map((tab) => tab.value)
-
-const groupingOptions: Array<{ value: 'category' | 'group'; label: string }> = [
-  { value: 'category', label: 'By category' },
-  { value: 'group', label: 'By group' },
-]
-
-function expenseTabFromParam(value: string | undefined): ExpenseTab | null {
-  return isOneOf(expenseTabValues, value) ? value : null
+function focusLabel(id: string, categories: Category[]) {
+  if (id === 'everything-else') return '• Everything else'
+  const category = categories.find((item) => item.id === id)
+  if (category) return `${category.emoji} ${category.name}`
+  const group = categories.find((item) => item.groupName === id)
+  return group ? `${group.groupEmoji} ${group.groupName}` : id
 }
 
-export function ReportsPage() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { tab: tabParam } = useParams()
-  const tab = expenseTabFromParam(tabParam)
-  const activeTab = tab ?? 'breakdown'
-  const {
-    dateFrom,
-    dateTo,
-    granularity, setGranularity,
-    categoryIds, setCategoryIds,
-    ownerIds, setOwnerIds,
-    groupBy, setGroupBy,
-    breakdownView, setBreakdownView,
-    trendsView, setTrendsView,
-    sort, setSort,
-    setMany,
-    filter,
-  } = useSpendingFilterParams(activeTab)
+const GROUPING_OPTIONS = [
+  { value: 'category', label: <><span className="lg:hidden">Category</span><span className="hidden lg:inline">By category</span></> },
+  { value: 'group', label: <><span className="lg:hidden">Group</span><span className="hidden lg:inline">By group</span></> },
+] as const
+const VIEW_OPTIONS = [
+  { value: 'pie', ariaLabel: 'Pie', iconOnly: true, label: <PieChart aria-hidden className="h-3.5 w-3.5" /> },
+  { value: 'bar', ariaLabel: 'Bars', iconOnly: true, label: <AlignLeft aria-hidden className="h-3.5 w-3.5" /> },
+] as const
 
-  const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null)
-  const [focusedCategoryIds, setFocusedCategoryIds] = useState<string[] | null>(null)
+// A focus belongs to the tab it was made on; switching tabs drops it.
+interface TabFocus { tab: SpendingFilterTab; focus: SpendingCategoryFocus }
+
+export function ReportsPage() {
+  const { tab: tabParam } = useParams()
+  const location = useLocation()
+  const activeTab: SpendingFilterTab = tabParam && isExpenseTab(tabParam) ? tabParam : 'breakdown'
+  const breakdownPath = useCallback(() => `/expenses/breakdown${location.search}`, [location.search])
+  useNormalizeTabParam('expenses', tabParam, isExpenseTab, breakdownPath)
+  const params = useSpendingFilterParams(activeTab)
+  const { dateFrom, dateTo, granularity, categoryIds, accountIds, ownerIds, showHidden, groupBy, breakdownView, sort, setMany, filter } = params
+  const now = useMemo(() => new Date(), [])
+  const hasDate = activeTab !== 'comparison'
+
+  const [tabFocus, setTabFocus] = useState<TabFocus | null>(null)
+  const focus = tabFocus?.tab === activeTab ? tabFocus.focus : null
   const [expanded, setExpanded] = useState(false)
   const { canRead } = usePermissions()
+  const canReadTransactions = canRead('transactions')
   const { categories } = useCategories()
-  const [desktopCategoriesOpen, setDesktopCategoriesOpen] = useState(false)
+  const { categoryGroups } = useCategoryGroups()
+  const { accounts } = useAccounts()
+  const { owners } = useOwners()
   const mobile = useMobileHeader()
 
-  function applyFilter(pending: ReportsPendingFilter) {
-    setMany(pending)
-    clearCategoryFocus()
-    setExpanded(false)
-    mobile.closeFilter()
-  }
+  const values = useMemo(() => ({ dateFrom, dateTo, categoryIds, accountIds, ownerIds, showHidden }), [dateFrom, dateTo, categoryIds, accountIds, ownerIds, showHidden])
+  const defaultRange = defaultDateRangeForSpendingTab(activeTab, granularity, now)
+  const defaultDateTimeRange = localDateRangeToUtcDateTimeRange(defaultRange.dateFrom, defaultRange.dateTo)
+  const dateFiltered = hasDate && (dateFrom !== defaultRange.dateFrom || dateTo !== defaultRange.dateTo)
+  const isDateFiltered = useCallback((candidate: TransactionsFilter) => candidate.datetimeRange?.from !== defaultDateTimeRange?.from || candidate.datetimeRange?.to !== defaultDateTimeRange?.to, [defaultDateTimeRange?.from, defaultDateTimeRange?.to])
+  const chipFilter = useMemo(() => spendingFilterToTransactionsFilter(values, now), [values, now])
+  // Pills always carry the closed range so removing another pill keeps the dates.
+  const pillFilter = useMemo(() => ({ ...chipFilter, datetimeRange: dateFiltered ? filter.datetimeRange : undefined }), [chipFilter, dateFiltered, filter.datetimeRange])
+  const filterCount = activeSpendingFilterCount(values, dateFiltered)
 
-  function clearFilter() {
-    const { dateFrom: nextDateFrom, dateTo: nextDateTo } = defaultDateRangeForSpendingTab(activeTab, granularity)
-    setMany({
-      dateFrom: nextDateFrom,
-      dateTo: nextDateTo,
-      categoryIds: [],
-      ownerIds: [],
-    })
-    clearCategoryFocus()
-    setExpanded(false)
-    mobile.closeFilter()
-  }
-
-  function handleDateRangeChange(next: { dateFrom: string; dateTo: string }) {
-    setMany({ dateFrom: next.dateFrom, dateTo: next.dateTo })
-    clearCategoryFocus()
-    setExpanded(false)
-  }
-
-  function handleGranularityChange(nextGranularity: typeof granularity) {
-    setGranularity(nextGranularity)
-    clearCategoryFocus()
-    setExpanded(false)
-  }
-
-  function handleCategoryFilterChange(nextCategoryIds: string[]) {
-    setCategoryIds(nextCategoryIds)
-    clearCategoryFocus()
-    setExpanded(false)
-  }
-
-  function handleTabChange(nextTab: ExpenseTab) {
-    if (focusedCategoryId === 'everything-else') clearCategoryFocus()
-    navigate({ pathname: `/expenses/${nextTab}`, search: location.search })
-  }
-
-  function handleBreakdownCategoryFocusChange(focus: SpendingCategoryFocus | null) {
-    setFocusedCategoryId(focus?.id ?? null)
-    setFocusedCategoryIds(focus?.categoryIds ?? null)
-  }
-
-  function handleTrendsCategoryFocusChange(categoryId: string | null) {
-    setFocusedCategoryId(categoryId)
-    setFocusedCategoryIds(null)
-  }
-
-  function clearCategoryFocus() {
-    setFocusedCategoryId(null)
-    setFocusedCategoryIds(null)
-  }
-
-  const transactionFilter: TransactionsFilter = useMemo(() => {
-    let resolvedCategoryIds: string[] | undefined
-    if (focusedCategoryIds) {
-      resolvedCategoryIds = focusedCategoryIds
-    } else if (focusedCategoryId) {
-      if (groupBy === 'group') {
-        resolvedCategoryIds = categories
-          .filter((c) => c.groupName === focusedCategoryId)
-          .map((c) => c.id)
-      } else {
-        resolvedCategoryIds = [focusedCategoryId]
-      }
-    } else if (categoryIds.length) {
-      resolvedCategoryIds = categoryIds
-    }
-    return {
-      datetimeRange: filter.datetimeRange,
-      isHidden: false,
-      ...(resolvedCategoryIds?.length ? { categoryIds: resolvedCategoryIds } : {}),
-      ...(ownerIds.length ? { ownerIds } : {}),
-    }
-  }, [filter.datetimeRange, focusedCategoryId, focusedCategoryIds, categoryIds, groupBy, categories, ownerIds])
-
-  const { categoryGroups } = useCategoryGroups()
   const spending = useSpendingByCategory(filter)
+  const previous = useMemo(() => previousRange({ dateFrom, dateTo }), [dateFrom, dateTo])
+  const previousFilter = useMemo((): SpendingFilter => ({ ...filter, datetimeRange: localDateRangeToUtcDateTimeRange(previous.dateFrom, previous.dateTo) ?? {} }), [filter, previous.dateFrom, previous.dateTo])
+  const [previousResult] = useQuery<{ spendingByCategory: SpendingByCategoryReport }, { filter: SpendingFilter }>({ query: SPENDING_TOTALS_QUERY, variables: { filter: previousFilter } })
+  const summary = useTransactionsSummary(params.transactionFilter, !canReadTransactions)
+  const allSummary = useTransactionsSummary(useMemo(() => ({ isHidden: showHidden ? undefined : false }), [showHidden]), !canReadTransactions)
 
-  const activePeriods = activeTab === 'breakdown' && spending.period ? [spending.period] : spending.periods
-  const allCategories = activePeriods.flatMap((p) => p.categories.map((c) => c.category))
-  const focusedCategory = allCategories.find((cat) => cat.id === focusedCategoryId) ??
-    (groupBy === 'group'
-      ? (() => {
-          const grouped = activePeriods.flatMap((p) => p.categories)
-          const g = grouped.find((c) => c.category.groupName === String(focusedCategoryId))
-          return g ? { id: focusedCategoryId!, name: g.category.groupName, emoji: g.category.groupEmoji, groupName: g.category.groupName, groupEmoji: g.category.groupEmoji, kind: 'EXPENSE' as const, sortOrder: 0 } : undefined
-        })()
-      : undefined)
-
-  const focusedCategoryDisplay = focusedCategoryId === 'everything-else'
-    ? { emoji: '•', name: 'Everything else' }
-    : focusedCategory
-    ? { emoji: focusedCategory.emoji, name: focusedCategory.name }
-    : undefined
-  const defaultDateRange = defaultDateRangeForSpendingTab(activeTab, granularity)
-  const dateRangeFiltered = activeTab !== 'comparison' && (dateFrom !== defaultDateRange.dateFrom || dateTo !== defaultDateRange.dateTo)
-  const activeFilterCount = ownerIds.length + categoryIds.length + (dateRangeFiltered ? 1 : 0)
-  useFiltersActive(activeFilterCount)
-
-  if (!tab) {
-    return <Navigate replace to={{ pathname: '/expenses/breakdown', search: location.search }} />
+  function setFocus(next: SpendingCategoryFocus | null) {
+    setTabFocus(next ? { tab: activeTab, focus: next } : null)
+    setExpanded(false)
   }
+
+  function applyTransactionsFilter(next: TransactionsFilter) {
+    setMany(spendingFilterFromTransactionsFilter(next, values, now))
+    setFocus(null)
+  }
+
+  function clearFilters() {
+    setMany({ ...defaultRange, categoryIds: [], accountIds: [], ownerIds: [], showHidden: undefined })
+    setFocus(null)
+    mobile.closeFilter()
+  }
+
+  const mobileHeaderActions = useMemo(() => (
+    <MobileFilterButton active={mobile.filterOpen} ariaLabel="Open expense filters" count={filterCount} onClick={mobile.filterOpen ? mobile.closeFilter : mobile.openFilter} />
+  ), [filterCount, mobile.closeFilter, mobile.filterOpen, mobile.openFilter])
+  useMobileHeaderActions(mobileHeaderActions)
+
+  const transactionFilter: TransactionsFilter = useMemo(
+    () => focus?.categoryIds.length ? { ...params.transactionFilter, categoryIds: focus.categoryIds } : params.transactionFilter,
+    [params.transactionFilter, focus],
+  )
+
+  const report = spending.report
+  const focusedLabel = focus ? focusLabel(focus.id, categories) : null
+  const lookups = useMemo(() => ({ accounts, categories, owners }), [accounts, categories, owners])
+  const activeRow = filterCount > 0 ? (
+    <TransactionActivePills
+      allCount={allSummary.summary?.totalCount}
+      dateValue={isAllTime(values, now) ? 'All time' : undefined}
+      filter={pillFilter}
+      lookups={lookups}
+      now={now}
+      onChange={(next) => applyTransactionsFilter({ ...next, datetimeRange: next.datetimeRange ?? (dateFiltered ? defaultDateTimeRange : filter.datetimeRange) })}
+      totalCount={summary.summary?.totalCount}
+    />
+  ) : undefined
+
+  const controls = (
+    <>
+      {hasDate ? <SegmentedControl ariaLabel="Expense grouping" onChange={(value) => { params.setGroupBy(value); setFocus(null) }} options={GROUPING_OPTIONS} value={groupBy} /> : null}
+      {activeTab === 'trends' ? <SegmentedControl ariaLabel="Granularity" onChange={(value) => { params.setGranularity(value); setFocus(null) }} options={GRANULARITY_OPTIONS} value={granularity} /> : null}
+      {activeTab === 'breakdown' ? <SegmentedControl ariaLabel="Spending chart view" onChange={params.setBreakdownView} options={VIEW_OPTIONS} value={breakdownView} /> : null}
+    </>
+  )
 
   return (
-    <div className="space-y-4 lg:space-y-6">
-      <PageHeader
-        actions={(
-          <>
-            {activeTab !== 'comparison' ? (
-              <SegmentedControl ariaLabel="Expense grouping" options={groupingOptions} value={groupBy} onChange={setGroupBy} />
-            ) : null}
-            <ReportFilterDropdown activeFilterCount={activeFilterCount} onClear={clearFilter}>
-              <div className="space-y-4">
-                {activeTab !== 'comparison' ? (
-                  <ReportFilterSection active={dateRangeFiltered}>
-                    <DateRangeInputs dateFrom={dateFrom} dateTo={dateTo} layout="compact" onChange={handleDateRangeChange} />
-                  </ReportFilterSection>
-                ) : null}
-                <OwnerFilterSection onChange={setOwnerIds} selectedOwners={ownerIds} />
-                <CollapsibleFilterSection active={categoryIds.length > 0} expanded={desktopCategoriesOpen} label="Categories" summary={filterSummary(categoryIds.length)} onToggle={() => setDesktopCategoriesOpen((open) => !open)}>
-                  <FilterListPicker>
-                    <CategoryChecklist categoryGroups={categoryGroups} onChange={handleCategoryFilterChange} selectedCategoryIds={categoryIds} />
-                  </FilterListPicker>
-                </CollapsibleFilterSection>
-              </div>
-            </ReportFilterDropdown>
-          </>
+    <div className="space-y-3">
+      <h1 className="sr-only">Expenses</h1>
+      <ExpensesHeaderCard
+        controls={controls}
+        filterCount={filterCount}
+        filters={(caretRight) => (
+          <ExpensesFilterPanel
+            accounts={accounts}
+            activeRow={activeRow}
+            caretRight={caretRight}
+            categoryGroups={categoryGroups}
+            clearable={filterCount > 0}
+            dateFiltered={dateFiltered}
+            filter={chipFilter}
+            now={now}
+            onChange={applyTransactionsFilter}
+            onClear={clearFilters}
+            onRuleCreated={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })}
+            owners={owners}
+            showDate={hasDate}
+          />
         )}
-        className="flex-nowrap gap-2"
-        title="Expenses"
+        stats={{ total: report?.totalAmount ?? 0, transactionCount: report?.transactionCount ?? 0, categoryCount: report?.categories.filter((item) => item.totalAmount !== 0).length ?? 0, dateFrom, dateTo, previousTotal: previousResult.data?.spendingByCategory.totalAmount ?? null, previousLabel: previous.label, now }}
+        tab={activeTab}
       >
-        <UnderlineTabs ariaLabel="Expense report views" items={expenseTabs} value={tab} onChange={handleTabChange} />
-      </PageHeader>
-      {spending.fetching && activeTab === 'breakdown' ? <LoadingSpinner label="Loading spending report" /> : null}
-      {spending.error && activeTab !== 'comparison' ? <ErrorState message="Could not load spending data." onRetry={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })} /> : null}
-      {activeTab === 'breakdown' && !spending.fetching ? <SpendingBreakdown expanded={expanded} focusedCategoryId={focusedCategoryId} groupBy={groupBy} onCategoryFocusChange={handleBreakdownCategoryFocusChange} onToggleExpanded={() => setExpanded((e) => !e)} onViewChange={setBreakdownView} period={spending.period} view={breakdownView} /> : null}
-      {activeTab === 'trends' ? <SpendingTrends focusedCategoryId={focusedCategoryId} granularity={granularity} groupBy={groupBy} onCategoryFocusChange={handleTrendsCategoryFocusChange} onGranularityChange={handleGranularityChange} onViewChange={setTrendsView} periods={spending.periods} view={trendsView} /> : null}
-      {activeTab === 'comparison' ? <SpendingComparison categoryIds={categoryIds} owners={ownerIds.length ? ownerIds : undefined} /> : null}
-      {focusedCategoryDisplay && activeTab !== 'comparison' ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-900 dark:border-brand-300 dark:bg-brand-950/70 dark:text-neutral-100">
-          <div>
-            Showing <span className="font-semibold">{focusedCategoryDisplay.emoji} {focusedCategoryDisplay.name}</span> transactions{activeTab === 'trends' ? ' across the selected period range' : ' for this period'}.
-          </div>
-          <button className="font-semibold text-brand-700 hover:text-brand-900 dark:text-brand-200 dark:hover:text-white" onClick={clearCategoryFocus} type="button">Clear filter</button>
+        {activeTab === 'comparison' ? (
+          <SpendingComparison accountIds={accountIds} categoryIds={categoryIds} owners={ownerIds.length ? ownerIds : undefined} showHidden={showHidden} />
+        ) : (
+          <QueryGate data={report ?? undefined} empty={!report?.categories.some((item) => item.totalAmount !== 0)} emptyTitle="No spending in this period" emptyDescription="Try another date range or clear the filters." error={spending.error} errorPrefix="Could not load spending data" fetching={spending.fetching} loadingLabel="Loading spending report" onRetry={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })}>
+            {activeTab === 'breakdown' ? (
+              <SpendingBreakdown expanded={expanded} focusedCategoryId={focus?.id ?? null} groupBy={groupBy} onCategoryFocusChange={setFocus} onToggleExpanded={() => setExpanded((value) => !value)} period={spending.period} view={breakdownView} />
+            ) : (
+              <SpendingTrends focusedCategoryId={focus?.id ?? null} groupBy={groupBy} onCategoryFocusChange={setFocus} periods={spending.periods} />
+            )}
+          </QueryGate>
+        )}
+      </ExpensesHeaderCard>
+      {focusedLabel && hasDate ? (
+        <div className="flex items-center justify-between gap-3 px-1 text-[13px] text-text-3">
+          <span>Showing <span className="font-medium text-text-1">{focusedLabel}</span> transactions.</span>
+          <Button onClick={() => setFocus(null)} size="sm" variant="ghost">Clear filter</Button>
         </div>
       ) : null}
-      {canRead('transactions') && activeTab !== 'comparison' ? (
-        <ReportsTransactionList
-          categories={categories}
-          onCategoryUpdated={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })}
-          sort={sort}
-          onSortChange={setSort}
-          transactionFilter={transactionFilter}
+      {canReadTransactions && hasDate ? (
+        <ReportsTransactionList categories={categories} onCategoryUpdated={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })} sort={sort} onSortChange={params.setSort} transactionFilter={transactionFilter} />
+      ) : null}
+      {mobile.filterOpen ? (
+        <ExpensesMobileFilters
+          filter={chipFilter}
+          isDateFiltered={isDateFiltered}
+          now={now}
+          onApply={(next) => { applyTransactionsFilter(next); mobile.closeFilter() }}
+          onClear={clearFilters}
+          onClose={mobile.closeFilter}
+          onRuleCreated={() => spending.reexecuteQuery({ requestPolicy: 'network-only' })}
+          showDate={hasDate}
         />
       ) : null}
-
-      {mobile.filterOpen && (
-        <ReportsMobileFilters
-          activeTab={activeTab}
-          breakdownView={breakdownView}
-          categoryIds={categoryIds}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          granularity={granularity}
-          groupBy={groupBy}
-          ownerIds={ownerIds}
-          trendsView={trendsView}
-          onApply={applyFilter}
-          onBreakdownViewChange={setBreakdownView}
-          onClear={clearFilter}
-          onClose={mobile.closeFilter}
-          onGranularityChange={handleGranularityChange}
-          onGroupByChange={setGroupBy}
-          onTrendsViewChange={setTrendsView}
-        />
-      )}
     </div>
   )
 }
