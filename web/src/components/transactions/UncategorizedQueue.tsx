@@ -11,7 +11,6 @@ import { EmptyState } from '../common/EmptyState'
 import { Card, FormError, FormSuccess } from '../common/FormControls'
 import { QueryGate } from '../common/QueryGate'
 import { TransactionDetailsOverlay } from './TransactionDetailsOverlay'
-import { TransactionDetailsPane } from './TransactionDetailsPane'
 import { MobileTransactionRow, TransactionRow } from './TransactionRow'
 
 const PAGE_SIZE = 50
@@ -198,17 +197,15 @@ export function UncategorizedQueue({ onReviewed }: { onReviewed?: () => void }) 
           </Card>
         )}
         {selectedTransaction ? (
-          <TransactionDetailsOverlay label={`Details for ${selectedTransaction.merchantName || selectedTransaction.originalName || 'transaction'}`} onClose={() => setSelectedId(null)} titleId={detailsTitleId}>
-            <TransactionDetailsPane
-              categories={categories}
-              key={selectedTransaction.id}
-              onClose={() => setSelectedId(null)}
-              onDelete={() => { setSelectedId(null); refetch() }}
-              onUpdate={refetch}
-              titleId={detailsTitleId}
-              transaction={selectedTransaction}
-            />
-          </TransactionDetailsOverlay>
+          <TransactionDetailsOverlay
+            categories={categories}
+            label={`Details for ${selectedTransaction.merchantName || selectedTransaction.originalName || 'transaction'}`}
+            onClose={() => setSelectedId(null)}
+            onDelete={() => { setSelectedId(null); refetch() }}
+            onUpdate={refetch}
+            titleId={detailsTitleId}
+            transaction={selectedTransaction}
+          />
         ) : null}
       </div>
     </QueryGate>

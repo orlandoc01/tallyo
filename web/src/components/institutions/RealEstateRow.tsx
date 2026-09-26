@@ -5,10 +5,11 @@ import type { Account } from '../../types/graphql'
 import { Button } from '../common/Button'
 import { FormError, TextField } from '../common/FormControls'
 import { AccountTable } from './AccountRows'
-import { ActionMenuItem } from '../common/ActionMenuItem'
 import { InstitutionCard } from './InstitutionCard'
 import { formatAddress } from './propertyAddress'
-import { RowActionsMenu } from '../common/RowActionsMenu'
+import { RowActionsMenu, type RowAction } from '../common/RowActionsMenu'
+import { SheetAvatar, SheetHero } from '../common/SheetHero'
+import { institutionColor } from '../../utils/colors'
 
 export function RealEstateRow({
   connectionId,
@@ -63,6 +64,18 @@ export function RealEstateRow({
   }
 
   const address = formatAddress(accountWealthProperty)
+  const title = account?.name || address || 'Home'
+  const menuItems: RowAction[] = [
+    ...(onUpdated ? [{
+      label: editing ? 'Hide update form' : 'Update value',
+      onSelect: () => {
+        setConfirming(false)
+        setIsMenuOpen(false)
+        setEditing((current) => !current)
+      },
+    }] : []),
+    ...(onUnlink ? [{ label: confirming ? 'Confirm remove' : 'Remove', destructive: true, onSelect: () => { void handleUnlink() } }] : []),
+  ]
 
   return (
     <InstitutionCard
@@ -70,26 +83,18 @@ export function RealEstateRow({
       menu={onUpdated || onUnlink ? (
         <RowActionsMenu
           ariaLabel="Open home actions"
+          hero={<SheetHero avatar={<SheetAvatar color={institutionColor(title)} glyph={title.charAt(0).toUpperCase()} />} sub={address || 'Home'} title={title} />}
           isOpen={isMenuOpen}
+          items={menuItems}
           onToggle={() => {
             setConfirming(false)
             setIsMenuOpen((open) => !open)
           }}
-        >
-          {onUpdated ? (
-            <ActionMenuItem onClick={() => {
-              setConfirming(false)
-              setIsMenuOpen(false)
-              setEditing((current) => !current)
-            }}>
-              {editing ? 'Hide update form' : 'Update value'}
-            </ActionMenuItem>
-          ) : null}
-          {onUnlink ? <ActionMenuItem destructive onClick={handleUnlink}>{confirming ? 'Confirm remove' : 'Remove'}</ActionMenuItem> : null}
-        </RowActionsMenu>
+          title="Property"
+        />
       ) : undefined}
       subtitle={address || 'Home'}
-      title={account?.name || address || 'Home'}
+      title={title}
       titleAttr={address || undefined}
     >
       {editing ? (

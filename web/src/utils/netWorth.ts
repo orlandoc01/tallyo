@@ -1,4 +1,4 @@
-import type { Account, Asset, NetWorthInput, NetWorthPoint, NetWorthReport } from '../types/graphql'
+import type { Account, Asset, ClassifierBreakdown, HoldingRollup, NetWorthInput, NetWorthPoint, NetWorthReport } from '../types/graphql'
 import { accountIdsForAccountGroupIds, ASSET_ACCOUNT_GROUPS, type AccountGroupId } from './accountGroups'
 
 export interface NetWorthChange {
@@ -48,6 +48,10 @@ export function netWorthInputFromFilters(ownerIds: string[], accountIds: string[
 
 export function hasNetWorthFilters(input: NetWorthInput) {
   return Boolean(input.ownerIds?.length || input.accountIds?.length)
+}
+
+export function classifierForHolding(report: NetWorthReport, holding: HoldingRollup): ClassifierBreakdown | null {
+  return report.classifierBreakdown.find((group) => group.holdings.some((item) => item.asset.id === holding.asset.id)) ?? null
 }
 
 export function assetFromNetWorthReport(report: NetWorthReport, assetID: string): Asset | null {

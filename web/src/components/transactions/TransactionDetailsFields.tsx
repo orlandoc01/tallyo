@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import type { Category, Transaction } from '../../types/graphql'
-import { accountDisplayLabel, groupAccountsByInstitution } from '../../utils/accounts'
+import { accountDisplayLabel, accountInstitutionLabel } from '../../utils/accounts'
 import { institutionColor } from '../../utils/colors'
 import { formatTransactionDatetime } from '../../utils/dates'
 import { CategoryTag } from '../common/Tag'
@@ -29,7 +29,7 @@ export function TransactionDetailsFields({ canWriteTransactions, categories, isS
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const categoryButtonRef = useRef<HTMLButtonElement>(null)
   const account = transaction.account
-  const institution = groupAccountsByInstitution([account])[0].label
+  const institution = accountInstitutionLabel(account)
 
   return (
     <>

@@ -2,9 +2,10 @@ import { useState } from 'react'
 import type { Account, EVMWallet } from '../../types/graphql'
 import { syncChipStatus } from './accountCards'
 import { AccountTable } from './AccountRows'
-import { ActionMenuItem } from '../common/ActionMenuItem'
 import { InstitutionCard, ProviderChip } from './InstitutionCard'
-import { RowActionsMenu } from '../common/RowActionsMenu'
+import { RowActionsMenu, type RowAction } from '../common/RowActionsMenu'
+import { SheetAvatar, SheetHero } from '../common/SheetHero'
+import { institutionColor } from '../../utils/colors'
 
 export function EVMWalletRow({
   account,
@@ -42,6 +43,13 @@ export function EVMWalletRow({
     onDelete?.()
   }
 
+  const title = account?.name || wallet.address
+  const menuItems: RowAction[] = [
+    ...(isActive && onDisconnect ? [{ label: 'Disconnect', onSelect: () => { setIsMenuOpen(false); onDisconnect() } }] : []),
+    ...(!isActive && onReconnect ? [{ label: 'Reconnect', onSelect: () => { setIsMenuOpen(false); onReconnect() } }] : []),
+    ...(onDelete ? [{ label: confirming ? 'Confirm delete' : 'Delete', destructive: true, onSelect: handleDelete }] : []),
+  ]
+
   return (
     <InstitutionCard
       chips={(
@@ -52,14 +60,17 @@ export function EVMWalletRow({
         </ProviderChip>
       )}
       menu={onDisconnect || onReconnect || onDelete ? (
-        <RowActionsMenu ariaLabel="Open wallet actions" isOpen={isMenuOpen} onToggle={toggleMenu}>
-          {isActive && onDisconnect ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onDisconnect() }}>Disconnect</ActionMenuItem> : null}
-          {!isActive && onReconnect ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onReconnect() }}>Reconnect</ActionMenuItem> : null}
-          {onDelete ? <ActionMenuItem destructive onClick={handleDelete}>{confirming ? 'Confirm delete' : 'Delete'}</ActionMenuItem> : null}
-        </RowActionsMenu>
+        <RowActionsMenu
+          ariaLabel="Open wallet actions"
+          hero={<SheetHero avatar={<SheetAvatar color={institutionColor(title)} glyph={title.charAt(0).toUpperCase()} />} sub={`EVM wallet · ${sync.text}`} title={title} />}
+          isOpen={isMenuOpen}
+          items={menuItems}
+          onToggle={toggleMenu}
+          title="Wallet"
+        />
       ) : undefined}
       subtitle={`EVM wallet · ${wallet.address}`}
-      title={account?.name || wallet.address}
+      title={title}
       titleAttr={wallet.address}
     >
       {account ? <AccountTable accounts={[account]} amountsHidden={amountsHidden} onAccountClick={onAccountClick} /> : null}

@@ -1,5 +1,6 @@
 import { addDays, startOfDay } from 'date-fns'
 import type { RecurrenceInterval, RecurringCharge } from '../../types/graphql'
+import { accountDisplayLabel } from '../../utils/accounts'
 import { parseLocalDate } from '../../utils/dates'
 
 type Cadence = RecurrenceInterval | null
@@ -15,6 +16,10 @@ const CADENCE_TABLE: ReadonlyArray<{ interval: Cadence; label: string; perMonth:
 
 function cadenceEntry(interval: Cadence) {
   return CADENCE_TABLE.find((entry) => entry.interval === interval) ?? CADENCE_TABLE[CADENCE_TABLE.length - 1]
+}
+
+export function cadenceLabel(interval: Cadence): string {
+  return cadenceEntry(interval).label
 }
 
 export function monthlyAmount(amount: number, interval: Cadence): number {
@@ -63,4 +68,9 @@ export function recurringStats(charges: RecurringCharge[], now: Date): Recurring
 
 export function latestTransaction<T extends { datetime: string }>(transactions: T[]): T | undefined {
   return transactions.reduce<T | undefined>((latest, transaction) => (!latest || transaction.datetime > latest.datetime ? transaction : latest), undefined)
+}
+
+export function chargeAccount(charge: RecurringCharge) {
+  const account = latestTransaction(charge.transactions)?.account
+  return account ? accountDisplayLabel(account) : '—'
 }

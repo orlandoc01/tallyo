@@ -7,11 +7,11 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities'
 import { DELETE_CATEGORY_GROUP_MUTATION, REORDER_CATEGORIES_MUTATION } from '../../graphql/mutations'
 import type { Category, CategoryGroup } from '../../types/graphql'
-import { ActionMenuItem } from '../common/ActionMenuItem'
 import { IconButton } from '../common/Button'
 import { ClickableRow } from '../common/ClickableRow'
 import { Card } from '../common/FormControls'
 import { RowActionsMenu } from '../common/RowActionsMenu'
+import { SheetAvatar, SheetHero } from '../common/SheetHero'
 import { Tag } from '../common/Tag'
 import { CATEGORY_KIND_TINT } from './categoryKindTint'
 
@@ -91,7 +91,7 @@ export function CategoryGroupCard({ group, canWrite, onEditGroup, onAddCategory,
               <IconButton ariaLabel={`Edit ${group.name} group`} onClick={onEditGroup} size="xs"><Pencil className="h-3.5 w-3.5" /></IconButton>
               <IconButton ariaLabel={`Delete ${group.name} group`} className="text-text-muted" disabled={!canDelete} onClick={handleDeleteGroup} size="xs" title={deleteTitle}><Trash2 className="h-3.5 w-3.5" /></IconButton>
             </div>
-            <GroupActionsMenu canDelete={canDelete} deleteTitle={deleteTitle} groupName={group.name} onDelete={handleDeleteGroup} onRename={onEditGroup} />
+            <GroupActionsMenu canDelete={canDelete} deleteTitle={deleteTitle} group={group} onAddCategory={onAddCategory} onDelete={handleDeleteGroup} onRename={onEditGroup} />
           </>
         ) : null}
       </div>
@@ -124,22 +124,33 @@ export function CategoryGroupCard({ group, canWrite, onEditGroup, onAddCategory,
   )
 }
 
-function GroupActionsMenu({ canDelete, deleteTitle, groupName, onDelete, onRename }: {
+function GroupActionsMenu({ canDelete, deleteTitle, group, onAddCategory, onDelete, onRename }: {
   canDelete: boolean
   deleteTitle?: string
-  groupName: string
+  group: CategoryGroup
+  onAddCategory: () => void
   onDelete: () => void
   onRename: () => void
 }) {
   const [open, setOpen] = useState(false)
   const toggle = () => setOpen((current) => !current)
+  const count = group.categories.length
+  const closeThen = (action: () => void) => () => { setOpen(false); action() }
 
   return (
     <div className="lg:hidden">
-      <RowActionsMenu ariaLabel={`${groupName} group actions`} isOpen={open} onToggle={toggle}>
-        <ActionMenuItem onClick={() => { setOpen(false); onRename() }}>Rename</ActionMenuItem>
-        <ActionMenuItem className="disabled:cursor-not-allowed disabled:opacity-40" destructive disabled={!canDelete} onClick={() => { setOpen(false); onDelete() }} title={deleteTitle}>Delete</ActionMenuItem>
-      </RowActionsMenu>
+      <RowActionsMenu
+        ariaLabel={`${group.name} group actions`}
+        hero={<SheetHero avatar={<SheetAvatar glyph={group.emoji} />} sub={`${count} ${count === 1 ? 'category' : 'categories'}`} title={group.name} />}
+        isOpen={open}
+        items={[
+          { label: 'Rename', onSelect: closeThen(onRename) },
+          { label: 'Add category', onSelect: closeThen(onAddCategory) },
+          { label: 'Delete', destructive: true, disabled: !canDelete, title: deleteTitle, onSelect: closeThen(onDelete) },
+        ]}
+        onToggle={toggle}
+        title="Category group"
+      />
     </div>
   )
 }

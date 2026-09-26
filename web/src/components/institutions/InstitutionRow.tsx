@@ -4,10 +4,11 @@ import type { Account, Connection, PlaidItem, SimpleFinConnection } from '../../
 import { formatDisplayDate, formatScheduleTime } from '../../utils/dates'
 import { syncChipStatus } from './accountCards'
 import { AccountTable } from './AccountRows'
-import { ActionMenuItem } from '../common/ActionMenuItem'
 import { healthMessage } from './connectionReview'
 import { InstitutionCard, ProviderChip } from './InstitutionCard'
-import { RowActionsMenu } from '../common/RowActionsMenu'
+import { RowActionsMenu, type RowAction } from '../common/RowActionsMenu'
+import { SheetAvatar, SheetHero } from '../common/SheetHero'
+import { institutionColor } from '../../utils/colors'
 
 export type InstitutionRowActions = {
   onAccountClick: (account: Account) => void
@@ -56,6 +57,28 @@ export function InstitutionRow({
     setIsMenuOpen((open) => !open)
   }
 
+  const closeThen = (action: () => void) => () => { setIsMenuOpen(false); action() }
+  const menuItems: RowAction[] = [
+    ...(isActive && plaidItem && onUpdateLogin ? [{ label: 'Update login', onSelect: closeThen(() => onUpdateLogin(plaidItem)) }] : []),
+    ...(isActive && plaidItem && onSyncSettings ? [{ label: 'Sync settings', onSelect: closeThen(() => onSyncSettings(connection, plaidItem)) }] : []),
+    ...(isActive && onAddManualAccount ? [{ label: 'Add manual account', onSelect: closeThen(() => onAddManualAccount(connection.id, name)) }] : []),
+    ...(isActive && onDisconnect ? [{ label: 'Disconnect', onSelect: closeThen(() => onDisconnect(connection)) }] : []),
+    ...(!isActive && onReconnect ? [{ label: 'Reconnect', onSelect: closeThen(() => onReconnect(connection)) }] : []),
+    ...(onDelete ? [{
+      label: confirmingDelete ? 'Confirm delete' : 'Delete',
+      destructive: true,
+      onSelect: () => {
+        if (!confirmingDelete) {
+          setConfirmingDelete(true)
+          return
+        }
+        setIsMenuOpen(false)
+        setConfirmingDelete(false)
+        onDelete(connection)
+      },
+    }] : []),
+  ]
+
   return (
     <InstitutionCard
       chips={(
@@ -71,26 +94,14 @@ export function InstitutionRow({
         </>
       )}
       menu={hasActions ? (
-        <RowActionsMenu ariaLabel={`Open actions for ${name}`} isOpen={isMenuOpen} onToggle={toggleMenu}>
-          {isActive && plaidItem && onUpdateLogin ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onUpdateLogin(plaidItem) }}>Update login</ActionMenuItem> : null}
-          {isActive && plaidItem && onSyncSettings ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onSyncSettings(connection, plaidItem) }}>Sync settings</ActionMenuItem> : null}
-          {isActive && onAddManualAccount ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onAddManualAccount(connection.id, name) }}>Add manual account</ActionMenuItem> : null}
-          {isActive && onDisconnect ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onDisconnect(connection) }}>Disconnect</ActionMenuItem> : null}
-          {!isActive && onReconnect ? <ActionMenuItem onClick={() => { setIsMenuOpen(false); onReconnect(connection) }}>Reconnect</ActionMenuItem> : null}
-          {onDelete ? (
-            <ActionMenuItem destructive onClick={() => {
-              if (!confirmingDelete) {
-                setConfirmingDelete(true)
-                return
-              }
-              setIsMenuOpen(false)
-              setConfirmingDelete(false)
-              onDelete(connection)
-            }}>
-              {confirmingDelete ? 'Confirm delete' : 'Delete'}
-            </ActionMenuItem>
-          ) : null}
-        </RowActionsMenu>
+        <RowActionsMenu
+          ariaLabel={`Open actions for ${name}`}
+          hero={<SheetHero avatar={<SheetAvatar color={institutionColor(name)} glyph={name.charAt(0).toUpperCase()} />} sub={`${count} ${count === 1 ? 'account' : 'accounts'} · ${sync.text}`} title={name} />}
+          isOpen={isMenuOpen}
+          items={menuItems}
+          onToggle={toggleMenu}
+          title="Connection"
+        />
       ) : undefined}
       subtitle={`${count} ${count === 1 ? 'account' : 'accounts'} · ${credentialLabel} · Connected ${formatDisplayDate(provider.createdAt.slice(0, 10))} by ${connection.owner.name}`}
       title={name}

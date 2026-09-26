@@ -11,6 +11,7 @@ import { AnalysisFilterContent } from '../components/portfolio/AnalysisFilters'
 import { AccountSidebar } from '../components/wealth/AccountSidebar'
 import { AllocationCard, type BreakdownView, type FocusState } from '../components/wealth/AllocationCard'
 import { AssetEditModal } from '../components/wealth/AssetEditModal'
+import { HoldingDetailSheet } from '../components/wealth/HoldingDetailSheet'
 import { NetWorthCard } from '../components/wealth/NetWorthCard'
 import { NetWorthFilterPanel } from '../components/wealth/NetWorthFilterPanel'
 import { NET_WORTH_RANGE_OPTIONS, rangeOption } from '../components/wealth/netWorthRanges'
@@ -18,10 +19,11 @@ import { useNetWorthModalRoutes } from '../components/wealth/useNetWorthModalRou
 import { useHistoricalNetWorth, useNetWorth } from '../hooks/useNetWorth'
 import { useNetWorthParams } from '../hooks/useNetWorthParams'
 import { useOwners } from '../hooks/useEntityQueries'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { usePermissions } from '../hooks/usePermissions'
-import { accountGroupIdsFromAccountIds, accountsFromNetWorthReport, hasNetWorthFilters, netWorthChangeOverRange, netWorthInputFromFilters } from '../utils/netWorth'
+import { accountGroupIdsFromAccountIds, accountsFromNetWorthReport, classifierForHolding, hasNetWorthFilters, netWorthChangeOverRange, netWorthInputFromFilters } from '../utils/netWorth'
 import { isInvalidGlobalIDError } from '../utils/graphqlErrors'
-import type { AssetClassifier, Granularity, NetWorthRange } from '../types/graphql'
+import type { AssetClassifier, Granularity, HoldingRollup, NetWorthRange } from '../types/graphql'
 import { accountIdsForAccountGroupIds, type AccountGroupId } from '../utils/accountGroups'
 import { toggleSelectedIds } from '../utils/selection'
 
@@ -48,6 +50,8 @@ export function NetWorthPage() {
   const [selectedLiabilityCategory, setSelectedLiabilityCategory] = useState<string | null>(null)
   const [view, setView] = useState<BreakdownView>('ASSETS')
   const [dateSectionOpen, setDateSectionOpen] = useState(false)
+  const [holdingSheet, setHoldingSheet] = useState<HoldingRollup | null>(null)
+  const isMobile = useIsMobile()
   const mobile = useMobileHeader()
   const { owners } = useOwners()
   const effectiveAccountIds = canReadHoldings ? accountIds : NO_ACCOUNT_IDS
@@ -84,6 +88,8 @@ export function NetWorthPage() {
   const refetchFocused = focusedQuery.refetch
   const retryFocus = useCallback(() => refetchFocused({ requestPolicy: 'network-only' }), [refetchFocused])
   const refetchLive = useCallback(() => refetch({ requestPolicy: 'network-only' }), [refetch])
+  const { openAsset, openAccountValuation } = modalRoutes
+  const handleAssetClick = useCallback((holding: HoldingRollup) => (isMobile ? setHoldingSheet(holding) : openAsset(holding)), [isMobile, openAsset])
 
   function clearAccountFiltersFromOutsideClick(event: MouseEvent<HTMLDivElement>) {
     if (!canReadHoldings || !accountIds.length) return
@@ -170,7 +176,7 @@ export function NetWorthPage() {
             selectedClassifier={selectedClassifier}
             selectedLiabilityCategory={selectedLiabilityCategory}
             view={view}
-            onAssetClick={modalRoutes.openAsset}
+            onAssetClick={handleAssetClick}
             onClearFocus={clearFocusDate}
             onRetryFocus={retryFocus}
             onSelectClassifier={setSelectedClassifier}
@@ -192,6 +198,17 @@ export function NetWorthPage() {
             refetchLive()
           }}
           onUpdate={refetchLive}
+        />
+      ) : null}
+      {holdingSheet && breakdownReport ? (
+        <HoldingDetailSheet
+          classifier={classifierForHolding(breakdownReport, holdingSheet)}
+          holding={holdingSheet}
+          key={holdingSheet.asset.id}
+          onClose={() => setHoldingSheet(null)}
+          onEditAsset={(holding) => { setHoldingSheet(null); openAsset(holding) }}
+          onViewAccount={(holding) => { const account = holding.holdings?.[0]?.account; if (account) { setHoldingSheet(null); openAccountValuation(account) } }}
+          totalAssetsUSD={breakdownReport.currentAssetsUSD}
         />
       ) : null}
       {modalRoutes.selectedAsset ? (

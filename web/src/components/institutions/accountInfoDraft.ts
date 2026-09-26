@@ -67,10 +67,6 @@ export function addressDirty(current: AccountAddressDraft, draft: AccountAddress
     draft.homeType !== current.homeType
 }
 
-export function sameIds(left: string[], right: string[]) {
-  return left.length === right.length && left.every((id) => right.includes(id))
-}
-
 export function buildAccountInfoInput(account: Account, draft: AccountInfoDraft): Omit<UpdateAccountInput, 'id'> {
   const input: Omit<UpdateAccountInput, 'id'> = {}
   if (draft.name !== account.name) input.name = draft.name

@@ -3,16 +3,16 @@ import { useQuery } from 'urql'
 import type { Account } from '../../types/graphql'
 import { ACCOUNT_QUERY } from '../../graphql/queries'
 import { accountMaskedName } from '../../utils/accounts'
-import { formatDisplayDate } from '../../utils/dates'
 import { Modal } from '../common/Modal'
 import { ModalCloseButton } from '../common/ModalHeader'
 import { FormError } from '../common/FormControls'
 import { SegmentedNavTabs } from '../common/SegmentedNavTabs'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { usePermissions } from '../../hooks/usePermissions'
+import { AccountDetailSheet, type AccountDetailTab } from './AccountDetailSheet'
+import { accountMetaRows } from './accountMeta'
 import { AccountInfoForm } from './AccountInfoForm'
 import { AccountSnapshotEditor } from './AccountSnapshotEditor'
-
-export type AccountDetailTab = 'info' | 'valuation'
 
 export function AccountDetailModal({
   account: initialAccount,
@@ -32,6 +32,7 @@ export function AccountDetailModal({
   onDelete?: (account: Account) => void
 }) {
   const { canRead } = usePermissions()
+  const isMobile = useIsMobile()
   const canReadValuation = canRead('wealth') && canRead('holdings')
   const [account, setAccount] = useState(initialAccount)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +59,26 @@ export function AccountDetailModal({
   const loadingEVMProvider = needsEVMProvider && providerResult.fetching
   const evmProviderError = needsEVMProvider ? providerResult.error : null
 
+  if (isMobile) {
+    return (
+      <AccountDetailSheet
+        account={accountForForm}
+        basePath={basePath}
+        canReadValuation={canReadValuation}
+        currentTab={currentTab}
+        error={error}
+        evmProviderError={!!evmProviderError}
+        institution={institutionName(account)}
+        loadingEVMProvider={loadingEVMProvider}
+        onAccountUpdate={handleAccountUpdate}
+        onClose={onClose}
+        onDelete={onDelete}
+        onError={setError}
+        tabSearch={tabSearch}
+      />
+    )
+  }
+
   return (
     <Modal className="flex h-[calc(100vh-5rem)] max-h-[48rem] flex-col" label={`Details for ${displayName}`} onClose={onClose} scrollable size="lg">
       <div className="flex items-start justify-between gap-4">
@@ -74,20 +95,12 @@ export function AccountDetailModal({
             <dd><span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">Manual</span></dd>
           </div>
         ) : null}
-        {account.typeLocked ? null : (
-          <div className="flex justify-between">
-            <dt className="text-text-3">Institution</dt>
-            <dd className="font-medium">{institutionName(account)}</dd>
+        {accountMetaRows(account, institutionName(account)).map((row) => (
+          <div className="flex justify-between" key={row.k}>
+            <dt className="text-text-3">{row.k}</dt>
+            <dd className="font-medium">{row.v}</dd>
           </div>
-        )}
-        <div className="flex justify-between">
-          <dt className="text-text-3">Created</dt>
-          <dd className="font-medium">{formatDisplayDate(account.createdAt.slice(0, 10))}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-3">Updated</dt>
-          <dd className="font-medium">{formatDisplayDate(account.updatedAt.slice(0, 10))}</dd>
-        </div>
+        ))}
       </dl>
 
       <SegmentedNavTabs

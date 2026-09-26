@@ -29,9 +29,11 @@ export function CategoryTag({ category, className, disabled = false, label, onCl
   )
 }
 
-export function TickerChip({ children }: { children: string }) {
+const tickerChipSizeClass = { sm: 'h-6 w-6 text-[9px] lg:h-[22px] lg:w-[22px]', md: 'h-10 w-10 text-[11px]' } as const
+
+export function TickerChip({ children, size = 'sm' }: { children: string; size?: keyof typeof tickerChipSizeClass }) {
   return (
-    <span aria-hidden className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[9px] font-semibold uppercase text-accent lg:h-[22px] lg:w-[22px]">
+    <span aria-hidden className={clsx('inline-flex shrink-0 items-center justify-center rounded-full bg-brand-50 font-semibold uppercase text-accent', tickerChipSizeClass[size])}>
       {children.slice(0, 4)}
     </span>
   )

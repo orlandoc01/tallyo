@@ -53,7 +53,7 @@ describe('mobile filters', () => {
     expect(dialog.firstElementChild).toHaveClass('max-h-[78%]')
     expect(dialog.firstElementChild).toHaveClass('flex-col')
     expect(dialog.firstElementChild).toHaveClass('bg-surface')
-    expect(dialog.firstElementChild?.children[2]).toHaveClass('min-h-0', 'overflow-y-auto')
+    expect(dialog.firstElementChild?.children[1]).toHaveClass('min-h-0', 'overflow-y-auto')
 
     fireEvent.click(dialog.firstElementChild!)
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()
@@ -70,10 +70,10 @@ describe('mobile filters', () => {
     expect(dialog.firstElementChild).toHaveClass('max-h-[78%]')
     expect(dialog.firstElementChild).toHaveClass('flex-col')
     expect(dialog.firstElementChild).toHaveClass('bg-surface')
-    expect(dialog.firstElementChild?.children[2]).toHaveClass('min-h-0', 'overflow-y-auto')
+    expect(dialog.firstElementChild?.children[1]).toHaveClass('min-h-0', 'overflow-y-auto')
     expect(screen.getAllByRole('heading', { name: 'Filters' })).toHaveLength(1)
-    expect(dialog.firstElementChild?.children[2].firstElementChild).not.toHaveClass('rounded-3xl')
-    expect(dialog.firstElementChild?.children[2].firstElementChild).not.toHaveClass('border')
+    expect(dialog.firstElementChild?.children[1].firstElementChild).not.toHaveClass('rounded-3xl')
+    expect(dialog.firstElementChild?.children[1].firstElementChild).not.toHaveClass('border')
 
     fireEvent.click(dialog.firstElementChild!)
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument()

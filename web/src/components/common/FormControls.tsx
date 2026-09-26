@@ -1,10 +1,15 @@
 import clsx from 'clsx'
-import { Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import type { HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 const labelClass = 'text-xs text-text-muted'
-const controlClass = 'mt-1 block w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] text-text-1 placeholder:text-text-faint focus:border-brand-600 focus:outline-none disabled:opacity-50 dark:bg-bg'
+const controlClass = 'mt-1 block w-full rounded-md border border-border-strong px-3 text-[13px] text-text-1 placeholder:text-text-faint focus:border-brand-600 focus:outline-none disabled:opacity-50'
 const inputHeightClass = 'h-9 lg:h-8'
+// Sheet fields sit on the sheet surface, so they take the page background and a 40px touch height.
+const fieldVariantClass = { default: 'bg-surface dark:bg-bg', sheet: 'bg-bg' } as const
+const inputVariantHeightClass = { default: inputHeightClass, sheet: 'h-10' } as const
+
+type FieldVariant = keyof typeof fieldVariantClass
 
 type FieldProps = {
   label: string
@@ -16,6 +21,7 @@ type FieldProps = {
   labelSuffix?: ReactNode
   mono?: boolean
   onChange: (value: string) => void
+  variant?: FieldVariant
 }
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'onChange'> & FieldProps
@@ -38,20 +44,39 @@ type SelectFieldProps<T extends string> = Omit<SelectHTMLAttributes<HTMLSelectEl
   onChange: (value: T) => void
 }
 
-export function TextField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, mono = false, onChange, ...props }: TextFieldProps) {
+export function TextField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, mono = false, onChange, variant = 'default', ...props }: TextFieldProps) {
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <input aria-label={ariaLabel ?? label} className={clsx(controlClass, inputHeightClass, hideLabel && 'mt-0', mono && 'font-mono text-xs', controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
+      <input aria-label={ariaLabel ?? label} className={clsx(controlClass, inputVariantHeightClass[variant], fieldVariantClass[variant], hideLabel && 'mt-0', mono && 'font-mono text-xs', controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
     </label>
   )
 }
 
-export function TextAreaField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, minHeight, mono = false, onChange, ...props }: TextAreaFieldProps) {
+export function TextAreaField({ ariaLabel, className, controlClassName, hideLabel = false, label, labelClassName, labelSuffix, minHeight, mono = false, onChange, variant = 'default', ...props }: TextAreaFieldProps) {
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <textarea aria-label={ariaLabel ?? label} className={clsx(controlClass, 'py-2', hideLabel && 'mt-0', mono && 'font-mono', minHeight, controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
+      <textarea aria-label={ariaLabel ?? label} className={clsx(controlClass, 'py-2', fieldVariantClass[variant], hideLabel && 'mt-0', mono && 'font-mono', minHeight, controlClassName)} onChange={(event) => onChange(event.target.value)} {...props} />
+    </label>
+  )
+}
+
+// A select-shaped button for pickers that open a sheet instead of a native <select>.
+export function SelectTriggerButton({ className, disabled = false, label, onClick, value }: {
+  className?: string
+  disabled?: boolean
+  label: string
+  onClick: () => void
+  value: ReactNode
+}) {
+  return (
+    <label className={clsx('block', className)}>
+      <span className={labelClass}>{label}</span>
+      <button aria-haspopup="dialog" className={clsx(controlClass, inputHeightClass, fieldVariantClass.default, 'flex items-center justify-between')} disabled={disabled} onClick={onClick} type="button">
+        <span className="truncate">{value}</span>
+        <ChevronDown aria-hidden className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+      </button>
     </label>
   )
 }
@@ -60,7 +85,7 @@ export function SelectField<T extends string>({ ariaLabel, className, controlCla
   return (
     <label className={clsx('block', className)}>
       <span className={hideLabel ? 'sr-only' : clsx(labelClass, labelClassName)}>{label}{labelSuffix}</span>
-      <select aria-label={ariaLabel ?? label} className={clsx(controlClass, inputHeightClass, hideLabel && 'mt-0', controlClassName)} onChange={(event) => onChange(event.target.value as T)} {...props}>
+      <select aria-label={ariaLabel ?? label} className={clsx(controlClass, inputHeightClass, fieldVariantClass.default, hideLabel && 'mt-0', controlClassName)} onChange={(event) => onChange(event.target.value as T)} {...props}>
         {options.map((option) => {
           const value = typeof option === 'string' ? option : option.value
           const disabled = typeof option === 'string' ? false : option.disabled
