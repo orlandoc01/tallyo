@@ -66,6 +66,6 @@ export function searchAccounts<T extends Pick<Account, 'name' | 'mask'>>(query: 
   return matching.length > 0 ? matching : null
 }
 
-function titleCase(value: string) {
+export function titleCase(value: string) {
   return value.replace(/\b\w/g, (character) => character.toUpperCase())
 }

@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { useMutation, useQuery } from 'urql'
-import { CHANGE_ACCOUNT_SNAPSHOT_MUTATION } from '../../graphql/mutations'
-import { ACCOUNT_SNAPSHOT_QUERY, ASSETS_QUERY } from '../../graphql/queries'
-import { usePermissions } from '../../hooks/usePermissions'
-import type { Account, AccountSnapshot, AccountSnapshotInput, AssetList, AssetsInput } from '../../types/graphql'
-import { formatCurrency, formatSignedCurrency } from '../../utils/currency'
+import { useQuery } from 'urql'
+import { ACCOUNT_SNAPSHOT_QUERY } from '../../graphql/queries'
+import type { Account, AccountSnapshot, AccountSnapshotInput } from '../../types/graphql'
+import { formatSignedCurrency } from '../../utils/currency'
 import { Button } from '../common/Button'
-import { SnapshotAssetPicker } from './SnapshotAssetPicker'
 import { SnapshotHistorySection } from './SnapshotHistorySection'
-import { SnapshotHoldingRow } from './SnapshotHoldingRow'
+import { SnapshotLinesFields } from './SnapshotLinesFields'
+import { useSnapshotEditorResources } from './useSnapshotEditorResources'
 import { useSnapshotHistory } from './useSnapshotHistory'
-import { assetToSnapshotLine, linesWithBalance, snapshotToLines, updateLineCash, updateLineQuantity, updateLineValue, USD_ASSET_ID, type SnapshotLine } from './accountSnapshotLines'
+import { snapshotToLines, type SnapshotLine } from './accountSnapshotLines'
 
 interface Props {
   account: Account
@@ -21,11 +19,8 @@ interface Props {
 type EditorMode = 'view' | 'editing' | 'saving'
 
 export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
-  const { canRead, canWrite } = usePermissions()
-  const canReadAssets = canRead('assets')
-  const canWriteWealth = canWrite('wealth')
-  const liabilityBalance = account.type === 'CREDIT' || account.type === 'LOAN'
-  const balanceOnly = account.manual && (account.type === 'CREDIT' || account.type === 'LOAN' || account.type === 'DEPOSITORY')
+  const resources = useSnapshotEditorResources(account)
+  const { balanceOnly, canManageManualHoldings, canReadAssets, canWriteWealth, liabilityBalance } = resources
   const [mode, setMode] = useState<EditorMode>('view')
   const [dirty, setDirty] = useState(false)
   const [selectedDate, setSelectedDate] = useState(account.latestSnapshot?.date ?? '')
@@ -38,12 +33,6 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
     variables: { input: queryInput ?? { accountId: account.id } },
     pause: queryInput === null,
   })
-  const [assetsResult] = useQuery<{ assets: AssetList }, { input: AssetsInput }>({
-    query: ASSETS_QUERY,
-    variables: { input: { includeHistorical: true } },
-    pause: !account.manual || !canReadAssets || !canWriteWealth,
-  })
-  const [, changeSnapshot] = useMutation(CHANGE_ACCOUNT_SNAPSHOT_MUTATION)
   const history = useSnapshotHistory(account, (snapshots) => {
     showKnownSnapshot(snapshots[0]?.date ?? '', snapshots[0] ?? null)
   })
@@ -71,13 +60,9 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
   const displayBalanceUSD = balanceOnly && liabilityBalance ? Math.abs(balanceUSD) : balanceUSD
   const snapshotHadHoldings = (snapshot?.holdings?.length ?? 0) > 0
   const saveDisabled = isSaving || !dirty || !snapshot || (lines.length === 0 && !snapshotHadHoldings)
-  const canManageManualHoldings = account.manual && canWriteWealth
   const showAddHolding = canManageManualHoldings && canReadAssets && isEditing
   const showRemoveHolding = canManageManualHoldings && isEditing
-  const selectedAssetIds = new Set(lines.map((line) => line.asset.id))
   const snapshotSectionTitle = account.type === 'INVESTMENT' ? 'Holdings' : 'Balance'
-  const usdAsset = assetsResult.data?.assets.items.find((asset) =>
-    asset.id === USD_ASSET_ID || (asset.assetType === 'CURRENCY' && asset.identifier === 'USD'))
   const snapshotNetContribution = snapshot ? formatSignedCurrency(snapshot.netContributionUSD) : '-'
 
   function handleDateChange(date: string) {
@@ -130,30 +115,19 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
     if (!snapshot || saveDisabled) return
     setMode('saving')
     setSaveError(null)
-    const mutationResult = await changeSnapshot({
-      input: {
-        snapshotId: snapshot.id,
-        holdings: lines.map((line) => ({
-          assetId: line.asset.id,
-          quantity: line.quantity,
-          valueUSD: line.valueUSD,
-        })),
-      },
-    })
-    if (mutationResult.error) {
-      setSaveError(mutationResult.error.message)
+    const saved = await resources.saveLines(snapshot, lines)
+    if (saved.error) {
+      setSaveError(saved.error)
       setMode('editing')
       return
     }
-    const updated = mutationResult.data?.changeAccountSnapshot as { snapshot?: AccountSnapshot; account?: Account } | undefined
-    if (updated?.snapshot) {
-      const updatedSnapshot = updated.snapshot
-      setSnapshot(updatedSnapshot)
-      setSelectedDate(updatedSnapshot.date)
-      setLines(snapshotToLines(updatedSnapshot))
-      history.applySavedSnapshot(updatedSnapshot)
+    if (saved.snapshot) {
+      setSnapshot(saved.snapshot)
+      setSelectedDate(saved.snapshot.date)
+      setLines(snapshotToLines(saved.snapshot))
+      history.applySavedSnapshot(saved.snapshot)
     }
-    onAccountUpdate(updated?.account ?? account)
+    onAccountUpdate(saved.account ?? account)
     setDirty(false)
     setMode('view')
   }
@@ -200,46 +174,17 @@ export function AccountSnapshotEditor({ account, onAccountUpdate }: Props) {
               <h3 className="text-sm font-semibold text-text-2">{snapshotSectionTitle}</h3>
               {snapshot.flagged ? <span className="rounded-full bg-warning/[0.15] px-2 py-0.5 text-xs font-semibold text-warning">Flagged</span> : null}
             </div>
-            {balanceOnly ? null : lines.map((line) => (
-              <SnapshotHoldingRow
-                disabled={controlsDisabled}
-                key={line.asset.id}
-                line={line}
-                onCashChange={(assetID, value) => changeLines(updateLineCash(lines, assetID, value))}
-                onQuantityChange={(assetID, value) => changeLines(updateLineQuantity(lines, assetID, value))}
-                onValueChange={(assetID, value) => changeLines(updateLineValue(lines, assetID, value))}
-                onRemove={showRemoveHolding ? (assetID) => changeLines(lines.filter((current) => current.asset.id !== assetID)) : undefined}
-              />
-            ))}
-            {!balanceOnly && showAddHolding ? (
-              <SnapshotAssetPicker
-                assets={assetsResult.data?.assets.items ?? []}
-                errorMessage={assetsResult.error?.message ?? null}
-                excludedAssetIds={selectedAssetIds}
-                fetching={assetsResult.fetching}
-                onSelect={(asset) => {
-                  if (!lines.some((line) => line.asset.id === asset.id)) changeLines([...lines, assetToSnapshotLine(asset)])
-                }}
-              />
-            ) : null}
-            {balanceOnly || lines.length === 0 ? (
-              <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2 text-sm">
-                <div className="font-medium text-text-1">Balance</div>
-                {balanceOnly && !controlsDisabled ? (
-                  <input
-                    aria-label="Snapshot balance"
-                    className="w-32 rounded-xl border border-border-strong bg-surface text-text-1 dark:bg-bg px-2 py-1.5 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    disabled={lines.length === 0 && !usdAsset}
-                    onChange={(e) => changeLines(linesWithBalance(lines, usdAsset, e.target.value, liabilityBalance))}
-                    step="any"
-                    type="number"
-                    value={liabilityBalance ? lines[0]?.valueText.replace(/^-/, '') ?? String(displayBalanceUSD) : lines[0]?.valueText ?? String(displayBalanceUSD)}
-                  />
-                ) : (
-                  <div aria-label="Snapshot balance" className="font-semibold tabular-nums text-text-1">{formatCurrency(displayBalanceUSD)}</div>
-                )}
-              </div>
-            ) : null}
+            <SnapshotLinesFields
+              balanceOnly={balanceOnly}
+              controlsDisabled={controlsDisabled}
+              displayBalanceUSD={displayBalanceUSD}
+              liabilityBalance={liabilityBalance}
+              lines={lines}
+              onChangeLines={changeLines}
+              resources={resources}
+              showAddHolding={showAddHolding}
+              showRemoveHolding={showRemoveHolding}
+            />
           </div>
         ) : null}
 

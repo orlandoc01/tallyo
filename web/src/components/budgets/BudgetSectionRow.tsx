@@ -12,12 +12,14 @@ const BUDGET_LINE_GRID_COLUMNS = 'minmax(160px,1.4fr) minmax(140px,2fr) minmax(9
 
 export function BudgetSectionRow({
   editable,
+  monthLabel,
   section,
   savingCategoryId,
   transactionLinkForCategory,
   onSaveLine,
 }: {
   editable: boolean
+  monthLabel: string
   section: BudgetSection
   savingCategoryId: string | null
   transactionLinkForCategory: (categoryId: string) => string
@@ -62,6 +64,7 @@ export function BudgetSectionRow({
                 editable={editable}
                 key={line.category.id}
                 line={line}
+                monthLabel={monthLabel}
                 onSave={(amount) => onSaveLine(line.category.id, amount)}
                 saving={savingCategoryId === line.category.id}
                 transactionLinkTo={transactionLinkForCategory(line.category.id)}

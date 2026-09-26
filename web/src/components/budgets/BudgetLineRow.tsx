@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import clsx from 'clsx'
 import { Link } from 'react-router'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { BudgetLine } from '../../types/graphql'
 import { formatCurrency } from '../../utils/currency'
 import { Button } from '../common/Button'
 import { DottedBar } from '../common/DottedBar'
 import { TextField } from '../common/FormControls'
+import { BudgetLineSheet } from './BudgetLineSheet'
 import { BUDGET_BAR_COLOR, budgetBarPercent, budgetPercent, budgetTone, budgetToneClass, formatBudgetDelta } from './budgetMath'
 
 const rowClass = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 border-t border-border px-4 py-2.5 [grid-template-areas:'name_actual'_'progress_planned'] lg:h-11 lg:grid-cols-[var(--budget-line-cols)] lg:items-center lg:gap-x-3 lg:py-0 lg:[grid-template-areas:'name_progress_planned_actual']"
@@ -13,17 +15,21 @@ const rowClass = "grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 border-t
 export function BudgetLineRow({
   editable,
   line,
+  monthLabel,
   saving,
   transactionLinkTo,
   onSave,
 }: {
   editable: boolean
   line: BudgetLine
+  monthLabel: string
   saving: boolean
   transactionLinkTo: string
   onSave: (amount: number) => void
 }) {
+  const isMobile = useIsMobile()
   const [editing, setEditing] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [draft, setDraft] = useState(line.budgeted.toFixed(2))
   const isIncome = line.category.kind === 'INCOME'
   const percent = budgetPercent(line.actual, line.budgeted)
@@ -74,7 +80,7 @@ export function BudgetLineRow({
           <Button
             aria-label={`Edit budget for ${line.category.name}`}
             className="tabular-nums"
-            onClick={() => { setDraft(line.budgeted.toFixed(2)); setEditing(true) }}
+            onClick={() => { if (isMobile) return setSheetOpen(true); setDraft(line.budgeted.toFixed(2)); setEditing(true) }}
             size="sm"
             variant="ghost-muted"
           >
@@ -88,6 +94,7 @@ export function BudgetLineRow({
         {formatCurrency(line.actual)}
         <span className="hidden lg:inline"> ({formatBudgetDelta(line.actual - line.budgeted)})</span>
       </div>
+      {sheetOpen ? <BudgetLineSheet line={line} monthLabel={monthLabel} onClose={() => setSheetOpen(false)} onSave={onSave} /> : null}
     </div>
   )
 }

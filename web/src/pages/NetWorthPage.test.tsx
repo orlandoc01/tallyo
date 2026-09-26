@@ -50,6 +50,8 @@ vi.mock('../components/wealth/AssetEditModal', () => ({
   isAssetEditTab: (tab: string) => tab === 'info' || tab === 'tracking',
 }))
 vi.mock('../hooks/useNetWorth', () => ({ useNetWorth: vi.fn(), useHistoricalNetWorth: vi.fn() }))
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../hooks/useIsMobile', () => ({ useIsMobile: () => mockViewport.isMobile }))
 vi.mock('../hooks/useEntityQueries', () => {
   const owners = [{ id: 'owner', name: 'Alex' }]
   const accounts = [
@@ -156,6 +158,7 @@ function mockHistorical(series: typeof gainingSeries) {
 
 describe('NetWorthPage', () => {
   beforeEach(() => {
+    mockViewport.isMobile = false
     mockedUseNetWorth.mockReset()
     mockedUseHistoricalNetWorth.mockReturnValue({ fetching: false, historicalReport: undefined } as unknown as ReturnType<typeof useHistoricalNetWorth>)
     localStorage.clear()
@@ -456,6 +459,25 @@ describe('NetWorthPage', () => {
     expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH')
     expect(screen.getByRole('dialog', { name: 'Account acct-home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Valuation' })).toHaveAttribute('href', '/net-worth/accounts/acct-home/valuation?range=ONE_MONTH')
+  })
+
+  it('opens a holding sheet from asset rows on mobile and routes to the account valuation', async () => {
+    mockViewport.isMobile = true
+    mockedUseNetWorth.mockReturnValue({ fetching: false, report } as unknown as ReturnType<typeof useNetWorth>)
+    renderPage(['/net-worth?range=ONE_MONTH'])
+
+    await userEvent.click(screen.getAllByRole('button', { name: /Public Assets/ })[1])
+    await userEvent.click(screen.getAllByRole('button', { name: /^Edit Apple Inc/ })[1])
+
+    const sheet = screen.getByRole('dialog', { name: 'Holding' })
+    expect(screen.getByTestId('location-pathname').textContent).toBe('/net-worth')
+    expect(within(sheet).getByText('Brokerage · 6 shares')).toBeInTheDocument()
+    expect(within(sheet).getByText('50.00% of assets')).toBeInTheDocument()
+
+    await userEvent.click(within(sheet).getByRole('button', { name: 'View account' }))
+    expect(screen.getByTestId('location-pathname').textContent).toBe('/net-worth/accounts/acct-invest/valuation')
+    expect(screen.getByTestId('location-search').textContent).toBe('?range=ONE_MONTH')
+    expect(screen.queryByRole('dialog', { name: 'Holding' })).not.toBeInTheDocument()
   })
 
   it('opens asset edit modals from direct net worth asset URLs', () => {

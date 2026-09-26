@@ -43,6 +43,10 @@ export function groupAccountsByInstitution(accounts: Account[]) {
   return Object.values(grouped).sort((a, b) => Number(a.isManual) - Number(b.isManual))
 }
 
+export function accountInstitutionLabel(account: Pick<Account, 'connection'>) {
+  return account.connection ? connectionProviderLabel(account.connection) : 'Manual'
+}
+
 function connectionProviderLabel(connection: NonNullable<Account['connection']>) {
   if (connection.name) {
     return connection.name

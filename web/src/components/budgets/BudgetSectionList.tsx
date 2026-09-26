@@ -37,6 +37,8 @@ export function BudgetSectionList({
     return [...report.sections, ...missing]
   }, [report, categoryGroups])
 
+  const monthLabel = periodFromMonthKey(monthKey)?.label ?? monthKey
+
   if (sections.length === 0) {
     return <EmptyState description="Create one to start budgeting." title="No income or expense categories yet" />
   }
@@ -47,6 +49,7 @@ export function BudgetSectionList({
         <BudgetSectionRow
           key={section.group.id}
           editable={editable}
+          monthLabel={monthLabel}
           onSaveLine={onSaveLine}
           savingCategoryId={savingCategoryId}
           section={section}

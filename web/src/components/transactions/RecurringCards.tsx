@@ -1,7 +1,6 @@
 import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import type { RecurringCharge } from '../../types/graphql'
-import { accountDisplayLabel } from '../../utils/accounts'
 import { categoryTint } from '../../utils/categoryTint'
 import { formatCurrency, formatTransactionAmount } from '../../utils/currency'
 import { formatDisplayDate } from '../../utils/dates'
@@ -13,7 +12,7 @@ import { Card } from '../common/FormControls'
 import { StatBlock, StatGrid } from '../common/StatBlock'
 import { CategoryTag, Tag } from '../common/Tag'
 import { TransactionAmount } from '../common/TransactionAmount'
-import { type CadenceGroup, latestTransaction, type RecurringStats } from './recurringCadence'
+import { type CadenceGroup, chargeAccount, type RecurringStats } from './recurringCadence'
 
 const GRID_COLUMNS = 'minmax(180px,2fr) minmax(100px,1fr) minmax(130px,1.5fr) minmax(150px,1.5fr) minmax(90px,110px)'
 
@@ -42,12 +41,8 @@ export function RecurringStatsCard({ stats }: { stats: RecurringStats }) {
   )
 }
 
-function chargeAccount(charge: RecurringCharge) {
-  const account = latestTransaction(charge.transactions)?.account
-  return account ? accountDisplayLabel(account) : '—'
-}
-
-export function RecurringCadenceCard({ group, onSelect }: { group: CadenceGroup; onSelect: (charge: RecurringCharge) => void }) {
+export function RecurringCadenceCard({ group, onSelect, selectAction = 'transactions' }: { group: CadenceGroup; onSelect: (charge: RecurringCharge) => void; selectAction?: 'transactions' | 'details' }) {
+  const rowLabel = (charge: RecurringCharge) => `View ${selectAction} for ${charge.merchantName}`
   return (
     <Card as="section">
       <div className="flex h-11 items-center justify-between gap-3 px-4">
@@ -64,7 +59,7 @@ export function RecurringCadenceCard({ group, onSelect }: { group: CadenceGroup;
             <span className="text-right">Amount</span>
           </DataGridHeader>
           {group.items.map((charge) => (
-            <DataGridRow ariaLabel={`View transactions for ${charge.merchantName}`} gridTemplateColumns={GRID_COLUMNS} key={charge.id} onClick={() => onSelect(charge)}>
+            <DataGridRow ariaLabel={rowLabel(charge)} gridTemplateColumns={GRID_COLUMNS} key={charge.id} onClick={() => onSelect(charge)}>
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-sm font-medium text-text-1">{charge.merchantName}</span>
                 {charge.status === 'EARLY_DETECTION' ? <Tag className="shrink-0">Early detection</Tag> : null}
@@ -80,7 +75,7 @@ export function RecurringCadenceCard({ group, onSelect }: { group: CadenceGroup;
       <div className="lg:hidden">
         {group.items.map((charge) => (
           <ClickableRow
-            ariaLabel={`View transactions for ${charge.merchantName}`}
+            ariaLabel={rowLabel(charge)}
             className="flex h-[58px] w-full items-center gap-3 border-t border-border px-4 text-left"
             key={charge.id}
             onClick={() => onSelect(charge)}

@@ -1,4 +1,6 @@
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { CreateSimpleFinAccessTokenPayload, ExchangePublicTokenPayload } from '../../types/graphql'
+import { ActionSheet } from '../common/ActionSheet'
 import { AddAccountChooserModal } from './AddAccountChooserModal'
 import { ConnectionModal } from './ConnectionModal'
 import { LinkEVMWalletModal } from './LinkEVMWalletModal'
@@ -21,6 +23,8 @@ export function AddAccountModals({
   onMessage: (message: string) => void
   onStepChange: (step: LinkingStep) => void
 }) {
+  const isMobile = useIsMobile()
+
   function finish(message: string) {
     onMessage(message)
     onStepChange(null)
@@ -35,9 +39,24 @@ export function AddAccountModals({
     finish(`Connected SimpleFIN with ${payload.connections.length} connection${payload.connections.length === 1 ? '' : 's'} and ${payload.accounts.length} account${payload.accounts.length === 1 ? '' : 's'}.`)
   }
 
+  const chooserOpen = step === 'chooser' || step === 'add-account'
+
   return (
     <>
-      {step === 'chooser' ? (
+      {chooserOpen && isMobile ? (
+        <ActionSheet
+          items={[
+            { label: 'Link a bank', onSelect: () => onStepChange('bank') },
+            { label: 'Link a crypto wallet', onSelect: () => onStepChange('evm') },
+            { label: 'Add manual account', onSelect: () => { onStepChange(null); onManualAccount() } },
+            { label: 'Add home', onSelect: () => onStepChange('realestate') },
+          ]}
+          onClose={() => onStepChange(null)}
+          title="Add account"
+        />
+      ) : null}
+
+      {step === 'chooser' && !isMobile ? (
         <ProviderChooserModal
           onClose={() => onStepChange(null)}
           onSelectBank={() => onStepChange('bank')}
@@ -45,7 +64,7 @@ export function AddAccountModals({
         />
       ) : null}
 
-      {step === 'add-account' ? (
+      {step === 'add-account' && !isMobile ? (
         <AddAccountChooserModal
           onClose={() => onStepChange(null)}
           onSelectManualAccount={() => {

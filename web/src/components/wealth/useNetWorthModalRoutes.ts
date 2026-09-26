@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useAccounts } from '../../hooks/useEntityQueries'
 import type { Account, HoldingRollup, NetWorthReport } from '../../types/graphql'
 import { assetFromNetWorthReport } from '../../utils/netWorth'
-import type { AccountDetailTab } from '../institutions/AccountDetailModal'
+import type { AccountDetailTab } from '../institutions/AccountDetailSheet'
 import { isAssetEditTab, type AssetEditTab } from './assetEditTabs'
 
 // URL-driven modal state for the net worth page: /net-worth/accounts/:id/:tab

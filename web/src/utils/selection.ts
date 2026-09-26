@@ -27,3 +27,7 @@ export function toggleSelectedIds<T extends string>(selectedIds: T[], ids: T[]):
 export function allSelected(selectedIds: string[], ids: string[]) {
   return ids.length > 0 && ids.every((id) => selectedIds.includes(id))
 }
+
+export function sameIds(left: string[], right: string[]) {
+  return left.length === right.length && left.every((id) => right.includes(id))
+}

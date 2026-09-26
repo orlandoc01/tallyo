@@ -1,12 +1,14 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from 'urql'
 
 import { refreshAccessToken } from '../../auth/tokenStore'
 import { UPDATE_CONFIGURATION_MUTATION } from '../../graphql/mutations'
 import { INSTANCE_TIMEZONE_QUERY } from '../../graphql/queries'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { Configuration, UpdateConfigurationInput } from '../../types/graphql'
 import { ErrorState } from '../common/ErrorState'
-import { SectionLabel, SelectField } from '../common/FormControls'
+import { SectionLabel, SelectField, SelectTriggerButton } from '../common/FormControls'
+import { PickerSheet } from '../common/PickerSheet'
 
 const fallbackTimezones = [
   'America/New_York',
@@ -24,6 +26,9 @@ export function TimezoneSection({ canWriteSettings }: { canWriteSettings: boolea
   >(UPDATE_CONFIGURATION_MUTATION)
   const timezones = useMemo(() => supportedTimezones(queryResult.data?.instanceTimezone), [queryResult.data?.instanceTimezone])
   const timezone = queryResult.data?.instanceTimezone ?? 'America/New_York'
+  const isMobile = useIsMobile()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const busy = queryResult.fetching || mutationResult.fetching
 
   async function changeTimezone(nextTimezone: string) {
     const result = await updateConfiguration({ input: { locale: { timezone: nextTimezone } } })
@@ -41,8 +46,13 @@ export function TimezoneSection({ canWriteSettings }: { canWriteSettings: boolea
       {queryResult.error ? <ErrorState message={queryResult.error.message} /> : null}
       {mutationResult.error ? <ErrorState message={mutationResult.error.message} /> : null}
 
-      {canWriteSettings ? (
-        <SelectField className="mt-3.5 max-w-[360px]" disabled={queryResult.fetching || mutationResult.fetching} label="Instance timezone" onChange={(nextTimezone) => { void changeTimezone(nextTimezone) }} options={timezones} value={timezone} />
+      {canWriteSettings && isMobile ? (
+        <div className="mt-3.5 max-w-[360px]">
+          <SelectTriggerButton disabled={busy} label="Instance timezone" onClick={() => setPickerOpen(true)} value={timezone} />
+          {pickerOpen ? <PickerSheet onChange={(nextTimezone) => { void changeTimezone(nextTimezone) }} onClose={() => setPickerOpen(false)} options={timezones.map((zone) => ({ id: zone, label: zone }))} title="Timezone" value={timezone} /> : null}
+        </div>
+      ) : canWriteSettings ? (
+        <SelectField className="mt-3.5 max-w-[360px]" disabled={busy} label="Instance timezone" onChange={(nextTimezone) => { void changeTimezone(nextTimezone) }} options={timezones} value={timezone} />
       ) : (
         <div className="mt-3.5 max-w-[360px]">
           <span className="text-xs text-text-muted">Instance timezone</span>

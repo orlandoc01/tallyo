@@ -10,7 +10,6 @@ import { formatSignedCurrency } from '../../utils/currency'
 import { formatDisplayDate } from '../../utils/dates'
 import { usePermissions } from '../../hooks/usePermissions'
 import { TransactionDetailsOverlay } from './TransactionDetailsOverlay'
-import { TransactionDetailsPane } from './TransactionDetailsPane'
 import { MobileTransactionRow, TransactionRow, type TransactionRowProps } from './TransactionRow'
 import { TransactionSortSelect } from './transactionRowGroups'
 import { type TransactionRowContext, dayTotal, renderTransactionRows } from './transactionRows'
@@ -128,21 +127,6 @@ export function TransactionList({
   }
 
   const showHeader = showTitle || Boolean(headerActions) || Boolean(onSortChange)
-  const detailsPane = selectedTransaction && categories ? (
-    <TransactionDetailsPane
-      categories={categories}
-      key={selectedTransaction.id}
-      onClose={closeDetails}
-      onDelete={(id: string) => {
-        setDeletedIds((ids) => new Set(ids).add(id))
-        closeDetails()
-      }}
-      onShowMerchant={onShowMerchant ? (merchant) => { onShowMerchant(merchant); closeDetails() } : undefined}
-      onUpdate={updateRenderedTransaction}
-      titleId={detailsTitleId}
-      transaction={selectedTransaction}
-    />
-  ) : null
   const detailsLabel = `Details for ${selectedTransaction?.merchantName || selectedTransaction?.originalName || 'transaction'}`
 
   return (
@@ -197,10 +181,20 @@ export function TransactionList({
         ) : null}
       </Card>
 
-      {detailsPane ? (
-        <TransactionDetailsOverlay label={detailsLabel} onClose={closeDetails} titleId={detailsTitleId}>
-          {detailsPane}
-        </TransactionDetailsOverlay>
+      {selectedTransaction && categories ? (
+        <TransactionDetailsOverlay
+          categories={categories}
+          label={detailsLabel}
+          onClose={closeDetails}
+          onDelete={(id: string) => {
+            setDeletedIds((ids) => new Set(ids).add(id))
+            closeDetails()
+          }}
+          onShowMerchant={onShowMerchant ? (merchant) => { onShowMerchant(merchant); closeDetails() } : undefined}
+          onUpdate={updateRenderedTransaction}
+          titleId={detailsTitleId}
+          transaction={selectedTransaction}
+        />
       ) : null}
     </div>
   )

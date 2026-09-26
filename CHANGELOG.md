@@ -4,6 +4,12 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-25
+
+### Changed
+- **Mobile detail sheets.** On phones, every popup is now a bottom sheet: transaction details (edits staged and saved in one step, Hidden/Recurring toggles, merchant link, delete), account details with Info and Valuation tabs (12-month sparkline, snapshots grouped by month, rows that expand in place), net worth holding details, recurring charge details, budget line details, row action menus, the add-account chooser, the Transactions "+ Create" menu, and the Expenses sort and Settings timezone pickers. Desktop is unchanged. No API or database changes.
+- Mobile sheets dismiss with a swipe down on the handle, in addition to the close button, backdrop tap, and Escape.
+
 ## [0.3.1] - 2026-09-22
 
 ### Changed
@@ -98,7 +104,8 @@ Parity with 0.2.x was verified against a copy of a production database, the full
 
 First public release.
 
-[Unreleased]: https://github.com/orlandoc01/tallyo/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/orlandoc01/tallyo/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/orlandoc01/tallyo/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/orlandoc01/tallyo/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/orlandoc01/tallyo/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/orlandoc01/tallyo/compare/v0.2.0...v0.2.1

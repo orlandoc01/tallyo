@@ -6,12 +6,12 @@ import { EmptyState } from '../components/common/EmptyState'
 import { LoadingSpinner } from '../components/common/LoadingSpinner'
 import { SearchInput } from '../components/common/FormControls'
 import { BulkActionBar, BulkSelectAllCheckbox, BulkTransactionModals } from '../components/transactions/BulkTransactionsUI'
-import { CreateTransactionModal } from '../components/transactions/CreateTransactionModal'
 import { TransactionActivePills } from '../components/transactions/TransactionActivePills'
 import { TransactionFilterPanel } from '../components/transactions/TransactionFilterPanel'
 import { TransactionList } from '../components/transactions/TransactionList'
 import { TransactionsHeader } from '../components/transactions/TransactionsHeader'
 import { TransactionsMobileFilters } from '../components/transactions/TransactionsMobileFilters'
+import { TransactionsCreateFlow, type CreateStep } from '../components/transactions/TransactionsCreateFlow'
 import { TransactionsMobileHeaderActions } from '../components/transactions/TransactionsMobileHeaderActions'
 import { TransactionSummaryCard } from '../components/transactions/TransactionSummary'
 import { useBulkTransactionActions } from '../components/transactions/useBulkTransactionActions'
@@ -49,7 +49,7 @@ export function TransactionsPage() {
 
   const [draftFilter, setDraftFilter] = useState<TransactionsFilter>(filter)
   const [search, setSearch] = useQueryParamState('q')
-  const [showCreate, setShowCreate] = useState(false)
+  const [createStep, setCreateStep] = useState<CreateStep>(null)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [desktopFiltersOpen, setDesktopFiltersOpen] = useState(false)
   const trimmedSearch = search.trim()
@@ -80,11 +80,11 @@ export function TransactionsPage() {
       canWrite={canWriteTransactions}
       filterOpen={filterOpen}
       isBulkMode={isBulkMode}
-      onCreate={() => setShowCreate(true)}
+      onCreate={() => setCreateStep(isMobile ? 'chooser' : 'transaction')}
       onToggleBulk={isBulkMode ? cancelBulkMode : enterBulkMode}
       onToggleFilter={() => (filterOpen ? closeFilter() : openFilter())}
     />
-  ), [activeFilterCount, canWriteTransactions, cancelBulkMode, closeFilter, enterBulkMode, filterOpen, isBulkMode, openFilter])
+  ), [activeFilterCount, canWriteTransactions, cancelBulkMode, closeFilter, enterBulkMode, filterOpen, isBulkMode, isMobile, openFilter])
 
   useFiltersActive(activeTransactionFilterCount(filter, trimmedSearch))
   useMobileHeaderActions(mobileHeaderActions)
@@ -145,7 +145,7 @@ export function TransactionsPage() {
         filtersOpen={desktopFiltersOpen}
         isBulkMode={isBulkMode}
         onCancelBulkMode={bulk.cancelBulkMode}
-        onCreate={() => setShowCreate(true)}
+        onCreate={() => setCreateStep('transaction')}
         onEnterBulkMode={enterBulkMode}
         onImportSuccess={refetchTransactions}
         onToggleFilters={() => setDesktopFiltersOpen((open) => !open)}
@@ -233,18 +233,20 @@ export function TransactionsPage() {
         />
       )}
 
-      {showCreate ? (
-        <CreateTransactionModal
-          accounts={accounts}
-          categories={categories}
-          onClose={() => setShowCreate(false)}
-          onCreated={(transaction) => {
-            setShowCreate(false)
-            refetchTransactions()
-            navigate({ pathname: `/transactions/${transaction.id}`, search: window.location.search })
-          }}
-        />
-      ) : null}
+      <TransactionsCreateFlow
+        accounts={accounts}
+        categories={categories}
+        categoryGroups={categoryGroups}
+        filter={draftFilter}
+        onCreated={(transaction) => {
+          setCreateStep(null)
+          refetchTransactions()
+          navigate({ pathname: `/transactions/${transaction.id}`, search: window.location.search })
+        }}
+        onRuleCreated={refetchTransactions}
+        onStepChange={setCreateStep}
+        step={createStep}
+      />
       <BulkTransactionModals actions={bulk} categories={categories} selectedCount={selectedIds.size} tags={tags} />
     </div>
   )

@@ -23,6 +23,16 @@ function DetailToggleRow({ checked, disabled, label, onChange }: { checked: bool
   )
 }
 
+export interface TransactionDetailsPaneProps {
+  categories: Category[]
+  onClose: () => void
+  onDelete?: (id: string) => void
+  onShowMerchant?: (merchant: string) => void
+  onUpdate?: (updated: Transaction) => void
+  titleId?: string
+  transaction: Transaction
+}
+
 export function TransactionDetailsPane({
   categories,
   onClose,
@@ -31,15 +41,7 @@ export function TransactionDetailsPane({
   onUpdate,
   titleId,
   transaction,
-}: {
-  categories: Category[]
-  onClose: () => void
-  onDelete?: (id: string) => void
-  onShowMerchant?: (merchant: string) => void
-  onUpdate?: (updated: Transaction) => void
-  titleId?: string
-  transaction: Transaction
-}) {
+}: TransactionDetailsPaneProps) {
   const [, updateTransaction] = useMutation(UPDATE_TRANSACTION_MUTATION)
   const [, deleteTransaction] = useMutation(DELETE_TRANSACTION_MUTATION)
 

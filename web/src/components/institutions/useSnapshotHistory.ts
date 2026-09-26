@@ -8,11 +8,12 @@ import type { Account, AccountSnapshot, AccountSnapshotConnection, AccountSnapsh
 // when the account or its latest snapshot changes; onInitialSnapshots fires
 // after the first page loads for accounts without a latest snapshot so the
 // editor can seed its selection.
-export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapshots: AccountSnapshot[]) => void) {
+export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapshots: AccountSnapshot[]) => void, firstPage = 5) {
   const client = useClient()
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const [snapshots, setSnapshots] = useState<AccountSnapshot[]>(() => account.latestSnapshot ? [account.latestSnapshot] : [])
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
   const [infinite, setInfinite] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +32,7 @@ export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapsh
 
     client.query<{ accountSnapshots: AccountSnapshotConnection }, { input: AccountSnapshotsInput }>(
       ACCOUNT_SNAPSHOTS_QUERY,
-      { input: { accountId: account.id, first: 5 } },
+      { input: { accountId: account.id, first: firstPage } },
       { requestPolicy: 'network-only' },
     ).toPromise()
       .then((queryResult) => {
@@ -40,6 +41,7 @@ export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapsh
         const fetched = connection?.edges.map((edge) => edge.node) ?? (latestSnapshot ? [latestSnapshot] : [])
         setSnapshots(fetched)
         setPageInfo(connection?.pageInfo ?? null)
+        setTotalCount(connection?.totalCount ?? null)
         setError(queryResult.error?.message ?? null)
         if (!latestSnapshot) {
           seedInitialSnapshots(fetched)
@@ -55,7 +57,7 @@ export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapsh
     // seedInitialSnapshots is an effect event: non-reactive and unstable, it
     // must stay out of the deps or this effect refetches on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account.id, account.latestSnapshot, client])
+  }, [account.id, account.latestSnapshot, client, firstPage])
 
   async function loadMore() {
     if (loading || !pageInfo?.hasNextPage || !pageInfo.endCursor) return
@@ -117,6 +119,7 @@ export function useSnapshotHistory(account: Account, onInitialSnapshots: (snapsh
     setInfinite,
     snapshots,
     snapshotsByDate: snapshotsByDateMap,
+    totalCount,
   }
 }
 
