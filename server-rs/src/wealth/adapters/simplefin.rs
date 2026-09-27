@@ -198,6 +198,14 @@ fn investment_snapshot(
 }
 
 fn holding_line(holding: &SimpleFinHolding, price_at: DateTime<Utc>) -> Result<Option<AssetDailyHolding>> {
+    if !holding.currency.is_empty() && !holding.currency.eq_ignore_ascii_case("USD") {
+        tracing::warn!(
+            holding_id = %holding.id,
+            holding_currency = %holding.currency,
+            "skipping SimpleFIN holding with a non-USD currency"
+        );
+        return Ok(None);
+    }
     let shares = simplefin_amount(&holding.shares)?;
     let value_usd = simplefin_money(&holding.market_value)?;
     if shares == 0.0 || value_usd == 0.0 {
@@ -471,6 +479,40 @@ mod tests {
             Utc.timestamp_opt(1_700_000_000, 0).single()
         );
         assert_eq!(investment.holdings[1].identifier, "USD");
+    }
+
+    #[test]
+    fn skips_non_usd_holdings_and_keeps_the_usd_account_balance() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap();
+        let sink = TestSink { now };
+        let snapshot = investment_snapshot(
+            &SimpleFinAccount {
+                id: "eth-wallet".to_owned(),
+                currency: "USD".to_owned(),
+                balance: "2021.33".to_owned(),
+                holdings: vec![SimpleFinHolding {
+                    id: "eth".to_owned(),
+                    symbol: "ETH".to_owned(),
+                    shares: "0.7519938".to_owned(),
+                    market_value: "2021.33".to_owned(),
+                    currency: "ETH".to_owned(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            2,
+            1,
+            "USD",
+            &sink,
+            now,
+        )
+        .unwrap();
+
+        assert_eq!(snapshot.balance_usd, Cents(202_133));
+        assert_eq!(snapshot.holdings.len(), 1);
+        assert_eq!(snapshot.holdings[0].identifier, "USD");
+        assert_eq!(snapshot.holdings[0].value_usd, 2021.33);
+        assert!(snapshot.holdings[0].asset.is_none());
     }
 
     #[test]

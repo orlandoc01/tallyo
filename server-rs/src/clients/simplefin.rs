@@ -141,8 +141,8 @@ impl SimpleFinClient {
             anyhow::bail!("accounts request failed with HTTP {}: {body}", status.as_u16());
         }
 
-        let accounts = serde_json::from_str::<SimpleFinAccountSet>(&body).context("decode accounts response")?;
-        validate_currencies(&accounts)?;
+        let mut accounts = serde_json::from_str::<SimpleFinAccountSet>(&body).context("decode accounts response")?;
+        filter_non_usd_accounts(&mut accounts);
         Ok(accounts)
     }
 }
@@ -181,18 +181,18 @@ fn accounts_url(mut access_url: Url, opts: GetAccountsOpts) -> Result<Url> {
     Ok(access_url)
 }
 
-fn validate_currencies(accounts: &SimpleFinAccountSet) -> Result<()> {
-    for account in &accounts.accounts {
-        if !account.currency.is_empty() && !account.currency.eq_ignore_ascii_case("USD") {
-            anyhow::bail!("unsupported simplefin account currency {:?}", account.currency);
+fn filter_non_usd_accounts(accounts: &mut SimpleFinAccountSet) {
+    accounts.accounts.retain(|account| {
+        let keep = account.currency.is_empty() || account.currency.eq_ignore_ascii_case("USD");
+        if !keep {
+            tracing::warn!(
+                account_id = %account.id,
+                account_currency = %account.currency,
+                "skipping SimpleFIN account with a non-USD account currency"
+            );
         }
-        for holding in &account.holdings {
-            if !holding.currency.is_empty() && !holding.currency.eq_ignore_ascii_case("USD") {
-                anyhow::bail!("unsupported simplefin holding currency {:?}", holding.currency);
-            }
-        }
-    }
-    Ok(())
+        keep
+    });
 }
 
 #[cfg(test)]
@@ -250,7 +250,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_invalid_tokens_and_non_usd_accounts() {
+    async fn keeps_usd_accounts_with_non_usd_holdings_and_filters_non_usd_accounts() {
         let client = SimpleFinClient::new().unwrap();
         assert!(client.claim("not-base64").await.is_err());
         assert_eq!(
@@ -264,14 +264,28 @@ mod tests {
 
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"accounts":[{"currency":"EUR"}]}"#))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{"accounts":[
+                    {"id":"usd-checking","currency":"USD"},
+                    {"id":"crypto-account","currency":"USD","holdings":[{"id":"eth","currency":"ETH"}]},
+                    {"id":"eur-account","currency":"EUR"}
+                ]}"#,
+            ))
             .mount(&server)
             .await;
-        assert!(
-            client
-                .get_accounts(&server.uri(), GetAccountsOpts::default())
-                .await
-                .is_err()
+
+        let accounts = client
+            .get_accounts(&server.uri(), GetAccountsOpts::default())
+            .await
+            .unwrap();
+        assert_eq!(accounts.accounts.len(), 2);
+        assert_eq!(
+            accounts
+                .accounts
+                .iter()
+                .map(|account| account.id.as_str())
+                .collect::<Vec<_>>(),
+            ["usd-checking", "crypto-account"]
         );
     }
 
