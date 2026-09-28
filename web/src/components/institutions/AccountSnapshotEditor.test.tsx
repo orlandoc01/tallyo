@@ -149,8 +149,8 @@ describe('AccountSnapshotEditor', () => {
     await waitFor(() => {
       expect(requestedInputs).toEqual([{ accountId: 'acct-1', first: 5 }])
     })
-    expect(await screen.findByRole('checkbox', { name: 'Select 05/17/2026 snapshot' })).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: 'Select 05/18/2026 snapshot' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: 'Select 05/17/2026 snapshot' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Select 05/18/2026 snapshot' })).not.toBeInTheDocument()
   })
 
   it('selects loaded history and keeps the arbitrary date jump query', async () => {
@@ -167,9 +167,10 @@ describe('AccountSnapshotEditor', () => {
 
     render(<AccountSnapshotEditor account={accounts[0]} onAccountUpdate={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
-    const may20 = await screen.findByRole('checkbox', { name: 'Select 05/20/2026 snapshot' })
-    expect(may20.parentElement).toHaveTextContent('$1,200.00')
+    const may20 = await screen.findByRole('radio', { name: 'Select 05/20/2026 snapshot' })
+    expect(may20).toHaveTextContent('$1,200.00')
     await user.click(may20)
+    expect(may20).toHaveAttribute('aria-checked', 'true')
 
     expect(screen.getByLabelText('Snapshot date')).toHaveValue('2026-05-20')
     expect(screen.getByText('Flagged')).toBeInTheDocument()
@@ -188,13 +189,13 @@ describe('AccountSnapshotEditor', () => {
     const user = userEvent.setup()
     render(<AccountSnapshotEditor account={accounts[0]} onAccountUpdate={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
-    expect(await screen.findByRole('checkbox', { name: 'Select 05/16/2026 snapshot' })).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: 'Select 05/15/2026 snapshot' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: 'Select 05/16/2026 snapshot' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Select 05/15/2026 snapshot' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /load more/i }))
 
-    expect(await screen.findByRole('checkbox', { name: 'Select 05/15/2026 snapshot' })).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: 'Select 05/14/2026 snapshot' })).toBeInTheDocument()
+    expect(await screen.findByRole('radio', { name: 'Select 05/15/2026 snapshot' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Select 05/14/2026 snapshot' })).toBeInTheDocument()
   })
 
   it('titles investment snapshots as holdings', async () => {

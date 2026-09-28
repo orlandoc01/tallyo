@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router'
-import { underlineTabClassName } from './underlineTabsStyles'
+import { underlineTabClassName, underlineTabsRuleClass } from './underlineTabsStyles'
 
-const sheetTabsNavClass = 'sticky top-0 z-[2] flex gap-5 border-b border-border bg-surface'
+const sheetTabsNavClass = `sticky top-0 z-[2] flex gap-5 ${underlineTabsRuleClass} bg-surface`
 
 export function SheetTabs({ ariaLabel, items }: { ariaLabel: string; items: Array<{ to: string; children: ReactNode }> }) {
   return (
