@@ -4,13 +4,20 @@ import { graphql, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../mocks/server'
 import { categoryGroups } from '../mocks/fixtures'
-import { mockGraphqlError, mockMutation, mockQuery } from '../test/msw'
+import { captureMutation, mockGraphqlError, mockMutation, mockQuery } from '../test/msw'
 import { allowAllPermissionResult } from '../test/permissions'
 import { MobileHeaderActionsHost, renderWithProviders } from '../test/renderWithProviders'
 import { CategoriesPage } from './CategoriesPage'
 import { usePermissions } from '../hooks/usePermissions'
 
 vi.mock('../hooks/usePermissions', async () => (await import('../test/permissions')).allowAllPermissions())
+
+const mockViewport = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('../hooks/useIsMobile', () => ({ useIsMobile: () => mockViewport.isMobile }))
+
+afterEach(() => {
+  mockViewport.isMobile = false
+})
 
 function renderCategoriesPage(withActionsHost = false) {
   return renderWithProviders(<CategoriesPage />, {
@@ -225,7 +232,7 @@ describe('CategoriesPage group card', () => {
     expect(screen.getByRole('button', { name: 'Groceries' })).toBeInTheDocument()
   })
 
-  it('offers rename and delete from the mobile group menu, also when collapsed', async () => {
+  it('offers rename and delete from the group menu dropdown on desktop, also when collapsed', async () => {
     const user = userEvent.setup()
     renderCategoriesPage()
 
@@ -242,6 +249,24 @@ describe('CategoriesPage group card', () => {
     await user.click(within(popover).getByRole('button', { name: 'Rename' }))
     expect(screen.getByRole('dialog', { name: /edit group/i })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Food group actions' })).not.toBeInTheDocument()
+  })
+
+  it('deletes an empty group from the mobile sheet after a second tap', async () => {
+    mockViewport.isMobile = true
+    const user = userEvent.setup()
+    mockQuery('CategoryGroups', { categoryGroups: { __typename: 'CategoryGroupList', items: [{ ...categoryGroups[0], categories: [] }] } })
+    const deleteGroup = captureMutation('DeleteCategoryGroup', { deleteCategoryGroup: { __typename: 'DeleteCategoryGroupPayload', success: true } })
+    renderCategoriesPage()
+
+    await screen.findByText('Food')
+    await user.click(screen.getByRole('button', { name: 'Food group actions' }))
+    const sheet = screen.getByRole('dialog', { name: 'Category group' })
+    await user.click(within(sheet).getByRole('button', { name: 'Delete' }))
+    expect(within(sheet).getByRole('button', { name: 'Tap again to confirm' })).toBeInTheDocument()
+    expect(deleteGroup.called).toBe(false)
+    await user.click(within(sheet).getByRole('button', { name: 'Tap again to confirm' }))
+
+    await waitFor(() => expect(deleteGroup.calls).toBe(1))
   })
 
   it('shows a delete error under the header of a collapsed group', async () => {

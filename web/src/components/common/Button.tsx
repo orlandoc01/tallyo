@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react'
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode, Ref } from 'react'
 import { Link } from 'react-router'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-solid' | 'ghost' | 'ghost-muted' | 'outline-accent'
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-solid' | 'danger-tinted' | 'ghost' | 'ghost-muted' | 'outline-accent'
 type ButtonSize = 'xs' | 'sm' | 'md' | 'lg'
 
 const variantClass: Record<ButtonVariant, string> = {
@@ -11,6 +11,7 @@ const variantClass: Record<ButtonVariant, string> = {
   secondary: 'bg-raised font-medium text-text-1 hover:bg-border-strong',
   danger: 'bg-transparent font-medium text-negative hover:bg-negative/10',
   'danger-solid': 'bg-negative font-semibold text-white hover:bg-negative/90 dark:text-bg',
+  'danger-tinted': 'bg-negative/10 font-semibold text-negative hover:bg-negative/15',
   ghost: 'font-medium text-text-1 hover:bg-raised',
   'ghost-muted': 'font-normal text-text-3 hover:bg-raised hover:text-text-1',
   'outline-accent': 'bg-brand-600/[0.12] font-semibold text-accent',
@@ -21,6 +22,7 @@ const variantBorderClass: Record<ButtonVariant, string> = {
   secondary: 'border-border-strong',
   danger: 'border-negative/35',
   'danger-solid': 'border-negative',
+  'danger-tinted': 'border-negative/40',
   ghost: 'border-transparent',
   'ghost-muted': 'border-transparent',
   'outline-accent': 'border-brand-600',

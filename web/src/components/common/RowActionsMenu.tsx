@@ -32,7 +32,7 @@ export function RowActionsMenu({ ariaLabel, hero, isOpen, items, onToggle, title
         <div aria-label={ariaLabel} className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border-strong bg-raised p-2 shadow-dropdown" role="dialog">
           {items.map((item, index) => (
             <ActionMenuItem className="disabled:cursor-not-allowed disabled:opacity-40" destructive={item.destructive} disabled={item.disabled} key={index} onClick={item.onSelect} title={item.title}>
-              {item.label}
+              {item.confirming ? `Confirm ${item.label.toLowerCase()}` : item.label}
             </ActionMenuItem>
           ))}
         </div>

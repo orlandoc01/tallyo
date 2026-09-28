@@ -2,10 +2,10 @@ import type { Account } from '../../types/graphql'
 import { accountMaskedName, accountNetContributionUSD } from '../../utils/accounts'
 import { institutionColor } from '../../utils/colors'
 import { formatSignedCurrency } from '../../utils/currency'
-import { Button } from '../common/Button'
 import { FormError } from '../common/FormControls'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
 import { MobileSheet } from '../common/MobileFilterDropdown'
+import { SheetDangerAction } from '../common/SheetDangerAction'
 import { SheetAvatar, SheetHero, SheetMeta } from '../common/SheetHero'
 import { SheetTabs } from '../common/SheetTabs'
 import { AccountInfoSheetRows } from './AccountInfoSheetRows'
@@ -36,11 +36,6 @@ export function AccountDetailSheet({ account, basePath, canReadValuation, curren
   const balance = accountNetContributionUSD(account)
   const displayName = accountMaskedName(account)
   const showInfo = currentTab === 'info' && !loadingEVMProvider && !evmProviderError
-  const removeAction = form.canWriteAccounts && account.manual ? (
-    <Button className="touch-manipulation" disabled={form.isSaving || form.isDeleting} onClick={() => { void form.handleRemoveManualAccount() }} size="sm" variant={form.confirmingDelete ? 'danger-solid' : 'ghost'}>
-      {form.isDeleting ? 'Removing…' : form.confirmingDelete ? 'Confirm remove' : 'Remove'}
-    </Button>
-  ) : undefined
   const footer = currentTab === 'info' ? (
     <MobileFilterFooter
       primaryDisabled={form.canWriteAccounts && form.disableSave}
@@ -53,7 +48,7 @@ export function AccountDetailSheet({ account, basePath, canReadValuation, curren
   ) : <MobileFilterFooter primaryLabel="Done" onPrimary={onClose} />
 
   return (
-    <MobileSheet action={removeAction} bodyClassName="pb-2" footer={footer} hideClose labelledBy="account-detail-title" maxHeight="84%" onClose={onClose} title="Account">
+    <MobileSheet bodyClassName="pb-2" footer={footer} hideClose labelledBy="account-detail-title" maxHeight="84%" onClose={onClose} title="Account">
       <div aria-label={`Details for ${displayName}`} role="region">
         <SheetHero
           avatar={<SheetAvatar color={institutionColor(institution)} glyph={institution.charAt(0).toUpperCase()} />}
@@ -71,7 +66,12 @@ export function AccountDetailSheet({ account, basePath, canReadValuation, curren
         {error ? <FormError className="mt-3">{error}</FormError> : null}
         {currentTab === 'info' && loadingEVMProvider ? <p className="mt-4 text-sm text-text-3" role="status">Loading wallet chains…</p> : null}
         {currentTab === 'info' && evmProviderError ? <FormError className="mt-3">Could not load wallet chains.</FormError> : null}
-        {showInfo ? <div className="mt-2"><AccountInfoSheetRows account={account} form={form} /></div> : null}
+        {showInfo ? (
+          <div className="mt-2">
+            <AccountInfoSheetRows account={account} form={form} />
+            {account.manual && form.canWriteAccounts ? <SheetDangerAction busy={form.isDeleting} busyLabel="Removing…" disabled={form.isSaving} label="Delete account" onSelect={() => { void form.removeAccount() }} /> : null}
+          </div>
+        ) : null}
         {currentTab === 'valuation' && canReadValuation ? <AccountValuationSheet account={account} key={`${account.id}:${account.latestSnapshot?.date ?? ''}`} onAccountUpdate={onAccountUpdate} /> : null}
       </div>
     </MobileSheet>

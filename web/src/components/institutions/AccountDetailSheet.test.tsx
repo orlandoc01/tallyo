@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { usePermissions } from '../../hooks/usePermissions'
-import { accounts } from '../../mocks/fixtures'
+import { accounts, owners } from '../../mocks/fixtures'
 import { allowAllPermissionResult } from '../../test/permissions'
-import { captureMutation, mockGraphqlError } from '../../test/msw'
+import { graphql, HttpResponse } from 'msw'
+import { server } from '../../mocks/server'
+import { captureMutation, deferred, mockGraphqlError } from '../../test/msw'
 import { TestProviders } from '../../test/renderWithProviders'
 import { AccountDetailModal } from './AccountDetailModal'
 
@@ -28,6 +30,19 @@ function Providers({ children }: { children: ReactNode }) {
 }
 
 describe('AccountDetailSheet', () => {
+  it('shows the account owner in the Owner row before the owners list resolves', async () => {
+    const ownersQuery = deferred()
+    server.use(graphql.link('/query').query('Owners', async () => {
+      await ownersQuery.wait()
+      return HttpResponse.json({ data: { owners: { __typename: 'OwnerList', items: owners } } })
+    }))
+    render(<AccountDetailModal account={accounts[0]} onClose={vi.fn()} />, { wrapper: Providers })
+
+    expect(screen.getByRole('button', { name: /^owner/i })).toHaveTextContent(accounts[0].owner.name)
+    ownersQuery.resolve()
+    expect(await screen.findByRole('button', { name: /^owner/i })).toHaveTextContent(accounts[0].owner.name)
+  })
+
   it('renders the hero, meta, sticky tabs and info rows on mobile', async () => {
     render(<AccountDetailModal account={{ ...accounts[0], notes: 'Household bills' }} onClose={vi.fn()} />, { wrapper: Providers })
 
@@ -95,18 +110,30 @@ describe('AccountDetailSheet', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/transactions?account_ids=acct-1')
   })
 
-  it('removes a manual account through the two-step title action', async () => {
+  it('removes a manual account through the two-step danger action', async () => {
     const user = userEvent.setup()
     const onDelete = vi.fn()
     const account = accounts.find((item) => item.id === 'manual-company-equity')!
     const removeAccount = captureMutation<{ id: string }>('RemoveManualAccount', { removeManualAccount: { __typename: 'RemoveManualAccountPayload', success: true } })
     render(<AccountDetailModal account={account} onClose={vi.fn()} onDelete={onDelete} />, { wrapper: Providers })
 
-    await user.click(screen.getByRole('button', { name: 'Remove' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm remove' }))
+    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete account' }))
+    expect(removeAccount.called).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
 
     await waitFor(() => expect(removeAccount.input).toEqual({ id: account.id }))
     expect(onDelete).toHaveBeenCalledWith(account)
+  })
+
+  it('offers the danger action only on the info tab of a manual account', () => {
+    const manual = accounts.find((item) => item.id === 'manual-company-equity')!
+    const { unmount } = render(<AccountDetailModal account={accounts[0]} onClose={vi.fn()} />, { wrapper: Providers })
+    expect(screen.queryByRole('button', { name: 'Delete account' })).not.toBeInTheDocument()
+    unmount()
+
+    render(<AccountDetailModal account={manual} activeTab="valuation" onClose={vi.fn()} />, { wrapper: Providers })
+    expect(screen.queryByRole('button', { name: 'Delete account' })).not.toBeInTheDocument()
   })
 
   it('clears a subtype that no longer fits the picked type', async () => {

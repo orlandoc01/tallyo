@@ -13,13 +13,13 @@ afterEach(() => {
   mockViewport.isMobile = false
 })
 
-function Harness({ onRename }: { onRename: () => void }) {
+function Harness({ confirming = false, onRename }: { confirming?: boolean; onRename: () => void }) {
   return (
     <RowActionsMenu
       ariaLabel="Open actions for Chase"
       hero={<p>Chase · 3 accounts</p>}
       isOpen
-      items={[{ label: 'Rename', onSelect: onRename }, { label: 'Delete', destructive: true, disabled: true, title: 'Delete accounts first', onSelect: vi.fn() }]}
+      items={[{ label: 'Rename', onSelect: onRename }, { label: 'Delete', confirming, destructive: true, disabled: !confirming, title: 'Delete accounts first', onSelect: vi.fn() }]}
       onToggle={vi.fn()}
       title="Connection"
     />
@@ -54,5 +54,15 @@ describe('RowActionsMenu', () => {
     expect(within(sheet).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     await user.click(within(sheet).getByRole('button', { name: 'Rename' }))
     expect(onRename).toHaveBeenCalledOnce()
+  })
+
+  it('labels an armed destructive item per surface', () => {
+    const { unmount } = render(<Harness confirming onRename={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Confirm delete' })).toBeEnabled()
+    unmount()
+
+    mockViewport.isMobile = true
+    render(<Harness confirming onRename={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Tap again to confirm' })).toBeEnabled()
   })
 })

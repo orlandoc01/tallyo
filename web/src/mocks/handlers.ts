@@ -29,7 +29,7 @@ import {
 } from './fixtures'
 import { stubClassifierBreakdown, stubNetWorthAssetsUSD, stubNetWorthHistory } from './netWorthFixtures'
 import { cashFlowPeriodsForFilter, spendingReportForFilter, type ReportFilter } from './reportFixtures'
-import type { Account, AccountSnapshot, AccountSnapshotInput, AccountSnapshotsInput, AddUserInput, AnalysisInput, Asset, AssetsInput, BudgetReportInput, BulkDeleteTransactionsInput, BulkUpdateTransactionsInput, CashFlowPeriod, ChangeAccountSnapshotInput, CopyBudgetsInput, CreateAssetInput, CreateCategoryGroupInput, CreateCategoryInput, CreateManualAccountInput, CreateOwnerInput, CreatePlaidCredentialInput, CreateRuleInput, CreateSimpleFinAccessTokenInput, CreateTransactionInput, LinkEVMWalletInput, MergeAssetInput, ReorderCategoriesInput, RulesInput, SetBudgetInput, SpendingByCategoryReport, TransactionsFilter, TransactionsInput, UpdateAccountInput, UpdateCategoryGroupInput, UpdateCategoryInput, UpdateConnectionInput, UpdatePlaidCredentialInput, UpdateRuleInput, UpdateTransactionInput, UpdateUserInput, User } from '../types/graphql'
+import type { Account, AccountSnapshot, AccountSnapshotInput, AccountSnapshotsInput, AddUserInput, AnalysisInput, Asset, AssetsInput, BudgetReportInput, BulkDeleteTransactionsInput, BulkUpdateTransactionsInput, CashFlowPeriod, ChangeAccountSnapshotInput, CopyBudgetsInput, CreateAssetInput, CreateCategoryGroupInput, CreateCategoryInput, CreateManualAccountInput, CreateOwnerInput, CreatePlaidCredentialInput, CreateRuleInput, CreateSimpleFinAccessTokenInput, CreateTagInput, CreateTransactionInput, LinkEVMWalletInput, LinkRealEstateInput, MergeAssetInput, ReorderCategoriesInput, RulesInput, SetBudgetInput, SpendingByCategoryReport, TransactionsFilter, TransactionsInput, UpdateAccountInput, UpdateCategoryGroupInput, UpdateCategoryInput, UpdateConnectionInput, UpdatePlaidCredentialInput, UpdateRuleInput, UpdateTagInput, UpdateTransactionInput, UpdateUserInput, User } from '../types/graphql'
 
 const base = import.meta.env.BASE_URL
 const api = graphql.link(`${base}query`)
@@ -811,6 +811,23 @@ export const handlers = [
     // Older tests still send `ids`; production uses the generated `transactionIds` field.
     const input = variables.input as BulkDeleteTransactionsInput & { ids?: string[] }
     return HttpResponse.json({ data: { bulkDeleteTransactions: { __typename: 'BulkDeleteTransactionsPayload', deletedCount: (input.ids ?? input.transactionIds ?? []).length } } })
+  }),
+  api.mutation('CreateTag', ({ variables }) => {
+    const input = variables.input as CreateTagInput
+    return HttpResponse.json({ data: { createTag: { __typename: 'CreateTagPayload', tag: { __typename: 'Tag', id: `tag-${input.name.toLowerCase().replace(/\s+/g, '-')}`, name: input.name, color: input.color } } } })
+  }),
+  api.mutation('UpdateTag', ({ variables }) => {
+    const input = variables.input as UpdateTagInput
+    return HttpResponse.json({ data: { updateTag: { __typename: 'UpdateTagPayload', tag: { __typename: 'Tag', id: input.id, name: input.name, color: input.color } } } })
+  }),
+  api.mutation('LinkRealEstate', ({ variables }) => {
+    const input = variables.input as LinkRealEstateInput
+    const owner = owners.find((item) => item.id === input.ownerId) ?? owners[0]
+    const home = accounts.find((account) => account.id === 'acct-real-estate') ?? accounts[0]
+    const address = { __typename: 'Address', street: input.street ?? null, city: input.city ?? null, state: input.state ?? null, zip: input.zip ?? null, homeType: input.homeType ?? null }
+    const connection = { __typename: 'Connection', id: `conn-home-${Date.now()}`, name: input.label ?? 'Home', owner, isActive: true, provider: null }
+    const account = { ...home, id: `home-${connection.id}`, connection, owner, name: input.label ?? 'Home', accountWealthProperty: { __typename: 'RealEstateAssetDetails', address } }
+    return HttpResponse.json({ data: { linkRealEstate: { __typename: 'LinkRealEstatePayload', connection, account, valuationUSD: input.manualValuationUSD } } })
   }),
   api.mutation('LinkEVMWallet', ({ variables }) => {
     const input = variables.input as LinkEVMWalletInput

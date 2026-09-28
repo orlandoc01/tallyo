@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { Account } from '../../types/graphql'
 import { accountDisplayLabel } from '../../utils/accounts'
 import { AccountFilterOptions } from '../common/AccountFilterOptions'
@@ -9,6 +8,7 @@ import { filterSummary, selectionSummary } from '../common/filterSummary'
 import { TextField } from '../common/FormControls'
 import { MobileFilterDropdown } from '../common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
+import { useSheetSections } from '../common/useSheetSections'
 import { AccountCheckboxList } from './AccountCheckboxList'
 import type { RuleFilterValues } from './ruleFilterUtils'
 
@@ -75,8 +75,7 @@ export function RuleFilterPanel({ accounts, caretRight, clearable, filters, onCh
 }
 
 export function RuleMobileFilters({ accounts, filters, onChange, onClear, onClose }: RuleFilterProps & { onClose: () => void }) {
-  const [open, setOpen] = useState<Section | null>(null)
-  const toggle = (section: Section) => () => setOpen((current) => current === section ? null : section)
+  const { open, toggle } = useSheetSections<Section>()
   return (
     <MobileFilterDropdown footer={<MobileFilterFooter onPrimary={onClose} />} labelledBy="rule-filters-title" onClear={onClear} onClose={onClose}>
       <CollapsibleFilterSection active={patternsActive(filters)} expanded={open === 'patterns'} label="Patterns" summary={patternsSummary(filters) ?? 'Any'} onToggle={toggle('patterns')}>

@@ -5,6 +5,7 @@ import type { Account, AccountType, UpdateConnectionInput, UpdateConnectionPaylo
 import { REMOVE_MANUAL_ACCOUNT_MUTATION, UPDATE_ACCOUNT_MUTATION, UPDATE_CONNECTION_MUTATION, UPDATE_REAL_ESTATE_MUTATION } from '../../graphql/mutations'
 import { useOwners } from '../../hooks/useEntityQueries'
 import { usePermissions } from '../../hooks/usePermissions'
+import { useTwoStepConfirm } from '../../hooks/useTwoStepConfirm'
 import { isValidSubtypeForType } from '../../utils/accountSubtypes'
 import { sameIds } from '../../utils/selection'
 import type { AddressField } from './addressDraft'
@@ -48,7 +49,7 @@ export function useAccountInfoForm({ account, onAccountUpdate, onClose, onDelete
   const currentChainIds = evmWallet?.chainIds ?? []
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const confirm = useTwoStepConfirm()
 
   const canEditPropertyAddress = isProperty && !!account.connection
   const needsTypeReview = accountNeedsReview(account) && !account.typeLocked
@@ -144,12 +145,7 @@ export function useAccountInfoForm({ account, onAccountUpdate, onClose, onDelete
     }
   }
 
-  async function handleRemoveManualAccount() {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true)
-      return
-    }
-
+  async function removeAccount() {
     setIsDeleting(true)
     onError(null)
     const result = await removeManualAccount({ input: { id: account.id } })
@@ -164,11 +160,13 @@ export function useAccountInfoForm({ account, onAccountUpdate, onClose, onDelete
     onClose()
   }
 
+  const handleRemoveManualAccount = () => (confirm.confirming ? removeAccount() : confirm.arm())
+
   return {
     canEditPropertyAddress,
     canWriteAccounts,
     chainsDirty,
-    confirmingDelete,
+    confirmingDelete: confirm.confirming,
     disableSave,
     draft,
     evmWallet,
@@ -184,5 +182,6 @@ export function useAccountInfoForm({ account, onAccountUpdate, onClose, onDelete
     needsTypeReview,
     owners,
     propertyAddressDirty,
+    removeAccount,
   }
 }

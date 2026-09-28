@@ -6,7 +6,7 @@ import { FilterPanel } from '../common/FilterPanel'
 import { MobileFilterDropdown } from '../common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
 import { ToggleSwitch } from '../common/ToggleSwitch'
-import { ASSET_TYPE_OPTIONS, assetTypeLabel, countActiveAssetFilters, type AssetFilterValues, type AssetTypeFilter } from './assetFilters'
+import { ASSET_TYPE_FILTER_OPTIONS, assetTypeLabel, countActiveAssetFilters, type AssetFilterValues, type AssetTypeFilter } from './assetFilters'
 
 interface AssetFilterProps {
   filters: AssetFilterValues
@@ -21,7 +21,7 @@ export function AssetFilterPanel({ caretRight, filters, onChange, onClear }: Ass
       <FilterDropdown active={typeActive} label="Asset type" summary={typeActive ? assetTypeLabel(filters.assetType) : undefined} width={200}>
         {(close) => (
           <div aria-label="Asset type" role="radiogroup">
-            {ASSET_TYPE_OPTIONS.map((option) => (
+            {ASSET_TYPE_FILTER_OPTIONS.map((option) => (
               <FilterPresetRow key={option.value} label={option.label} onSelect={() => { onChange({ ...filters, assetType: option.value }); close() }} selected={option.value === filters.assetType} />
             ))}
           </div>
@@ -44,7 +44,7 @@ export function AssetMobileFilters({ filters, onChange, onClear, onClose }: Asse
       </label>
       <CollapsibleFilterSection active={filters.assetType !== 'ALL'} expanded={typeOpen} label="Asset type" summary={assetTypeLabel(filters.assetType)} onToggle={() => setTypeOpen((current) => !current)}>
         <FilterRadioList<AssetTypeFilter>
-          options={ASSET_TYPE_OPTIONS.map((option) => ({ id: option.value, label: option.label, ariaLabel: option.label }))}
+          options={ASSET_TYPE_FILTER_OPTIONS.map((option) => ({ id: option.value, label: option.label, ariaLabel: option.label }))}
           selectedId={filters.assetType}
           onChange={(assetType) => { onChange({ ...filters, assetType }); setTypeOpen(false) }}
         />

@@ -10,7 +10,7 @@ import { usePermissions } from '../../hooks/usePermissions'
 import { accounts, plaidItems, simpleFinConnections } from '../../mocks/fixtures'
 import { server } from '../../mocks/server'
 import { ACCOUNTS_PATHS, absoluteRoutePath } from '../../routes'
-import { captureMutation, mockMutation, mockQuery } from '../../test/msw'
+import { captureMutation, deferred, mockMutation, mockQuery } from '../../test/msw'
 import { allowAllPermissionResult } from '../../test/permissions'
 import { MobileHeaderActionsHost, TestProviders } from '../../test/renderWithProviders'
 import { AccountDetailModal } from './AccountDetailModal'
@@ -1032,18 +1032,6 @@ describe('AccountsPage account routes', () => {
 
 function InstitutionProvider({ children }: { children: ReactNode }) {
   return <TestProviders withGraphql>{children}</TestProviders>
-}
-
-function deferred() {
-  let resolve!: () => void
-  const promise = new Promise<void>((done) => {
-    resolve = done
-  })
-
-  return {
-    resolve,
-    wait: () => promise,
-  }
 }
 
 function InstitutionProviderWithRouter({ children }: { children: ReactNode }) {

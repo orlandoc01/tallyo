@@ -6,18 +6,21 @@ import { Modal } from '../common/Modal'
 import { ModalHeader } from '../common/ModalHeader'
 import { StatBlock, StatGrid } from '../common/StatBlock'
 import { RESOLVE_BALANCE_REVIEW_MUTATION } from '../../graphql/mutations'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { usePermissions } from '../../hooks/usePermissions'
 import type { BalanceReviewAction, BalanceSnapshotReview, ResolveBalanceReviewPayload } from '../../types/graphql'
 import { accountMaskedName } from '../../utils/accounts'
 import { formatAccountType } from '../../utils/accountSubtypes'
 import { formatCurrency, formatPercentChange, formatSignedCurrency } from '../../utils/currency'
 import { formatDisplayDate } from '../../utils/dates'
+import { BalanceReviewSheet } from './BalanceReviewSheet'
 
 type ResolveBalanceReviewData = {
   resolveBalanceReview: ResolveBalanceReviewPayload
 }
 
 export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: () => void; onResolved: () => void; review: BalanceSnapshotReview }) {
+  const isMobile = useIsMobile()
   const [, resolveReview] = useMutation<ResolveBalanceReviewData>(RESOLVE_BALANCE_REVIEW_MUTATION)
   const { canWrite } = usePermissions()
   const [confirmUseProvider, setConfirmUseProvider] = useState(false)
@@ -27,6 +30,7 @@ export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: (
   const canResolve = canWrite('wealth')
   const difference = review.providerBalanceUSD - review.carryForwardBalanceUSD
   const deviation = review.carryForwardBalanceUSD === 0 ? null : (difference / Math.abs(review.carryForwardBalanceUSD)) * 100
+  const subtitle = `${formatAccountType(review.account.type)}${review.account.subtype ? ` / ${review.account.subtype}` : ''}`
 
   async function resolve(action: BalanceReviewAction) {
     setResolving(action)
@@ -40,12 +44,16 @@ export function BalanceReviewModal({ onClose, onResolved, review }: { onClose: (
     onResolved()
   }
 
+  if (isMobile) {
+    return <BalanceReviewSheet canResolve={canResolve} deviation={deviation} difference={difference} mutationError={mutationError} onApprove={() => { void resolve('APPROVE_CHANGES') }} onClose={onClose} onUseProvider={() => { void resolve('USE_PROVIDER') }} resolving={resolving} review={review} subtitle={subtitle} />
+  }
+
   return (
     <Modal label={`Balance review for ${accountMaskedName(review.account)}`} onClose={onClose} scrollable size="lg">
       <div className="space-y-5">
         <ModalHeader
           onClose={onClose}
-          subtitle={`${formatAccountType(review.account.type)}${review.account.subtype ? ` / ${review.account.subtype}` : ''}`}
+          subtitle={subtitle}
           title={accountMaskedName(review.account)}
         />
 

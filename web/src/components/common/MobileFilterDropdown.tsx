@@ -33,6 +33,7 @@ interface MobileSheetProps {
   action?: ReactNode
   bodyClassName?: string
   children: ReactNode
+  dismissible?: boolean
   footer?: ReactNode
   hideClose?: boolean
   labelledBy: string
@@ -44,7 +45,7 @@ interface MobileSheetProps {
 
 const DISMISS_DRAG_PX = 64
 
-function useSwipeDown(onClose: () => void) {
+function useSwipeDown(onClose: () => void, dismissible: boolean) {
   const panelRef = useRef<HTMLDivElement>(null)
   const startY = useRef<number | null>(null)
 
@@ -54,13 +55,13 @@ function useSwipeDown(onClose: () => void) {
 
   function settle(dy: number | null) {
     startY.current = null
-    if (dy !== null && dy > DISMISS_DRAG_PX) onClose()
+    if (dismissible && dy !== null && dy > DISMISS_DRAG_PX) onClose()
     else if (panelRef.current) panelRef.current.style.transform = ''
   }
 
   const gripHandlers = {
     onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-      if ((event.target as Element).closest('button')) return
+      if (!dismissible || (event.target as Element).closest('button')) return
       event.currentTarget.setPointerCapture?.(event.pointerId)
       startY.current = event.clientY
     },
@@ -79,23 +80,24 @@ function useSwipeDown(onClose: () => void) {
   return { panelRef, gripHandlers }
 }
 
-export function MobileSheet({ action, bodyClassName, children, footer, hideClose = false, labelledBy, maxHeight = '78%', onClear, onClose, title = 'Filters' }: MobileSheetProps) {
+export function MobileSheet({ action, bodyClassName, children, dismissible = true, footer, hideClose = false, labelledBy, maxHeight = '78%', onClear, onClose, title = 'Filters' }: MobileSheetProps) {
   const titleAction = action ?? (onClear ? <Button className="touch-manipulation" onClick={onClear} size="sm" variant="ghost">Clear filters</Button> : null)
-  const { panelRef, gripHandlers } = useSwipeDown(onClose)
+  const { panelRef, gripHandlers } = useSwipeDown(onClose, dismissible)
 
   useEffect(() => {
+    if (!dismissible) return
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [dismissible, onClose])
   const dialog = (
     <div
       aria-labelledby={labelledBy}
       aria-modal="true"
       className="fixed inset-0 z-40 bg-overlay lg:hidden"
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
       role="dialog"
     >
       <div

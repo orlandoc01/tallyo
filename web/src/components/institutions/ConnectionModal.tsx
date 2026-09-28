@@ -1,7 +1,10 @@
 import clsx from 'clsx'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { CreateSimpleFinAccessTokenPayload, ExchangePublicTokenPayload } from '../../types/graphql'
+import { useIsMobile } from '../../hooks/useIsMobile'
+import { MobileSheet } from '../common/MobileFilterDropdown'
 import { Modal } from '../common/Modal'
+import { SheetTabButtons, SheetTabPanel } from '../common/SheetTabs'
 import { PlaidConnectionForm } from './AddAccountFlow'
 import { SimpleFinConnectionForm } from './SimpleFinConnectionForm'
 
@@ -23,7 +26,25 @@ export function ConnectionModal({
   onPlaidLinked: (payload: ExchangePublicTokenPayload) => void
   onSimpleFinLinked: (payload: CreateSimpleFinAccessTokenPayload) => void
 }) {
+  const isMobile = useIsMobile()
+  const tabsId = useId()
   const [activeTab, setActiveTab] = useState<ConnectionTab>(initialTab)
+  const forms = {
+    plaid: <PlaidConnectionForm onClose={onClose} onLinked={onPlaidLinked} />,
+    simplefin: <SimpleFinConnectionForm onClose={onClose} onLinked={onSimpleFinLinked} />,
+  }
+
+  if (isMobile) {
+    return (
+      <MobileSheet bodyClassName="pb-2" dismissible={false} hideClose labelledBy="connection-sheet-title" maxHeight="84%" onClose={onClose} title="Link connection">
+        <SheetTabButtons ariaLabel="Bank data providers" idPrefix={tabsId} items={TABS.map((tab) => ({ id: tab.value, children: tab.label }))} onChange={setActiveTab} value={activeTab} />
+        <SheetTabPanel idPrefix={tabsId} tabId={activeTab}>
+          <p className="py-2 text-[13px] text-text-3">{TABS.find((tab) => tab.value === activeTab)?.description}</p>
+          {forms[activeTab]}
+        </SheetTabPanel>
+      </MobileSheet>
+    )
+  }
 
   return (
     <Modal dismissOnBackdrop={false} label="Link Connection" onClose={onClose} size="lg">
@@ -51,11 +72,7 @@ export function ConnectionModal({
         ))}
       </div>
 
-      {activeTab === 'plaid' ? (
-        <PlaidConnectionForm onClose={onClose} onLinked={onPlaidLinked} />
-      ) : (
-        <SimpleFinConnectionForm onClose={onClose} onLinked={onSimpleFinLinked} />
-      )}
+      {forms[activeTab]}
     </Modal>
   )
 }

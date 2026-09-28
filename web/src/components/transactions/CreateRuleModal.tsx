@@ -9,7 +9,9 @@ import { ModalHeader } from '../common/ModalHeader'
 import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { useSaveAction } from '../../hooks/useSaveAction'
 import { useTags } from '../../hooks/useEntityQueries'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { RuleFormFields } from './RuleFormFields'
+import { RuleSheet } from './RuleSheet'
 import { ruleInputFromFields, useRuleFormFields } from './useRuleFormFields'
 
 function initialAmountRange(filter: TransactionsFilter) {
@@ -33,6 +35,7 @@ export function CreateRuleModal({
   onClose: () => void
   onCreated?: () => void
 }) {
+  const isMobile = useIsMobile()
   const amountRange = initialAmountRange(filter)
   const categories = categoryGroups.flatMap((group) => group.categories)
   const fields = useRuleFormFields({
@@ -57,8 +60,8 @@ export function CreateRuleModal({
 
   const canSubmit = !!fields.categoryId || !!fields.merchantName.trim() || fields.tagIds.length > 0 || fields.shouldHide
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     setError(null)
 
     if (!canSubmit) {
@@ -70,6 +73,10 @@ export function CreateRuleModal({
     if (fields.shouldHide) input.changes.isHidden = true
 
     await save(() => createRule({ input }), () => { onCreated?.(); onClose() })
+  }
+
+  if (isMobile) {
+    return <RuleSheet accounts={accounts} applyRetroactively={applyRetroactively} canSubmit={canSubmit} categories={categories} error={error} fields={fields} onClose={onClose} onSubmit={handleSubmit} saving={saving} setApplyRetroactively={setApplyRetroactively} submitLabel="Submit rule" tags={tags} title="Create rule" />
   }
 
   return (

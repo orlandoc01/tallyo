@@ -26,10 +26,24 @@ describe('row action menus on mobile', () => {
 
     expect(screen.getByRole('dialog', { name: 'Connection' })).toBeInTheDocument()
     expect(onDelete).not.toHaveBeenCalled()
-    await user.click(within(sheet).getByRole('button', { name: 'Confirm delete' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Tap again to confirm' }))
 
     expect(onDelete).toHaveBeenCalledWith(connection)
     expect(screen.queryByRole('dialog', { name: 'Connection' })).not.toBeInTheDocument()
+  })
+
+  it('disarms the institution delete when the sheet is cancelled', async () => {
+    const user = userEvent.setup()
+    render(<InstitutionRow accounts={[]} connection={connection} plaidItem={plaidItems[0]} onAccountClick={vi.fn()} onDelete={vi.fn()} />)
+
+    const trigger = screen.getByRole('button', { name: /open actions for american express/i })
+    await user.click(trigger)
+    await user.click(within(screen.getByRole('dialog', { name: 'Connection' })).getByRole('button', { name: 'Delete' }))
+    expect(screen.getByRole('button', { name: 'Tap again to confirm' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(trigger)
+
+    expect(within(screen.getByRole('dialog', { name: 'Connection' })).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('runs a plain item and closes the wallet sheet, confirming delete in two taps', async () => {
@@ -49,7 +63,7 @@ describe('row action menus on mobile', () => {
     sheet = screen.getByRole('dialog', { name: 'Wallet' })
     await user.click(within(sheet).getByRole('button', { name: 'Delete' }))
     expect(onDelete).not.toHaveBeenCalled()
-    await user.click(within(sheet).getByRole('button', { name: 'Confirm delete' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Tap again to confirm' }))
     expect(onDelete).toHaveBeenCalledOnce()
   })
 
@@ -64,7 +78,7 @@ describe('row action menus on mobile', () => {
     const sheet = screen.getByRole('dialog', { name: 'Property' })
     await user.click(within(sheet).getByRole('button', { name: 'Remove' }))
     expect(unlink.called).toBe(false)
-    await user.click(within(sheet).getByRole('button', { name: 'Confirm remove' }))
+    await user.click(within(sheet).getByRole('button', { name: 'Tap again to confirm' }))
 
     await waitFor(() => expect(unlink.called).toBe(true))
     expect(onUnlink).toHaveBeenCalledWith('conn-home')

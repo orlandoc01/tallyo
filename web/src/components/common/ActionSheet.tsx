@@ -1,10 +1,12 @@
 import { useId, type ReactNode } from 'react'
 import { MobileFilterFooter } from './MobileFilterFooter'
 import { MobileSheet } from './MobileFilterDropdown'
+import { SheetDangerAction } from './SheetDangerAction'
 import { SheetActionRow } from './SheetRows'
 
 export interface ActionSheetItem {
   label: string
+  confirming?: boolean
   destructive?: boolean
   disabled?: boolean
   title?: string
@@ -29,16 +31,12 @@ export function ActionSheet({ hero, items, onClose, title }: {
       title={title}
     >
       {hero}
-      {items.map((item, index) => (
-        <SheetActionRow
-          destructive={item.destructive}
-          disabled={item.disabled}
-          // Labels change on two-step confirms; a positional key keeps focus on the same button.
-          key={index}
-          label={item.label}
-          onClick={item.onSelect}
-          title={item.title}
-        />
+      {items.filter((item) => !item.destructive).map((item, index) => (
+        <SheetActionRow disabled={item.disabled} key={index} label={item.label} onClick={item.onSelect} title={item.title} />
+      ))}
+      {items.filter((item) => item.destructive).map((item, index) => (
+        // Labels change on two-step confirms; a positional key keeps focus on the same button.
+        <SheetDangerAction confirming={item.confirming} disabled={item.disabled} key={index} label={item.label} onSelect={item.onSelect} title={item.title} />
       ))}
     </MobileSheet>
   )

@@ -4,7 +4,11 @@ import { deletePasskey, listPasskeys, renamePasskey, runPasskeyRegistration, typ
 import { AuthContext } from '../../auth/authContextValue'
 import { Button } from '../common/Button'
 import { Card, FormError, TextField } from '../common/FormControls'
+import { MobileFilterFooter } from '../common/MobileFilterFooter'
+import { MobileSheet } from '../common/MobileFilterDropdown'
 import { Modal } from '../common/Modal'
+import { SheetField } from '../common/SheetRows'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { ListCardHeader } from './ListCardHeader'
 
 export function SecurityTab({ headerActions }: { headerActions?: ReactNode }) {
@@ -79,7 +83,30 @@ export function SecurityTab({ headerActions }: { headerActions?: ReactNode }) {
   )
 }
 
-function AddPasskeyModal({ blocking, onClose, onAdded }: { blocking?: boolean; onClose: () => void; onAdded: () => void }) {
+function AddPasskeySheet({ blocking, error, name, onClose, onNext, passkeyAvailable, saving, setName }: {
+  blocking: boolean
+  error: string | null
+  name: string
+  onClose: () => void
+  onNext: () => void
+  passkeyAvailable: boolean
+  saving: boolean
+  setName: (name: string) => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const footer = <MobileFilterFooter primaryDisabled={saving || !name.trim() || (blocking && !passkeyAvailable)} primaryLabel={saving ? 'Waiting...' : 'Next'} onPrimary={onNext} />
+  return (
+    <MobileSheet bodyClassName="pb-2" dismissible={!blocking} footer={footer} hideClose labelledBy="add-passkey-sheet-title" onClose={onClose} title="Add passkey">
+      <p className="pb-2 text-[13px] text-text-3">{blocking ? 'Passkeys are the only sign-in method. Add one now so this account can sign in again.' : 'Use a device name like “Personal iPhone”. Face ID will start after you continue.'}</p>
+      {blocking && !passkeyAvailable ? <FormError className="mb-3">This browser does not support passkeys. Open this page on a device with platform passkey support.</FormError> : null}
+      <SheetField expanded={expanded} label="Passkey name" onChange={setName} onToggle={() => setExpanded((current) => !current)} placeholder="iPhone" value={name} />
+      {error ? <p className="py-2 text-sm text-negative">{error}</p> : null}
+    </MobileSheet>
+  )
+}
+
+function AddPasskeyModal({ blocking = false, onClose, onAdded }: { blocking?: boolean; onClose: () => void; onAdded: () => void }) {
+  const isMobile = useIsMobile()
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -97,6 +124,10 @@ function AddPasskeyModal({ blocking, onClose, onAdded }: { blocking?: boolean; o
     } finally {
       setSaving(false)
     }
+  }
+
+  if (isMobile) {
+    return <AddPasskeySheet blocking={blocking} error={error} name={name} onClose={blocking ? () => undefined : onClose} onNext={() => void add()} passkeyAvailable={passkeyAvailable} saving={saving} setName={setName} />
   }
 
   return (

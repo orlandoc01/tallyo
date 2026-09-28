@@ -12,6 +12,18 @@ export function mockMutation(name: string, data: Data) {
   server.use(graphql.link('/query').mutation(name, () => HttpResponse.json({ data })))
 }
 
+export function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+
+  return {
+    resolve,
+    wait: () => promise,
+  }
+}
+
 export function captureQuery(name: string, data: Data | ((calls: number) => Data)) {
   let calls = 0
 

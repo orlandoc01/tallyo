@@ -8,6 +8,14 @@ export const CLASSIFIER_OPTIONS: Record<AssetType, AssetClassifier[]> = {
   OTHER: ['CASH', 'PUBLIC', 'COMPANY_EQUITY', 'CRYPTOCURRENCY', 'STABLECOIN', 'REAL_ESTATE'],
 }
 
+export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  CURRENCY: 'Currency',
+  SECURITY: 'Security',
+  CRYPTO: 'Crypto',
+  REAL_ESTATE: 'Real estate',
+  OTHER: 'Other',
+}
+
 export const CLASSIFIER_LABELS: Record<AssetClassifier, string> = {
   CASH: 'Cash & Equivalents',
   PUBLIC: 'Public Assets',

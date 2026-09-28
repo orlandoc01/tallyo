@@ -1,10 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { graphql, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { server } from '../../mocks/server'
 import { categories, normalizeTransactionForGraphql, transactions } from '../../mocks/fixtures'
 import { usePermissions } from '../../hooks/usePermissions'
 import { allowAllPermissionResult } from '../../test/permissions'
-import { captureMutation, mockGraphqlError, mockMutation } from '../../test/msw'
+import { captureMutation, deferred, mockGraphqlError, mockMutation } from '../../test/msw'
 import { GraphqlTestProvider } from '../../test/renderWithProviders'
 import { TransactionDetailsSheet } from './TransactionDetailsSheet'
 
@@ -82,17 +84,58 @@ describe('TransactionDetailsSheet', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('deletes after confirmation', async () => {
+  it('deletes after a second tap', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const deleteTransaction = captureMutation('DeleteTransaction', { deleteTransaction: { __typename: 'DeleteTransactionPayload', success: true } })
     const onDelete = vi.fn()
     renderSheet({ onDelete })
 
     await user.click(screen.getByRole('button', { name: 'Delete transaction' }))
+    expect(deleteTransaction.called).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
 
     await waitFor(() => expect(deleteTransaction.called).toBe(true))
     expect(onDelete).toHaveBeenCalledWith(transaction.id)
+  })
+
+  it('shows the deleting label and locks Save while the delete is in flight', async () => {
+    const user = userEvent.setup()
+    const deleteTransaction = deferred()
+    server.use(graphql.link('/query').mutation('DeleteTransaction', async () => {
+      await deleteTransaction.wait()
+      return HttpResponse.json({ data: { deleteTransaction: { __typename: 'DeleteTransactionPayload', success: true } } })
+    }))
+    const onDelete = vi.fn()
+    renderSheet({ onDelete })
+
+    await user.click(screen.getByRole('button', { name: 'Delete transaction' }))
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
+
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    deleteTransaction.resolve()
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(transaction.id))
+  })
+
+  it('keeps the danger action disabled and unarmed while a save is in flight', async () => {
+    const user = userEvent.setup()
+    const updateTransaction = deferred()
+    server.use(graphql.link('/query').mutation('UpdateTransaction', async () => {
+      await updateTransaction.wait()
+      return HttpResponse.json({ data: { updateTransaction: { __typename: 'UpdateTransactionPayload', transaction } } })
+    }))
+    const { onClose } = renderSheet()
+
+    await user.click(screen.getByRole('switch', { name: 'Hidden' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    const danger = screen.getByRole('button', { name: 'Delete transaction' })
+    expect(danger).toBeDisabled()
+    await user.click(danger)
+    expect(screen.getByRole('button', { name: 'Delete transaction' })).toBeInTheDocument()
+    expect(screen.queryByText('Tap again to confirm')).not.toBeInTheDocument()
+    updateTransaction.resolve()
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
   })
 
   it('hides editing affordances without write access', () => {
@@ -120,12 +163,12 @@ describe('TransactionDetailsSheet', () => {
 
   it('surfaces delete failures and a not-found result', async () => {
     const user = userEvent.setup()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const onDelete = vi.fn()
     mockGraphqlError('DeleteTransaction', 'Could not delete', { kind: 'mutation' })
     const { unmount } = render(<TransactionDetailsSheet categories={categories} onClose={vi.fn()} onDelete={onDelete} titleId="txn-title" transaction={transaction} />, { wrapper: GraphqlTestProvider })
 
     await user.click(screen.getByRole('button', { name: 'Delete transaction' }))
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
     expect(await screen.findByText(/Could not delete/)).toBeInTheDocument()
     expect(onDelete).not.toHaveBeenCalled()
     unmount()
@@ -134,6 +177,7 @@ describe('TransactionDetailsSheet', () => {
     render(<TransactionDetailsSheet categories={categories} onClose={vi.fn()} onDelete={onDelete} titleId="txn-title" transaction={transaction} />, { wrapper: GraphqlTestProvider })
 
     await user.click(screen.getByRole('button', { name: 'Delete transaction' }))
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
     expect(await screen.findByText('Transaction was not found.')).toBeInTheDocument()
     expect(onDelete).not.toHaveBeenCalled()
   })

@@ -1,12 +1,12 @@
-import { useState } from 'react'
 import { useEVMChains } from '../../hooks/useEntityQueries'
 import type { Account, AccountType } from '../../types/graphql'
 import { ACCOUNT_TYPES, formatAccountType, isValidSubtypeForType, subtypeOptions } from '../../utils/accountSubtypes'
 import { formatRelativeTime } from '../../utils/dates'
-import { OwnerDot } from '../common/OwnerDot'
 import { SheetAccordionRow, SheetField, SheetPickList, SheetStaticRow, SheetToggleRow } from '../common/SheetRows'
+import { useSheetSections } from '../common/useSheetSections'
 import { accountNumberLabel, titleCase } from './accountCards'
 import { AddressFields } from './AddressFields'
+import { OwnerPickRow } from './OwnerPickRow'
 import { formatAddress, joinAddress } from './propertyAddress'
 import type { useAccountInfoForm } from './useAccountInfoForm'
 
@@ -17,7 +17,7 @@ function formatSubtype(subtype: string) {
 }
 
 // Mounted only for EVM wallets so other accounts never fetch the chain list.
-function ChainsRow({ chainIds, changed, expanded, onChange, onToggle }: { chainIds: string[]; changed: boolean; expanded: boolean; onChange: (chainIds: string[]) => void; onToggle: () => void }) {
+export function ChainsRow({ chainIds, changed, expanded, onChange, onToggle }: { chainIds: string[]; changed: boolean; expanded: boolean; onChange: (chainIds: string[]) => void; onToggle: () => void }) {
   const { chains } = useEVMChains()
   const selectedNames = chains.filter((chain) => chainIds.includes(chain.id)).map((chain) => chain.name)
   return (
@@ -28,10 +28,8 @@ function ChainsRow({ chainIds, changed, expanded, onChange, onToggle }: { chainI
 }
 
 export function AccountInfoSheetRows({ account, form }: { account: Account; form: ReturnType<typeof useAccountInfoForm> }) {
-  const [open, setOpen] = useState<Section | null>(null)
+  const { open, pickOne, toggle } = useSheetSections<Section>()
   const { canWriteAccounts, draft, evmWallet, handleDraftChange, isProperty, owners } = form
-  const toggle = (section: Section) => () => setOpen((current) => current === section ? null : section)
-  const pickOne = <T extends string>(apply: (id: T) => void) => ([id]: T[]) => { apply(id); setOpen(null) }
   const showSubtype = !isProperty && draft.type !== 'CRYPTO_WALLET'
   const typeOptions: readonly AccountType[] = ACCOUNT_TYPES.includes(draft.type) ? ACCOUNT_TYPES : [draft.type, ...ACCOUNT_TYPES]
   const subtypeIds = [
@@ -39,7 +37,6 @@ export function AccountInfoSheetRows({ account, form }: { account: Account; form
     ...(draft.subtype && !isValidSubtypeForType(draft.type, draft.subtype) ? [draft.subtype] : []),
     ...subtypeOptions(draft.type),
   ]
-  const ownerName = owners.find((owner) => owner.id === draft.ownerId)?.name ?? account.owner.name
 
   return (
     <>
@@ -47,15 +44,9 @@ export function AccountInfoSheetRows({ account, form }: { account: Account; form
         ? <SheetField changed={draft.name !== account.name} expanded={open === 'name'} label="Name" onChange={(name) => handleDraftChange({ name })} onToggle={toggle('name')} placeholder="Account name" value={draft.name} />
         : <SheetStaticRow label="Name" value={account.name} />}
 
-      {canWriteAccounts ? (
-        <SheetAccordionRow changed={draft.ownerId !== account.owner.id} expanded={open === 'owner'} label="Owner" onToggle={toggle('owner')} summary={ownerName}>
-          <SheetPickList
-            options={owners.map((owner) => ({ id: owner.id, ariaLabel: owner.name, label: owner.name, leading: <OwnerDot name={owner.name} /> }))}
-            selectedIds={[draft.ownerId]}
-            onChange={pickOne((ownerId) => handleDraftChange({ ownerId }))}
-          />
-        </SheetAccordionRow>
-      ) : <SheetStaticRow label="Owner" value={account.owner.name} />}
+      {canWriteAccounts
+        ? <OwnerPickRow canCreate={false} changed={draft.ownerId !== account.owner.id} expanded={open === 'owner'} onChange={(ownerId) => handleDraftChange({ ownerId })} onToggle={toggle('owner')} owners={owners} placeholder={account.owner.name} value={draft.ownerId} />
+        : <SheetStaticRow label="Owner" value={account.owner.name} />}
 
       {account.typeLocked || !canWriteAccounts ? <SheetStaticRow label="Type" value={formatAccountType(draft.type)} /> : (
         <SheetAccordionRow changed={draft.type !== account.type} expanded={open === 'type'} label="Type" onToggle={toggle('type')} summary={formatAccountType(draft.type)}>
