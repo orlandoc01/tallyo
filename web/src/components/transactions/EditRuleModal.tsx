@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useMutation } from 'urql'
 import { DELETE_RULE_MUTATION, UPDATE_RULE_MUTATION } from '../../graphql/mutations'
 import { useAccounts, useCategoryGroups, useTags } from '../../hooks/useEntityQueries'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { Rule, UpdateRuleInput, UpdateRulePayload } from '../../types/graphql'
 import { amountToInputValue } from '../../utils/amount'
 import { Button } from '../common/Button'
@@ -10,7 +11,9 @@ import { Modal, ModalActions } from '../common/Modal'
 import { ModalHeader } from '../common/ModalHeader'
 import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { useSaveAction } from '../../hooks/useSaveAction'
+import { SheetDangerAction } from '../common/SheetDangerAction'
 import { RuleFormFields } from './RuleFormFields'
+import { RuleSheet } from './RuleSheet'
 import { ruleInputFromFields, useRuleFormFields } from './useRuleFormFields'
 
 export function EditRuleModal({
@@ -24,6 +27,7 @@ export function EditRuleModal({
   onUpdated?: () => void
   onDeleted?: () => void
 }) {
+  const isMobile = useIsMobile()
   const { accounts } = useAccounts()
   const { categoryGroups } = useCategoryGroups()
   const { tags } = useTags()
@@ -55,8 +59,8 @@ export function EditRuleModal({
   const hasRecurringAction = rule.shouldBeRecurring !== null && rule.shouldBeRecurring !== undefined
   const canSubmit = !!fields.categoryId || !!fields.merchantName.trim() || fields.tagIds.length > 0 || fields.shouldHide || hasRecurringAction
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function handleSubmit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
     setError(null)
 
     if (!canSubmit) {
@@ -77,11 +81,7 @@ export function EditRuleModal({
     await save(() => updateRule({ input }), () => { onUpdated?.(); onClose() })
   }
 
-  async function handleDelete() {
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
+  async function removeRule() {
     const result = await deleteRule({ id: rule.id })
     if (result.error) {
       setError(result.error.message)
@@ -91,8 +91,39 @@ export function EditRuleModal({
     onClose()
   }
 
+  async function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    await removeRule()
+  }
+
   const fetching = updating || deleting
   const formErrorId = error ? 'edit-rule-error' : undefined
+
+  if (isMobile) {
+    return (
+      <RuleSheet
+        accounts={accounts}
+        applyRetroactively={applyRetroactively}
+        canSubmit={canSubmit}
+        categories={categories}
+        disabled={deleting}
+        danger={<SheetDangerAction busy={deleting} busyLabel="Deleting…" disabled={updating} label="Delete rule" onSelect={() => { void removeRule() }} />}
+        error={error}
+        fields={fields}
+        includePriority
+        onClose={onClose}
+        onSubmit={handleSubmit}
+        saving={updating}
+        setApplyRetroactively={setApplyRetroactively}
+        submitLabel="Save changes"
+        tags={tags}
+        title="Edit rule"
+      />
+    )
+  }
 
   return (
     <Modal onClose={onClose} scrollable size="lg">

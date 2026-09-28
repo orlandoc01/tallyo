@@ -6,6 +6,7 @@ import { CheckboxField } from '../common/FormControls'
 import { MobileFilterDropdown } from '../common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
 import { selectionSummary } from '../common/filterSummary'
+import { useSheetSections } from '../common/useSheetSections'
 import { CreateRuleModal } from './CreateRuleModal'
 import { AmountFilterOptions, SortOptions, TagFilterOptions, TextFilterFields } from './TransactionFilterOptions'
 import { AccountSection, CategorySection, DateSection, OwnerSection, ShowHiddenRow } from './TransactionFilterSections'
@@ -29,9 +30,8 @@ export function TransactionsMobileFilters({ filter, now, onApply, onClear, onClo
   const { tags } = useTags()
   const [pending, setPending] = useState(filter)
   const [pendingSort, setPendingSort] = useState(sort)
-  const [open, setOpen] = useState<Section | null>(null)
+  const { open, toggle } = useSheetSections<Section>()
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false)
-  const toggle = (section: Section) => () => setOpen((current) => current === section ? null : section)
   const sectionProps = (id: Section) => ({ expanded: open === id, filter: pending, onChange: setPending, onToggle: toggle(id) })
   const section = (id: Section, label: string, active: boolean, summary: string | undefined, children: ReactNode) => (
     <CollapsibleFilterSection active={active} expanded={open === id} label={label} summary={summary} onToggle={toggle(id)}>{children}</CollapsibleFilterSection>

@@ -1,15 +1,13 @@
-import { useState } from 'react'
-import { useMutation } from 'urql'
-import { LINK_REAL_ESTATE_MUTATION } from '../../graphql/mutations'
+import type { FormEvent } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { LinkRealEstatePayload } from '../../types/graphql'
 import { FormError, TextField } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
 import { ModalHeader } from '../common/ModalHeader'
-import { useSaveAction } from '../../hooks/useSaveAction'
 import { AddressFields } from './AddressFields'
-import { emptyAddressDraft, type AddressField } from './addressDraft'
+import { LinkRealEstateSheet } from './LinkRealEstateSheet'
 import { OwnerLoadStatus, OwnerSelectField } from './OwnerSelectField'
-import { useLinkOwners } from './useLinkOwners'
+import { useLinkRealEstateForm } from './useLinkRealEstateForm'
 
 export function LinkRealEstateModal({
   onClose,
@@ -18,32 +16,15 @@ export function LinkRealEstateModal({
   onClose: () => void
   onLinked: (payload: LinkRealEstatePayload) => void
 }) {
-  const { owners, ownersFetching, ownersError, canCreateOwner, selectedOwner, setSelectedOwner, handleOwnerCreated } = useLinkOwners()
-  const [label, setLabel] = useState('')
-  const [valuationUSD, setValuationUSD] = useState('')
-  const [addressDraft, setAddressDraft] = useState(emptyAddressDraft)
-  const { error: submitError, saving: submitting, save, setError: setSubmitError } = useSaveAction()
-  const [, linkRealEstate] = useMutation<{ linkRealEstate: LinkRealEstatePayload }>(LINK_REAL_ESTATE_MUTATION)
+  const isMobile = useIsMobile()
+  const form = useLinkRealEstateForm({ onLinked })
+  const { addressDraft, canCreateOwner, label, owners, ownersError, ownersFetching, selectedOwner, submitError, submitting, valuationUSD } = form
 
-  function handleAddressChange(field: AddressField, value: string) {
-    setAddressDraft((draft) => ({ ...draft, [field]: value }))
-  }
+  if (isMobile) return <LinkRealEstateSheet form={form} onClose={onClose} />
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const value = Number(valuationUSD)
-    if (!Number.isFinite(value) || value <= 0) {
-      setSubmitError('Enter a positive valuation.')
-      return
-    }
-    if (!selectedOwner) {
-      setSubmitError('Select an owner.')
-      return
-    }
-    await save(
-      () => linkRealEstate({ input: { street: addressDraft.street || null, city: addressDraft.city || null, state: addressDraft.state || null, zip: addressDraft.zip || null, ownerId: selectedOwner, label: label || null, manualValuationUSD: value } }),
-      (result) => { if (result.data?.linkRealEstate) onLinked(result.data.linkRealEstate) },
-    )
+    void form.submit()
   }
 
   return (
@@ -53,10 +34,10 @@ export function LinkRealEstateModal({
       <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
         <OwnerLoadStatus error={ownersError} fetching={ownersFetching} />
 
-        <AddressFields address={addressDraft} onChange={handleAddressChange} />
+        <AddressFields address={addressDraft} onChange={form.handleAddressChange} />
 
-        <TextField label="Label" labelSuffix={<span className="text-xs font-normal text-text-muted"> (optional)</span>} onChange={setLabel} placeholder="e.g. Primary home" type="text" value={label} />
-        <TextField inputMode="decimal" label="Manual valuation USD" labelSuffix={<span className="text-negative"> *</span>} onChange={setValuationUSD} placeholder="850000" required type="number" value={valuationUSD} />
+        <TextField label="Label" labelSuffix={<span className="text-xs font-normal text-text-muted"> (optional)</span>} onChange={form.setLabel} placeholder="e.g. Primary home" type="text" value={label} />
+        <TextField inputMode="decimal" label="Manual valuation USD" labelSuffix={<span className="text-negative"> *</span>} onChange={form.setValuationUSD} placeholder="850000" required type="number" value={valuationUSD} />
 
         <OwnerSelectField
           canCreateOwner={canCreateOwner}
@@ -64,8 +45,8 @@ export function LinkRealEstateModal({
           ownersError={ownersError}
           ownersFetching={ownersFetching}
           selectedOwner={selectedOwner}
-          setSelectedOwner={setSelectedOwner}
-          onOwnerCreated={handleOwnerCreated}
+          setSelectedOwner={form.setSelectedOwner}
+          onOwnerCreated={form.handleOwnerCreated}
         />
 
         {submitError ? <FormError>{submitError}</FormError> : null}

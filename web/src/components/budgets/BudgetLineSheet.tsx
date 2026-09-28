@@ -4,10 +4,10 @@ import { useBudgetMutations } from '../../hooks/useBudgets'
 import { useSaveAction } from '../../hooks/useSaveAction'
 import type { BudgetLine } from '../../types/graphql'
 import { formatCurrency } from '../../utils/currency'
-import { Button } from '../common/Button'
 import { FormError } from '../common/FormControls'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
 import { MobileSheet } from '../common/MobileFilterDropdown'
+import { SheetDangerAction } from '../common/SheetDangerAction'
 import { SheetAvatar, SheetHero } from '../common/SheetHero'
 import { SheetField, SheetStaticRow } from '../common/SheetRows'
 import { budgetPercent, budgetTone, budgetToneClass } from './budgetMath'
@@ -36,14 +36,8 @@ export function BudgetLineSheet({ line, monthLabel, onClose, onSave }: {
   }
 
   const budgetId = line.id
-  const removeAction = budgetId ? (
-    <Button className="touch-manipulation" disabled={saving} onClick={() => { void save(() => deleteBudget({ input: { id: budgetId } }), onClose) }} size="sm" variant="ghost">
-      Remove budget
-    </Button>
-  ) : undefined
-
   return (
-    <MobileSheet action={removeAction} bodyClassName="pb-2" footer={<MobileFilterFooter primaryDisabled={!valid || saving} primaryLabel="Save" onPrimary={handleSave} />} hideClose labelledBy="budget-line-title" maxHeight="84%" onClose={onClose} title="Budget">
+    <MobileSheet bodyClassName="pb-2" footer={<MobileFilterFooter primaryDisabled={!valid || saving} primaryLabel="Save" onPrimary={handleSave} />} hideClose labelledBy="budget-line-title" maxHeight="84%" onClose={onClose} title="Budget">
       <div aria-label={`Budget for ${line.category.name}`} role="region">
         <SheetHero
           avatar={<SheetAvatar glyph={line.category.emoji} />}
@@ -56,6 +50,7 @@ export function BudgetLineSheet({ line, monthLabel, onClose, onSave }: {
         {error ? <FormError className="mb-3">{error}</FormError> : null}
         <SheetField changed={draft !== line.budgeted.toFixed(2)} expanded={plannedOpen} inputMode="decimal" label="Planned" onChange={setDraft} onToggle={() => setPlannedOpen((open) => !open)} placeholder="Amount per month" type="number" value={draft} />
         <SheetStaticRow label="Spent" value={formatCurrency(line.actual)} valueClassName={clsx('font-medium', tone)} />
+        {budgetId ? <SheetDangerAction busy={saving} busyLabel="Removing…" label="Remove budget" onSelect={() => { void save(() => deleteBudget({ input: { id: budgetId } }), onClose) }} /> : null}
       </div>
     </MobileSheet>
   )

@@ -1,13 +1,14 @@
 import clsx from 'clsx'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { TextAreaField } from '../common/FormControls'
 import { Modal, ModalActions } from '../common/Modal'
 import { ModalCloseButton } from '../common/ModalHeader'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import type { Category, Tag, TransactionUpdates } from '../../types/graphql'
+import { BulkEditSheet } from './BulkEditSheet'
 import { CategorySelect } from './CategorySelect'
 import { TagChip, TagPicker } from './TagPicker'
-
-type SectionKey = 'category' | 'notes' | 'recurring' | 'hidden' | 'tags'
+import { useBulkEditForm } from './useBulkEditForm'
 
 const activeSectionClass = 'bg-brand-50/70 ring-1 ring-inset ring-brand-200'
 const inactiveSectionClass = '[@media(hover:hover)]:hover:bg-hover'
@@ -21,36 +22,13 @@ export function BulkEditTransactionsModal({ categories, error, selectedCount, su
   onClose: () => void
   onConfirm: (updates: TransactionUpdates) => void
 }) {
-  const [active, setActive] = useState<Set<SectionKey>>(new Set())
-  const [categoryId, setCategoryId] = useState('')
-  const [notes, setNotes] = useState('')
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [isHidden, setIsHidden] = useState(false)
-  const [tagIds, setTagIds] = useState<string[]>([])
+  const isMobile = useIsMobile()
+  const form = useBulkEditForm()
+  const { activate, active, buildUpdates, canConfirm, categoryId, isHidden, isRecurring, notes, setCategoryId, setIsHidden, setIsRecurring, setNotes, setTagIds, tagIds, toggle } = form
   const selectedTags = tags.filter((tag) => tagIds.includes(tag.id))
-  const canConfirm = active.size > 0 && (!active.has('category') || categoryId !== '')
 
-  function activate(section: SectionKey) {
-    setActive((current) => new Set(current).add(section))
-  }
-
-  function toggle(section: SectionKey) {
-    setActive((current) => {
-      const next = new Set(current)
-      if (next.has(section)) next.delete(section)
-      else next.add(section)
-      return next
-    })
-  }
-
-  function buildUpdates(): TransactionUpdates {
-    const updates: TransactionUpdates = {}
-    if (active.has('category')) updates.categoryId = categoryId
-    if (active.has('notes')) updates.notes = notes || null
-    if (active.has('recurring')) updates.isRecurring = isRecurring
-    if (active.has('hidden')) updates.isHidden = isHidden
-    if (active.has('tags')) updates.tagIds = tagIds
-    return updates
+  if (isMobile) {
+    return <BulkEditSheet categories={categories} error={error} form={form} onClose={onClose} onConfirm={() => onConfirm(buildUpdates())} selectedCount={selectedCount} submitting={submitting ?? false} tags={tags} />
   }
 
   return (

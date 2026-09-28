@@ -2,27 +2,15 @@ import { useId } from 'react'
 import { SelectField, TextField } from '../common/FormControls'
 import { ToggleSwitch } from '../common/ToggleSwitch'
 import type { AssetClassifier } from '../../types/graphql'
-import { getTrackingTickerError } from './assetPriceValidation'
+import type { AssetSecurityForm } from './assetSecurityForm'
 import { AssetTrackingFields } from './AssetTrackingFields'
 import { CLASSIFIER_LABELS } from './assetFormOptions'
-import type { useAssetQuote } from './useAssetQuote'
 
 type AssetInfoDraft = {
   identifier: string
   name: string
   classifier: AssetClassifier
 }
-
-type AssetSecurityDraft = {
-  identifier: string
-  customTracking: boolean
-  forcePrice: boolean
-  forcedUsdPrice: string
-  trackingMultiplier: string
-  trackingTicker: string
-}
-
-type AssetQuoteState = Pick<ReturnType<typeof useAssetQuote>, 'clearQuote' | 'isQuoting' | 'quote' | 'quoteError'>
 
 export function AssetInfoFields({
   availableClassifiers,
@@ -64,33 +52,10 @@ export function AssetInfoFields({
   )
 }
 
-export function AssetSecurityFields({
-  canEdit,
-  draft,
-  onVerify,
-  quoteState,
-  updateDraft,
-}: {
-  canEdit: boolean
-  draft: AssetSecurityDraft
-  onVerify: () => void
-  quoteState: AssetQuoteState
-  updateDraft: (draft: Partial<AssetSecurityDraft>) => void
-}) {
-  const { clearQuote, isQuoting, quote, quoteError } = quoteState
+export function AssetSecurityFields({ form }: { form: AssetSecurityForm }) {
+  const { canEdit, draft, updateDraft } = form
   const descriptionId = useId()
   const fieldsId = useId()
-  const tickerError = getTrackingTickerError(draft.customTracking, draft.trackingTicker, draft.identifier)
-
-  function handleCustomTrackingChange(customTracking: boolean) {
-    updateDraft({ customTracking })
-    clearQuote()
-  }
-
-  function handleTickerChange(trackingTicker: string) {
-    updateDraft({ trackingTicker })
-    clearQuote()
-  }
 
   return (
     <>
@@ -108,24 +73,12 @@ export function AssetSecurityFields({
             checked={draft.customTracking}
             disabled={!canEdit}
             label="Custom Tracking"
-            onChange={handleCustomTrackingChange}
+            onChange={form.setCustomTracking}
           />
         </div>
         {draft.customTracking ? (
-          <div className="mt-3 space-y-2" id={fieldsId}>
-            <AssetTrackingFields
-              canEdit={canEdit}
-              isQuoting={isQuoting}
-              onMultiplierChange={(trackingMultiplier) => updateDraft({ trackingMultiplier })}
-              onTickerChange={handleTickerChange}
-              onVerify={onVerify}
-              quote={quote}
-              quoteError={quoteError}
-              trackingMultiplier={draft.trackingMultiplier}
-              trackingTicker={draft.trackingTicker}
-              verifyDisabled={isQuoting || !canEdit || !draft.trackingTicker.trim()}
-            />
-            {tickerError ? <p className="text-xs text-negative" role="alert">{tickerError}</p> : null}
+          <div className="mt-3" id={fieldsId}>
+            <AssetTrackingFields form={form} />
           </div>
         ) : null}
       </div>

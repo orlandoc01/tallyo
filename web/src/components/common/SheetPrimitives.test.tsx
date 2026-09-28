@@ -1,15 +1,16 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { ActionSheet } from './ActionSheet'
 import { MobileFilterFooter } from './MobileFilterFooter'
 import { MobileSheet } from './MobileFilterDropdown'
 import { PickerSheet } from './PickerSheet'
 import { SheetFoot, SheetHero, SheetMeta } from './SheetHero'
+import { SheetDangerAction } from './SheetDangerAction'
 import { SheetAccordionRow, SheetField, SheetPickList, SheetStaticRow, SheetToggleRow } from './SheetRows'
-import { SheetTabs } from './SheetTabs'
+import { SheetTabButtons, SheetTabs } from './SheetTabs'
 import { TickerChip } from './Tag'
 
 function pointer(target: Element, type: string, clientY: number) {
@@ -76,6 +77,20 @@ describe('MobileSheet', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('ignores the scrim, Escape and swipe when not dismissible but keeps the close button', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(<MobileSheet dismissible={false} labelledBy="sheet-title" onClose={onClose} title="Busy"><p>Body</p></MobileSheet>)
+
+    await user.click(screen.getByRole('dialog'))
+    await user.keyboard('{Escape}')
+    swipe(screen.getByRole('heading', { name: 'Busy' }), 100, 200)
+    expect(onClose).not.toHaveBeenCalled()
+    expect((screen.getByRole('dialog').firstElementChild as HTMLElement).style.transform).toBe('')
+    await user.click(screen.getByRole('button', { name: 'Close filters' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('renders a neutral primary footer button', () => {
     render(<MobileFilterFooter primaryLabel="Cancel" primaryVariant="secondary" onPrimary={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('bg-raised')
@@ -128,6 +143,19 @@ describe('SheetRows', () => {
     expect(onChange).toHaveBeenLastCalledWith([])
   })
 
+  it('renders date, password and mono fields', () => {
+    render(
+      <>
+        <SheetField expanded label="Date" onChange={vi.fn()} onToggle={vi.fn()} placeholder="YYYY-MM-DD" type="date" value="2026-05-01" />
+        <SheetField expanded label="Cron" mono onChange={vi.fn()} onToggle={vi.fn()} placeholder="0 6 * * *" value="0 6 * * *" />
+        <SheetField expanded label="Secret" mono onChange={vi.fn()} onToggle={vi.fn()} placeholder="••••" type="password" value="" />
+      </>,
+    )
+    expect(screen.getByLabelText('Date')).toHaveAttribute('type', 'date')
+    expect(screen.getByRole('textbox', { name: 'Cron' })).toHaveClass('font-mono')
+    expect(screen.getByLabelText('Secret')).toHaveAttribute('type', 'password')
+  })
+
   it('renders a field with placeholder summary and focuses the input when expanded', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
@@ -169,6 +197,95 @@ describe('SheetHero, SheetMeta, SheetFoot, SheetTabs', () => {
   })
 })
 
+describe('SheetTabButtons', () => {
+  it('renders sticky state-driven tabs and reports the picked tab', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<SheetTabButtons ariaLabel="Rule sections" idPrefix="rule" items={[{ id: 'filters', children: 'Filters' }, { id: 'changes', children: 'Changes' }]} onChange={onChange} value="filters" />)
+
+    expect(screen.getByRole('tablist', { name: 'Rule sections' })).toHaveClass('sticky')
+    expect(screen.getByRole('tab', { name: 'Filters' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Filters' })).toHaveAttribute('aria-controls', 'rule-tab-filters-panel')
+    expect(screen.getByRole('tab', { name: 'Changes' })).toHaveClass('border-transparent')
+    await user.click(screen.getByRole('tab', { name: 'Changes' }))
+    expect(onChange).toHaveBeenCalledWith('changes')
+  })
+})
+
+describe('SheetDangerAction', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('arms on the first tap and runs on the second', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    render(<SheetDangerAction label="Delete transaction" onSelect={onSelect} />)
+
+    const button = screen.getByRole('button', { name: 'Delete transaction' })
+    expect(button).toHaveClass('w-full', 'text-negative')
+    expect(screen.queryByText("This can't be undone.")).not.toBeInTheDocument()
+    await user.click(button)
+    expect(button).toHaveTextContent('Tap again to confirm')
+    expect(screen.getByText("This can't be undone.")).toBeInTheDocument()
+    expect(onSelect).not.toHaveBeenCalled()
+    await user.click(button)
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(button).toHaveTextContent('Delete transaction')
+  })
+
+  it('scrolls the armed hint into view once', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const { rerender } = render(<SheetDangerAction label="Delete" onSelect={onSelect} />)
+
+    await user.click(screen.getByRole('button'))
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    rerender(<SheetDangerAction label="Delete" onSelect={onSelect} />)
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+  })
+
+  it('disarms after 4 s idle', () => {
+    vi.useFakeTimers()
+    render(<SheetDangerAction label="Remove budget" onSelect={vi.fn()} />)
+
+    const button = screen.getByRole('button')
+    fireEvent.click(button)
+    expect(button).toHaveTextContent('Tap again to confirm')
+    act(() => { vi.advanceTimersByTime(4000) })
+    expect(button).toHaveTextContent('Remove budget')
+  })
+
+  it('defers arming to the parent when controlled', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const { rerender } = render(<SheetDangerAction confirming={false} label="Delete" onSelect={onSelect} />)
+
+    await user.click(screen.getByRole('button'))
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button')).toHaveTextContent('Delete')
+    rerender(<SheetDangerAction confirming label="Delete" onSelect={onSelect} />)
+    expect(screen.getByRole('button')).toHaveTextContent('Tap again to confirm')
+    await user.click(screen.getByRole('button'))
+    expect(onSelect).toHaveBeenCalledTimes(2)
+  })
+
+  it('never arms while disabled and shows the busy label while busy', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    const { rerender } = render(<SheetDangerAction disabled label="Delete" onSelect={onSelect} />)
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(onSelect).not.toHaveBeenCalled()
+    rerender(<SheetDangerAction busy busyLabel="Deleting…" label="Delete" onSelect={onSelect} />)
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled()
+  })
+})
+
 describe('ActionSheet and PickerSheet', () => {
   it('runs the item without closing, and cancels from the footer', async () => {
     const user = userEvent.setup()
@@ -178,8 +295,10 @@ describe('ActionSheet and PickerSheet', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Connection' })
     expect(within(dialog).getByText('Chase')).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Remove' })).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: 'Remove' })).toHaveClass('text-negative')
+    const remove = within(dialog).getByRole('button', { name: 'Remove' })
+    expect(remove).toBeDisabled()
+    expect(remove).toHaveClass('text-negative', 'w-full')
+    expect(within(dialog).getByRole('button', { name: 'Sync now' }).compareDocumentPosition(remove)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     await user.click(within(dialog).getByRole('button', { name: 'Sync now' }))
     expect(onSelect).toHaveBeenCalledOnce()
     expect(onClose).not.toHaveBeenCalled()

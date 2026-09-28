@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from 'urql'
 import { UNLINK_REAL_ESTATE_MUTATION, UPDATE_REAL_ESTATE_MUTATION } from '../../graphql/mutations'
+import { useTwoStepConfirm } from '../../hooks/useTwoStepConfirm'
 import type { Account } from '../../types/graphql'
 import { Button } from '../common/Button'
 import { FormError, TextField } from '../common/FormControls'
@@ -28,7 +29,7 @@ export function RealEstateRow({
   onUpdated?: () => void
   onUnlink?: (connectionId: string) => void
 }) {
-  const [confirming, setConfirming] = useState(false)
+  const confirm = useTwoStepConfirm()
   const [editing, setEditing] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [value, setValue] = useState('')
@@ -37,10 +38,7 @@ export function RealEstateRow({
   const [, updateValuation] = useMutation<{ updateRealEstate: { account: { id: string } } }>(UPDATE_REAL_ESTATE_MUTATION)
 
   async function handleUnlink() {
-    if (!confirming) {
-      setConfirming(true)
-      return
-    }
+    if (!confirm.confirming) return confirm.arm()
     await unlinkRealEstate({ id: connectionId })
     setIsMenuOpen(false)
     onUnlink?.(connectionId)
@@ -69,12 +67,12 @@ export function RealEstateRow({
     ...(onUpdated ? [{
       label: editing ? 'Hide update form' : 'Update value',
       onSelect: () => {
-        setConfirming(false)
+        confirm.reset()
         setIsMenuOpen(false)
         setEditing((current) => !current)
       },
     }] : []),
-    ...(onUnlink ? [{ label: confirming ? 'Confirm remove' : 'Remove', destructive: true, onSelect: () => { void handleUnlink() } }] : []),
+    ...(onUnlink ? [{ label: 'Remove', destructive: true, confirming: confirm.confirming, onSelect: () => { void handleUnlink() } }] : []),
   ]
 
   return (
@@ -87,7 +85,7 @@ export function RealEstateRow({
           isOpen={isMenuOpen}
           items={menuItems}
           onToggle={() => {
-            setConfirming(false)
+            confirm.reset()
             setIsMenuOpen((open) => !open)
           }}
           title="Property"

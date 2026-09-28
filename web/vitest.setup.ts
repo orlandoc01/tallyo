@@ -10,6 +10,7 @@ class ResizeObserverMock {
 }
 
 globalThis.ResizeObserver = ResizeObserverMock
+Element.prototype.scrollIntoView ??= () => {}
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useMutation, useQuery } from 'urql'
-import { DELETE_PLAID_CREDENTIAL_MUTATION, CREATE_PLAID_CREDENTIAL_MUTATION, UPDATE_PLAID_CREDENTIAL_MUTATION } from '../../graphql/mutations'
+import { useQuery } from 'urql'
 import { CONNECTIONS_QUERY, PLAID_CREDENTIALS_QUERY } from '../../graphql/queries'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { usePermissions } from '../../hooks/usePermissions'
-import type { Connection, CreatePlaidCredentialInput, DeletePlaidCredentialInput, PlaidCredential, PlaidEnvironment, UpdatePlaidCredentialInput } from '../../types/graphql'
+import type { Connection, PlaidCredential } from '../../types/graphql'
 import { Button } from '../common/Button'
 import { EmptyState } from '../common/EmptyState'
 import { Card, FormError, TextField } from '../common/FormControls'
@@ -13,13 +13,8 @@ import { QueryGate } from '../common/QueryGate'
 import { SegmentedControl } from '../common/SegmentedControl'
 import { CollapsibleRowToggle } from './CollapsibleRowToggle'
 import { ListCardHeader } from './ListCardHeader'
-
-type FormMode = 'create' | 'edit'
-
-const ENVIRONMENT_OPTIONS = [
-  { value: 'SANDBOX', label: 'sandbox' },
-  { value: 'PRODUCTION', label: 'production' },
-] as const satisfies ReadonlyArray<{ value: PlaidEnvironment; label: string }>
+import { PlaidCredentialSheet } from './PlaidCredentialSheet'
+import { ENVIRONMENT_OPTIONS, usePlaidCredentialForm, type PlaidCredentialFormMode } from './usePlaidCredentialForm'
 
 function getCredentialTitle(credential: PlaidCredential) {
   if (credential.label?.trim()) return credential.label.trim()
@@ -29,7 +24,7 @@ function getCredentialTitle(credential: PlaidCredential) {
 export function PlaidTab() {
   const { canRead, canWrite } = usePermissions()
   const [expanded, setExpanded] = useState<number | null>(null)
-  const [modal, setModal] = useState<{ mode: FormMode; credential?: PlaidCredential } | null>(null)
+  const [modal, setModal] = useState<{ mode: PlaidCredentialFormMode; credential?: PlaidCredential } | null>(null)
   const [credentialResult, refetchCredentials] = useQuery<{ plaidCredentials: { items: PlaidCredential[] } }>({ query: PLAID_CREDENTIALS_QUERY, pause: !canRead('settings') })
   const [connectionResult, refetchConnections] = useQuery<{ connections: { items: Connection[] } }>({ query: CONNECTIONS_QUERY, variables: { input: { includeInactive: true } }, pause: !canRead('settings') })
 
@@ -105,38 +100,25 @@ export function PlaidTab() {
   )
 }
 
-function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: FormMode; credential?: PlaidCredential; onClose: () => void; onSaved: () => void }) {
-  const [clientId, setClientId] = useState(credential?.clientId ?? '')
-  const [secret, setSecret] = useState('')
-  const [label, setLabel] = useState(credential?.label ?? '')
-  const [environment, setEnvironment] = useState<PlaidEnvironment>(credential?.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX')
+function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: PlaidCredentialFormMode; credential?: PlaidCredential; onClose: () => void; onSaved: () => void }) {
+  const isMobile = useIsMobile()
+  const form = usePlaidCredentialForm({ credential, mode, onSaved })
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [createResult, createCredential] = useMutation<{ createPlaidCredential: { credential: PlaidCredential } }, { input: CreatePlaidCredentialInput }>(CREATE_PLAID_CREDENTIAL_MUTATION)
-  const [updateResult, updateCredential] = useMutation<{ updatePlaidCredential: { credential: PlaidCredential } }, { input: UpdatePlaidCredentialInput }>(UPDATE_PLAID_CREDENTIAL_MUTATION)
-  const [deleteResult, deleteCredential] = useMutation<{ deletePlaidCredential: { success: boolean } }, { input: DeletePlaidCredentialInput }>(DELETE_PLAID_CREDENTIAL_MUTATION)
-  const saving = createResult.fetching || updateResult.fetching || deleteResult.fetching
-  const error = createResult.error || updateResult.error || deleteResult.error
+  const { clientId, environment, error, label, saving, secret } = form
 
-  async function submit(event: FormEvent) {
+  if (isMobile) return <PlaidCredentialSheet form={form} mode={mode} onClose={onClose} />
+
+  function submit(event: FormEvent) {
     event.preventDefault()
-    if (mode === 'create') {
-      const result = await createCredential({ input: { clientId, secret, environment, label: label.trim() || null } })
-      if (!result.error) onSaved()
-      return
-    }
-    if (!credential) return
-    const result = await updateCredential({ input: { id: credential.id, secret, environment } })
-    if (!result.error) onSaved()
+    void form.submit()
   }
 
-  async function handleDelete() {
-    if (!credential) return
+  function handleDelete() {
     if (!confirmDelete) {
       setConfirmDelete(true)
       return
     }
-    const result = await deleteCredential({ input: { id: credential.id } })
-    if (!result.error) onSaved()
+    void form.remove()
   }
 
   return (
@@ -148,19 +130,19 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
         </div>
         <p className="text-xs text-text-muted"><span aria-hidden="true" className="text-negative">*</span> Required</p>
 
-        <TextField aria-invalid={!clientId.trim()} disabled={mode === 'edit'} label="Client ID" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={setClientId} required value={clientId} />
-        <TextField aria-invalid={!secret.trim()} label="Client secret" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={setSecret} required type="password" value={secret} />
+        <TextField aria-invalid={!clientId.trim()} disabled={mode === 'edit'} label="Client ID" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={form.setClientId} required value={clientId} />
+        <TextField aria-invalid={!secret.trim()} label="Client secret" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} mono onChange={form.setSecret} required type="password" value={secret} />
 
         {mode === 'create' ? (
-          <TextField label="Label" onChange={setLabel} placeholder="Primary" value={label} />
+          <TextField label="Label" onChange={form.setLabel} placeholder="Primary" value={label} />
         ) : null}
 
         <div className="space-y-1">
           <span className="block text-xs text-text-muted">Environment</span>
-          <SegmentedControl ariaLabel="Environment" onChange={setEnvironment} options={ENVIRONMENT_OPTIONS} value={environment} />
+          <SegmentedControl ariaLabel="Environment" onChange={form.setEnvironment} options={ENVIRONMENT_OPTIONS} value={environment} />
         </div>
 
-        {error ? <FormError>{error.message}</FormError> : null}
+        {error ? <FormError>{error}</FormError> : null}
 
         <div className="flex items-center justify-between gap-3">
           {mode === 'edit' ? (
@@ -174,4 +156,3 @@ function PlaidCredentialModal({ mode, credential, onClose, onSaved }: { mode: Fo
     </Modal>
   )
 }
-

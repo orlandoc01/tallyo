@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTwoStepConfirm } from '../../hooks/useTwoStepConfirm'
 import type { Account, EVMWallet } from '../../types/graphql'
 import { syncChipStatus } from './accountCards'
 import { AccountTable } from './AccountRows'
@@ -26,20 +27,17 @@ export function EVMWalletRow({
   onReconnect?: () => void
   onDelete?: () => void
 }) {
-  const [confirming, setConfirming] = useState(false)
+  const confirm = useTwoStepConfirm()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const sync = syncChipStatus(isActive, account?.lastSyncedAt)
 
   function toggleMenu() {
-    setConfirming(false)
+    confirm.reset()
     setIsMenuOpen((open) => !open)
   }
 
   function handleDelete() {
-    if (!confirming) {
-      setConfirming(true)
-      return
-    }
+    if (!confirm.confirming) return confirm.arm()
     onDelete?.()
   }
 
@@ -47,7 +45,7 @@ export function EVMWalletRow({
   const menuItems: RowAction[] = [
     ...(isActive && onDisconnect ? [{ label: 'Disconnect', onSelect: () => { setIsMenuOpen(false); onDisconnect() } }] : []),
     ...(!isActive && onReconnect ? [{ label: 'Reconnect', onSelect: () => { setIsMenuOpen(false); onReconnect() } }] : []),
-    ...(onDelete ? [{ label: confirming ? 'Confirm delete' : 'Delete', destructive: true, onSelect: handleDelete }] : []),
+    ...(onDelete ? [{ label: 'Delete', destructive: true, confirming: confirm.confirming, onSelect: handleDelete }] : []),
   ]
 
   return (

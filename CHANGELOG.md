@@ -4,7 +4,13 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
-## [0.3.2] - 2026-09-25
+## [0.3.3] - 2026-09-28
+
+### Changed
+- **Mobile form sheets.** Every remaining form popup on phones is now a bottom sheet, completing the mobile sheet work from 0.3.2: the asset editor (Info · Tracking tabs), category groups and categories (Info · Plaid tabs), budgets, tags, new transactions, rules (Filters · Changes tabs), bulk edit and bulk delete, manual accounts, sync settings, crypto wallet, home, and connection linking, new assets, balance review, Plaid credentials, and passkeys. Desktop is unchanged. No API or database changes.
+- Destructive actions inside mobile sheets (delete transaction, account, budget line, rule, tag, category, Plaid credential; remove connection, wallet, or property) use one full-width tinted button at the bottom of the sheet with a two-tap confirm that resets after 4 seconds, replacing the assorted red text rows, header buttons, and native confirm dialogs.
+
+## [0.3.2] - 2026-09-26
 
 ### Changed
 - **Mobile detail sheets.** On phones, every popup is now a bottom sheet: transaction details (edits staged and saved in one step, Hidden/Recurring toggles, merchant link, delete), account details with Info and Valuation tabs (12-month sparkline, snapshots grouped by month, rows that expand in place), net worth holding details, recurring charge details, budget line details, row action menus, the add-account chooser, the Transactions "+ Create" menu, and the Expenses sort and Settings timezone pickers. Desktop is unchanged. No API or database changes.

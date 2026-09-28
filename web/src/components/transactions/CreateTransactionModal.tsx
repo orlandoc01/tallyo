@@ -1,14 +1,13 @@
-import { useState, type FormEvent } from 'react'
-import { useMutation } from 'urql'
+import type { FormEvent } from 'react'
 import { FormError, SelectField, TextAreaField, TextField } from '../common/FormControls'
 import { ToggleSettingRow } from '../common/ToggleSwitch'
 import { Modal, ModalActions, ModalFooter } from '../common/Modal'
 import { ModalCloseButton } from '../common/ModalHeader'
-import { useSaveAction } from '../../hooks/useSaveAction'
-import { CREATE_TRANSACTION_MUTATION } from '../../graphql/mutations'
-import type { Account, Category, CreateTransactionInput, CreateTransactionPayload, Transaction } from '../../types/graphql'
+import { useIsMobile } from '../../hooks/useIsMobile'
+import type { Account, Category, Transaction } from '../../types/graphql'
 import { accountDisplayLabel } from '../../utils/accounts'
-import { toDateInputValue } from '../../utils/dates'
+import { CreateTransactionSheet } from './CreateTransactionSheet'
+import { useCreateTransactionForm } from './useCreateTransactionForm'
 
 export function CreateTransactionModal({
   accounts,
@@ -21,40 +20,15 @@ export function CreateTransactionModal({
   onClose: () => void
   onCreated: (transaction: Transaction) => void
 }) {
-  const visibleAccounts = accounts.filter((account) => !account.hidden)
-  const [, createTransaction] = useMutation<{ createTransaction: CreateTransactionPayload }, { input: CreateTransactionInput }>(CREATE_TRANSACTION_MUTATION)
-  const { error, saving, save, setError } = useSaveAction()
-  const [accountId, setAccountId] = useState(visibleAccounts[0]?.id ?? '')
-  const [date, setDate] = useState(toDateInputValue(new Date()))
-  const [amount, setAmount] = useState('')
-  const [merchantName, setMerchantName] = useState('')
-  const [originalName, setOriginalName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [notes, setNotes] = useState('')
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [isHidden, setIsHidden] = useState(false)
+  const isMobile = useIsMobile()
+  const form = useCreateTransactionForm({ accounts, onCreated })
+  const { draft, error, patch, saving, visibleAccounts } = form
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  if (isMobile) return <CreateTransactionSheet categories={categories} form={form} onClose={onClose} />
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setError(null)
-
-    const parsedAmount = Number(amount)
-    if (amount.trim() === '' || !Number.isFinite(parsedAmount)) {
-      setError('Enter a valid amount.')
-      return
-    }
-    if (!merchantName.trim() && !originalName.trim()) {
-      setError('Enter a merchant or original name.')
-      return
-    }
-
-    let created: Transaction | undefined
-    await save(async () => {
-      const result = await createTransaction({ input: { accountId, date, amount: parsedAmount, merchantName: merchantName.trim() || null, originalName: originalName.trim() || null, categoryId: categoryId || null, notes: notes.trim() || null, isRecurring, isHidden } })
-      created = result.data?.createTransaction.transaction
-      if (!result.error && !created) throw new Error('Transaction was not created.')
-      return result
-    }, () => { if (created) onCreated(created) })
+    void form.save()
   }
 
   return (
@@ -71,28 +45,28 @@ export function CreateTransactionModal({
         {error ? <FormError>{error}</FormError> : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField className="sm:col-span-2" disabled={visibleAccounts.length === 0} label="Account" onChange={setAccountId} options={visibleAccounts.map((account) => ({ label: accountDisplayLabel(account), value: account.id }))} required value={accountId} />
-          <TextField label="Date" onChange={setDate} required type="date" value={date} />
-          <TextField inputMode="decimal" label="Amount" onChange={setAmount} placeholder="42.50" required step="0.01" type="number" value={amount} />
-          <TextField label="Merchant" onChange={setMerchantName} placeholder="Coffee Shop" value={merchantName} />
-          <TextField label="Original name" onChange={setOriginalName} placeholder="POS COFFEE SHOP" value={originalName} />
+          <SelectField className="sm:col-span-2" disabled={visibleAccounts.length === 0} label="Account" onChange={(accountId) => patch({ accountId })} options={visibleAccounts.map((account) => ({ label: accountDisplayLabel(account), value: account.id }))} required value={draft.accountId} />
+          <TextField label="Date" onChange={(date) => patch({ date })} required type="date" value={draft.date} />
+          <TextField inputMode="decimal" label="Amount" onChange={(amount) => patch({ amount })} placeholder="42.50" required step="0.01" type="number" value={draft.amount} />
+          <TextField label="Merchant" onChange={(merchantName) => patch({ merchantName })} placeholder="Coffee Shop" value={draft.merchantName} />
+          <TextField label="Original name" onChange={(originalName) => patch({ originalName })} placeholder="POS COFFEE SHOP" value={draft.originalName} />
           <SelectField
             className="sm:col-span-2"
             label="Category"
-            onChange={setCategoryId}
+            onChange={(categoryId) => patch({ categoryId })}
             options={[{ label: 'Uncategorized', value: '' }, ...categories.map((category) => ({ label: `${category.emoji} ${category.groupName} / ${category.name}`, value: category.id }))]}
-            value={categoryId}
+            value={draft.categoryId}
           />
         </div>
 
         <p className="text-xs text-text-3">Use positive amounts for spending and negative amounts for refunds or credits.</p>
 
         <div className="space-y-2 border-t border-border pt-4">
-          <ToggleSettingRow checked={isHidden} onChange={setIsHidden} title="Hidden" />
-          <ToggleSettingRow checked={isRecurring} onChange={setIsRecurring} title="Recurring" />
+          <ToggleSettingRow checked={draft.isHidden} onChange={(isHidden) => patch({ isHidden })} title="Hidden" />
+          <ToggleSettingRow checked={draft.isRecurring} onChange={(isRecurring) => patch({ isRecurring })} title="Recurring" />
         </div>
 
-        <TextAreaField label="Notes" onChange={setNotes} rows={3} value={notes} />
+        <TextAreaField label="Notes" onChange={(notes) => patch({ notes })} rows={3} value={draft.notes} />
 
         {visibleAccounts.length === 0 ? <div className="rounded-xl bg-warning/[0.12] px-3 py-2 text-sm text-warning">Add an account before creating transactions.</div> : null}
 

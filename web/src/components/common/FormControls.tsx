@@ -9,7 +9,7 @@ const inputHeightClass = 'h-9 lg:h-8'
 const fieldVariantClass = { default: 'bg-surface dark:bg-bg', sheet: 'bg-bg' } as const
 const inputVariantHeightClass = { default: inputHeightClass, sheet: 'h-10' } as const
 
-type FieldVariant = keyof typeof fieldVariantClass
+export type FieldVariant = keyof typeof fieldVariantClass
 
 type FieldProps = {
   label: string
@@ -149,6 +149,10 @@ export function FormError({ children, className, id }: { children: ReactNode; cl
 
 export function FormSuccess({ children }: { children: ReactNode }) {
   return <p className="rounded-md bg-positive/10 px-4 py-3 text-sm text-positive">{children}</p>
+}
+
+export function FormWarning({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={clsx('rounded-md bg-warning/10 px-4 py-3 text-[13px] text-warning', className)}>{children}</p>
 }
 
 export function SectionLabel({ as: Component = 'h2', children, className }: HTMLAttributes<HTMLElement> & { as?: 'h2' | 'h3' | 'h4' | 'p' }) {

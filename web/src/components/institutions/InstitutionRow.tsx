@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { useTwoStepConfirm } from '../../hooks/useTwoStepConfirm'
 import type { Account, Connection, PlaidItem, SimpleFinConnection } from '../../types/graphql'
 import { formatDisplayDate, formatScheduleTime } from '../../utils/dates'
 import { syncChipStatus } from './accountCards'
@@ -41,7 +42,7 @@ export function InstitutionRow({
   amountsHidden?: boolean
 } & InstitutionRowActions) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const confirm = useTwoStepConfirm()
   const provider = plaidItem ?? simpleFinConnection
   if (!provider) return null
 
@@ -53,7 +54,7 @@ export function InstitutionRow({
   const hasActions = Boolean(onUpdateLogin || onSyncSettings || onAddManualAccount || onDisconnect || onReconnect || onDelete)
 
   function toggleMenu() {
-    setConfirmingDelete(false)
+    confirm.reset()
     setIsMenuOpen((open) => !open)
   }
 
@@ -65,15 +66,13 @@ export function InstitutionRow({
     ...(isActive && onDisconnect ? [{ label: 'Disconnect', onSelect: closeThen(() => onDisconnect(connection)) }] : []),
     ...(!isActive && onReconnect ? [{ label: 'Reconnect', onSelect: closeThen(() => onReconnect(connection)) }] : []),
     ...(onDelete ? [{
-      label: confirmingDelete ? 'Confirm delete' : 'Delete',
+      label: 'Delete',
       destructive: true,
+      confirming: confirm.confirming,
       onSelect: () => {
-        if (!confirmingDelete) {
-          setConfirmingDelete(true)
-          return
-        }
+        if (!confirm.confirming) return confirm.arm()
         setIsMenuOpen(false)
-        setConfirmingDelete(false)
+        confirm.reset()
         onDelete(connection)
       },
     }] : []),

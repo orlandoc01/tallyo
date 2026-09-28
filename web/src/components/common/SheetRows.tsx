@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Check, ChevronDown } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { TextAreaField, TextField } from './FormControls'
 import { ToggleSwitch } from './ToggleSwitch'
 
@@ -44,20 +44,20 @@ export function SheetToggleRow({ checked, description, disabled = false, label, 
   label: string
   onChange: (value: boolean) => void
 }) {
+  const descriptionId = useId()
   return (
     <div className="flex min-h-[52px] items-center justify-between gap-4 border-t border-border py-2">
       <span className="min-w-0">
         <span className="block text-sm text-text-2">{label}</span>
-        {description ? <span className="block text-xs text-text-3">{description}</span> : null}
+        {description ? <span className="block text-xs text-text-3" id={descriptionId}>{description}</span> : null}
       </span>
-      <ToggleSwitch checked={checked} disabled={disabled} label={label} onChange={onChange} size="lg" />
+      <ToggleSwitch aria-describedby={description ? descriptionId : undefined} checked={checked} disabled={disabled} label={label} onChange={onChange} size="lg" />
     </div>
   )
 }
 
-// A full-width 52px tap row (menu items, destructive actions at the bottom of a body).
-export function SheetActionRow({ destructive = false, disabled = false, label, onClick, title }: {
-  destructive?: boolean
+// A full-width 52px tap row (menu items).
+export function SheetActionRow({ disabled = false, label, onClick, title }: {
   disabled?: boolean
   label: string
   onClick: () => void
@@ -65,7 +65,7 @@ export function SheetActionRow({ destructive = false, disabled = false, label, o
 }) {
   return (
     <button
-      className={clsx(rowClass, 'touch-manipulation border-t border-border disabled:cursor-not-allowed disabled:opacity-40', destructive && 'text-negative')}
+      className={clsx(rowClass, 'touch-manipulation border-t border-border disabled:cursor-not-allowed disabled:opacity-40')}
       disabled={disabled}
       onClick={onClick}
       title={title}
@@ -127,17 +127,19 @@ export function SheetPickList<T extends string = string>({ onChange, options, se
   )
 }
 
-export function SheetField({ changed = false, disabled = false, expanded, inputMode, label, multiline = false, onChange, onToggle, placeholder, type = 'text', value }: {
+export function SheetField({ changed = false, disabled = false, expanded, inputMode, label, maxLength, mono = false, multiline = false, onChange, onToggle, placeholder, type = 'text', value }: {
   changed?: boolean
   disabled?: boolean
   expanded: boolean
   inputMode?: 'decimal' | 'text'
   label: string
+  maxLength?: number
+  mono?: boolean
   multiline?: boolean
   onChange: (value: string) => void
   onToggle: () => void
   placeholder: string
-  type?: 'text' | 'number'
+  type?: 'text' | 'number' | 'date' | 'password'
   value: string
 }) {
   const summary = value.trim() ? value : <span className="text-text-muted">{placeholder}</span>
@@ -145,7 +147,7 @@ export function SheetField({ changed = false, disabled = false, expanded, inputM
     <SheetAccordionRow changed={changed} expanded={expanded} label={label} onToggle={onToggle} summary={summary}>
       {multiline
         ? <TextAreaField autoFocus disabled={disabled} hideLabel label={label} onChange={onChange} placeholder={placeholder} rows={3} value={value} variant="sheet" />
-        : <TextField autoFocus disabled={disabled} hideLabel inputMode={inputMode} label={label} onChange={onChange} placeholder={placeholder} type={type} value={value} variant="sheet" />}
+        : <TextField autoFocus disabled={disabled} hideLabel inputMode={inputMode} label={label} maxLength={maxLength} mono={mono} onChange={onChange} placeholder={placeholder} type={type} value={value} variant="sheet" />}
     </SheetAccordionRow>
   )
 }

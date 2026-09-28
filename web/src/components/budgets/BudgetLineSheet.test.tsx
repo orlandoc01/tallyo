@@ -34,13 +34,15 @@ describe('BudgetLineSheet', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('removes the budget from the title action', async () => {
+  it('removes the budget after a second tap', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
     const deleteBudget = captureMutation<{ id: string }>('DeleteBudget', { deleteBudget: { __typename: 'DeleteBudgetPayload', success: true } })
     render(<BudgetLineSheet line={line} monthLabel="June 2026" onClose={onClose} onSave={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
     await user.click(screen.getByRole('button', { name: 'Remove budget' }))
+    expect(deleteBudget.called).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
 
     await waitFor(() => expect(deleteBudget.input).toEqual({ id: 'budget-1' }))
     expect(onClose).toHaveBeenCalledOnce()
@@ -78,6 +80,7 @@ describe('BudgetLineSheet', () => {
     render(<BudgetLineSheet line={line} monthLabel="June 2026" onClose={onClose} onSave={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
     await user.click(screen.getByRole('button', { name: 'Remove budget' }))
+    await user.click(screen.getByRole('button', { name: 'Tap again to confirm' }))
 
     expect(await screen.findByText(/Budget is locked/)).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()

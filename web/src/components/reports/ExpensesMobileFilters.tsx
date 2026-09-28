@@ -3,6 +3,7 @@ import { useAccounts, useCategoryGroups } from '../../hooks/useEntityQueries'
 import type { TransactionsFilter } from '../../types/graphql'
 import { MobileFilterDropdown } from '../common/MobileFilterDropdown'
 import { MobileFilterFooter } from '../common/MobileFilterFooter'
+import { useSheetSections } from '../common/useSheetSections'
 import { CreateRuleModal } from '../transactions/CreateRuleModal'
 import { AccountSection, CategorySection, DateSection, OwnerSection, ShowHiddenRow } from '../transactions/TransactionFilterSections'
 import { dateRangeSummary } from '../transactions/transactionFilterPresets'
@@ -22,9 +23,8 @@ export function ExpensesMobileFilters({ filter, isDateFiltered, now, onApply, on
   const { accounts } = useAccounts()
   const { categoryGroups } = useCategoryGroups()
   const [pending, setPending] = useState(filter)
-  const [open, setOpen] = useState<Section | null>(null)
+  const { open, toggle } = useSheetSections<Section>()
   const [isCreateRuleOpen, setIsCreateRuleOpen] = useState(false)
-  const toggle = (section: Section) => () => setOpen((current) => current === section ? null : section)
   const sectionProps = (id: Section) => ({ expanded: open === id, filter: pending, onChange: setPending, onToggle: toggle(id) })
   const dateFiltered = isDateFiltered(pending)
 

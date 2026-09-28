@@ -1,15 +1,12 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { useMutation } from 'urql'
-import type { AccountType, Owner } from '../../types/graphql'
-import { CREATE_MANUAL_ACCOUNT_MUTATION } from '../../graphql/mutations'
-import { useOwners } from '../../hooks/useEntityQueries'
-import { usePermissions } from '../../hooks/usePermissions'
+import type { FormEvent } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { ACCOUNT_TYPES, formatAccountType } from '../../utils/accountSubtypes'
 import { CheckboxField, FieldLabel, FormError, SelectField, TextField } from '../common/FormControls'
 import { Modal, ModalActions, ModalFooter } from '../common/Modal'
 import { ModalHeader } from '../common/ModalHeader'
-import { useSaveAction } from '../../hooks/useSaveAction'
+import { AddManualAccountSheet } from './AddManualAccountSheet'
 import { OwnerSelect } from './OwnerSelect'
+import { useManualAccountForm } from './useManualAccountForm'
 
 export function AddManualAccountModal({
   connectionId,
@@ -22,36 +19,15 @@ export function AddManualAccountModal({
   onClose: () => void
   onCreated: () => void
 }) {
-  const { owners: fetchedOwners } = useOwners()
-  const { canWrite } = usePermissions()
-  const canCreateOwner = canWrite('owners')
-  const [, createManualAccount] = useMutation(CREATE_MANUAL_ACCOUNT_MUTATION)
+  const isMobile = useIsMobile()
+  const form = useManualAccountForm({ connectionId, onClose, onCreated })
+  const { canCreateOwner, canSave, draft, effectiveOwnerId, error, noOwnersReadOnly, owners, patch, saving } = form
 
-  const [name, setName] = useState('')
-  const [ownerId, setOwnerId] = useState('')
-  const [createdOwners, setCreatedOwners] = useState<Owner[]>([])
-  const [type, setType] = useState<AccountType>('DEPOSITORY')
-  const [closed, setClosed] = useState(false)
-  const [hidden, setHidden] = useState(false)
-  const { error, saving: isSubmitting, save } = useSaveAction()
+  if (isMobile) return <AddManualAccountSheet form={form} institutionName={institutionName} onClose={onClose} />
 
-  const owners = useMemo(() => [...fetchedOwners, ...createdOwners], [fetchedOwners, createdOwners])
-  const effectiveOwnerId = ownerId || owners[0]?.id || ''
-  const noOwnersReadOnly = owners.length === 0 && !canCreateOwner
-
-  function handleOwnerCreated(owner: Owner) {
-    setCreatedOwners((prev) => [...prev, owner])
-    setOwnerId(owner.id)
-  }
-
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
-
-    await save(
-      () => createManualAccount({ input: { connectionId, name: name.trim(), ownerId: effectiveOwnerId, type, closed, hidden } }),
-      () => { onCreated(); onClose() },
-    )
+    void form.save()
   }
 
   return (
@@ -67,27 +43,27 @@ export function AddManualAccountModal({
 
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           <p className="text-xs text-text-3"><span aria-hidden="true" className="text-negative">*</span> Required</p>
-          <TextField aria-invalid={!name.trim()} autoFocus label="Account name" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} onChange={setName} placeholder="e.g. Old Amex Gold" required type="text" value={name} />
+          <TextField aria-invalid={!draft.name.trim()} autoFocus label="Account name" labelSuffix={<span aria-hidden="true" className="text-negative"> *</span>} onChange={(name) => patch({ name })} placeholder="e.g. Old Amex Gold" required type="text" value={draft.name} />
 
           <FieldLabel label="Owner">
             <OwnerSelect
               canCreate={canCreateOwner}
-              onChange={setOwnerId}
-              onOwnerCreated={handleOwnerCreated}
+              onChange={(ownerId) => patch({ ownerId })}
+              onOwnerCreated={form.handleOwnerCreated}
               owners={owners}
               value={effectiveOwnerId}
             />
           </FieldLabel>
 
-          <SelectField label="Type" onChange={setType} options={ACCOUNT_TYPES.map((t) => ({ label: formatAccountType(t), value: t }))} value={type} />
+          <SelectField label="Type" onChange={(type) => patch({ type })} options={ACCOUNT_TYPES.map((t) => ({ label: formatAccountType(t), value: t }))} value={draft.type} />
 
           <div className="flex gap-6">
-            <CheckboxField checked={closed} label="Closed" onChange={setClosed} />
-            <CheckboxField checked={hidden} label="Hidden" onChange={setHidden} />
+            <CheckboxField checked={draft.closed} label="Closed" onChange={(closed) => patch({ closed })} />
+            <CheckboxField checked={draft.hidden} label="Hidden" onChange={(hidden) => patch({ hidden })} />
           </div>
 
           <ModalFooter>
-            <ModalActions busy={isSubmitting} busyLabel="Creating…" disabled={isSubmitting || !name.trim() || !effectiveOwnerId || noOwnersReadOnly} onCancel={onClose} submitLabel="Create account" />
+            <ModalActions busy={saving} busyLabel="Creating…" disabled={!canSave} onCancel={onClose} submitLabel="Create account" />
           </ModalFooter>
         </form>
     </Modal>

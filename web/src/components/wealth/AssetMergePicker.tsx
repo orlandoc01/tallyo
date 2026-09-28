@@ -4,7 +4,7 @@ import { MERGE_ASSET_MUTATION } from '../../graphql/mutations'
 import { ASSETS_QUERY } from '../../graphql/queries'
 import type { Asset, AssetAdapterSource } from '../../types/graphql'
 import { Button } from '../common/Button'
-import { SectionLabel, TextField } from '../common/FormControls'
+import { SectionLabel, TextField, type FieldVariant } from '../common/FormControls'
 import { Tag } from '../common/Tag'
 
 type MergePickerState = {
@@ -21,11 +21,13 @@ export function AssetMergePicker({
   canEdit,
   onClose,
   onUpdate,
+  variant = 'default',
 }: {
   asset: Asset
   canEdit: boolean
   onClose: () => void
   onUpdate?: (asset: Asset) => void
+  variant?: FieldVariant
 }) {
   const client = useClient()
   const [, mergeAsset] = useMutation(MERGE_ASSET_MUTATION)
@@ -114,7 +116,7 @@ export function AssetMergePicker({
           </div>
           <TextField ariaLabel="Search merge target assets" hideLabel label="Search merge target assets" onChange={handleMergeSearch} onKeyDown={(event) => {
             if (event.key === 'Enter') event.preventDefault()
-          }} placeholder="Search assets..." type="search" value={mergePicker.search} />
+          }} placeholder="Search assets..." type="search" value={mergePicker.search} variant={variant} />
           {mergePicker.isLoading ? <p className="text-[13px] text-text-muted">Loading assets...</p> : null}
           {mergePicker.error ? <p className="text-[13px] text-negative">{mergePicker.error}</p> : null}
           {!mergePicker.isLoading && !mergePicker.error && mergeTargetAssets.length === 0 ? (
