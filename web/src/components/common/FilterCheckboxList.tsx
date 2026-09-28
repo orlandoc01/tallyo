@@ -58,7 +58,7 @@ export function FilterRadioList<T extends string>({ options, selectedId, onChang
         <button
           aria-checked={selectedId === option.id}
           aria-label={option.ariaLabel}
-          className={clsx(filterRowClassName, selectedId === option.id ? 'text-text-1' : 'text-text-2')}
+          className={clsx(filterRowClassName, selectedId === option.id ? 'bg-raised text-text-1' : 'text-text-2')}
           key={option.id}
           onClick={() => onChange(option.id)}
           role="radio"

@@ -4,6 +4,12 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-09-28
+
+### Fixed
+- The tab strip in the desktop account detail and asset edit dialogs no longer shows a stray vertical scrollbar in browsers with classic scrollbars. The active tab underline now renders as a solid 2px line over the strip's rule.
+- The snapshot history list in account details highlights the selected date as a single-choice row instead of showing a checkbox per date. The same selected-row highlight applies to the net worth, cash flow, and asset filter pickers.
+
 ## [0.3.3] - 2026-09-28
 
 ### Changed
