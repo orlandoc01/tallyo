@@ -6,7 +6,9 @@ use sqlx::SqlitePool;
 use crate::{
     accounts::{
         AccountsCreated, CreateSimpleFinAccessTokenPayload, EventBus, SimpleFinAccessToken, UpsertAccount,
-        simplefin_types::{fields_from_simplefin_account, new_upsert_simple_fin_connection_params},
+        simplefin_types::{
+            fields_from_simplefin_account, new_upsert_simple_fin_connection_params, skipped_accounts_messages,
+        },
     },
     apierror::ApiError,
     clients::simplefin::{GetAccountsOpts, SimpleFinClient},
@@ -14,7 +16,8 @@ use crate::{
 
 use super::store::{
     create_simple_fin_access_token, delete_simple_fin_access_token, owner_by_id, reset_simple_fin_token_synced_at,
-    simple_fin_access_token_by_id, simple_fin_connections_by_token_ids, upsert_account,
+    set_simple_fin_connection_health, simple_fin_access_token_by_id, simple_fin_connections_by_token_ids,
+    upsert_account,
 };
 
 pub struct SimpleFinService {
@@ -62,6 +65,13 @@ impl SimpleFinService {
             let (simple_fin_connection_id, connection_id) =
                 super::store::link_simple_fin_connection(&self.pool, &params).await?;
             connections_by_external_id.insert(connection.conn_id.clone(), (simple_fin_connection_id, connection_id));
+        }
+        for (conn_id, message) in skipped_accounts_messages(&account_set.skipped_non_usd) {
+            let Some((simple_fin_connection_id, _)) = connections_by_external_id.get(&conn_id) else {
+                continue;
+            };
+            set_simple_fin_connection_health(&self.pool, *simple_fin_connection_id, "HEALTHY", Some(&message), None)
+                .await?;
         }
         for simple_fin_account in &account_set.accounts {
             let Some((_, connection_id)) = connections_by_external_id.get(&simple_fin_account.conn_id) else {
@@ -149,7 +159,8 @@ mod tests {
                 "connections":[{"conn_id":"bank","name":"Bank","org_url":"https://bank.example"}],
                 "accounts":[
                     {"id":"unknown","conn_id":"bank","name":"Mystery"},
-                    {"id":"checking","conn_id":"bank","name":"Joint Checking"}
+                    {"id":"checking","conn_id":"bank","name":"Joint Checking"},
+                    {"id":"euros","conn_id":"bank","name":"Euro Savings","currency":"EUR"}
                 ]
             }),
         )
@@ -159,7 +170,7 @@ mod tests {
         let events = EventBus::default();
         let mut subscriber = events.register_subscriber("test");
         let service = SimpleFinService {
-            pool,
+            pool: pool.clone(),
             client: SimpleFinClient::new()?,
             events,
         };
@@ -168,6 +179,18 @@ mod tests {
             .await?;
         assert_eq!(payload.connections.len(), 1);
         assert_eq!(payload.accounts.len(), 2);
+        assert!(payload.accounts.iter().all(|account| account.name != "Euro Savings"));
+        assert_eq!(
+            sqlx::query_as::<_, (String, Option<String>)>(
+                "SELECT health_state, health_error_message FROM simplefin_connections WHERE external_id = 'bank'",
+            )
+            .fetch_one(&pool)
+            .await?,
+            (
+                "HEALTHY".to_owned(),
+                Some("Skipped non-USD accounts: Euro Savings (EUR)".to_owned())
+            )
+        );
         assert!(
             payload
                 .accounts

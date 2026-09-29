@@ -61,7 +61,7 @@ Tallyo ships as a single `tallyo` binary with the web app embedded. It runs back
 
 Tallyo is built for household-scale self-hosting. Run it behind your own reverse proxy, VPN, or identity-aware proxy — do not expose it directly to the public internet. See [Security and Deployment Notes](docs/security.md) before publishing an instance.
 
-**US/USD only for now.** All amounts are stored and displayed as USD with no currency conversion. SimpleFIN rejects non-USD accounts and Plaid/CSV amounts are taken as USD verbatim.
+**US/USD only for now.** All amounts are stored and displayed as USD with no currency conversion. SimpleFIN skips non-USD accounts (noted in the connection's health message) while USD account balances and their holdings sync; Plaid/CSV amounts are taken as USD verbatim.
 
 **Plaid is optional.** SimpleFIN sync, CSV import/export, crypto wallet tracking, and manual accounts (including real estate and manual holdings/liabilities) all work without a Plaid account, so you can track spending and net worth entirely without it.
 

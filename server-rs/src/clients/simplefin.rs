@@ -71,6 +71,8 @@ pub struct SimpleFinAccountSet {
     pub accounts: Vec<SimpleFinAccount>,
     #[serde(rename = "errlist")]
     pub errors: Vec<SimpleFinError>,
+    #[serde(skip)]
+    pub skipped_non_usd: Vec<SimpleFinAccount>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -141,9 +143,19 @@ impl SimpleFinClient {
             anyhow::bail!("accounts request failed with HTTP {}: {body}", status.as_u16());
         }
 
-        let accounts = serde_json::from_str::<SimpleFinAccountSet>(&body).context("decode accounts response")?;
-        validate_currencies(&accounts)?;
-        Ok(accounts)
+        let decoded = serde_json::from_str::<SimpleFinAccountSet>(&body).context("decode accounts response")?;
+        let (accounts, skipped_non_usd): (Vec<_>, Vec<_>) = decoded
+            .accounts
+            .into_iter()
+            .partition(|account| is_usd(&account.currency));
+        for account in &skipped_non_usd {
+            tracing::debug!(account_id = %account.id, currency = %account.currency, "skipping non-USD simplefin account");
+        }
+        Ok(SimpleFinAccountSet {
+            accounts,
+            skipped_non_usd,
+            ..decoded
+        })
     }
 }
 
@@ -181,18 +193,9 @@ fn accounts_url(mut access_url: Url, opts: GetAccountsOpts) -> Result<Url> {
     Ok(access_url)
 }
 
-fn validate_currencies(accounts: &SimpleFinAccountSet) -> Result<()> {
-    for account in &accounts.accounts {
-        if !account.currency.is_empty() && !account.currency.eq_ignore_ascii_case("USD") {
-            anyhow::bail!("unsupported simplefin account currency {:?}", account.currency);
-        }
-        for holding in &account.holdings {
-            if !holding.currency.is_empty() && !holding.currency.eq_ignore_ascii_case("USD") {
-                anyhow::bail!("unsupported simplefin holding currency {:?}", holding.currency);
-            }
-        }
-    }
-    Ok(())
+fn is_usd(currency: &str) -> bool {
+    let currency = currency.trim();
+    currency.is_empty() || currency.eq_ignore_ascii_case("USD")
 }
 
 #[cfg(test)]
@@ -250,7 +253,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_invalid_tokens_and_non_usd_accounts() {
+    async fn rejects_invalid_tokens_and_urls() {
         let client = SimpleFinClient::new().unwrap();
         assert!(client.claim("not-base64").await.is_err());
         assert_eq!(
@@ -261,18 +264,31 @@ mod tests {
                 .to_string(),
             "invalid simplefin access URL"
         );
+    }
 
+    #[tokio::test]
+    async fn keeps_usd_accounts_and_skips_non_usd_accounts() {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"accounts":[{"currency":"EUR"}]}"#))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                r#"{"accounts":[
+                    {"id":"usd-checking","currency":"USD"},
+                    {"id":"crypto-account","currency":"USD","holdings":[{"id":"eth","symbol":"ETH","currency":"ETH"}]},
+                    {"id":"eur-account","currency":"EUR"}
+                ]}"#,
+            ))
             .mount(&server)
             .await;
-        assert!(
-            client
-                .get_accounts(&server.uri(), GetAccountsOpts::default())
-                .await
-                .is_err()
-        );
+
+        let accounts = SimpleFinClient::new()
+            .unwrap()
+            .get_accounts(&server.uri(), GetAccountsOpts::default())
+            .await
+            .unwrap();
+
+        let ids = |accounts: &[super::SimpleFinAccount]| accounts.iter().map(|a| a.id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&accounts.accounts), ["usd-checking", "crypto-account"]);
+        assert_eq!(ids(&accounts.skipped_non_usd), ["eur-account"]);
     }
 
     const ACCOUNTS: &str = r#"{

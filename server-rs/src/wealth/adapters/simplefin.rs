@@ -474,6 +474,85 @@ mod tests {
     }
 
     #[test]
+    fn records_eth_holding_as_asset_not_usd_cash() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap();
+        let sink = TestSink { now };
+        let snapshot = investment_snapshot(
+            &SimpleFinAccount {
+                id: "crypto".to_owned(),
+                currency: "USD".to_owned(),
+                balance: "2021.33".to_owned(),
+                holdings: vec![SimpleFinHolding {
+                    id: "eth".to_owned(),
+                    symbol: "ETH".to_owned(),
+                    shares: "0.7519938".to_owned(),
+                    market_value: "2021.33".to_owned(),
+                    currency: "ETH".to_owned(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            2,
+            1,
+            "USD",
+            &sink,
+            now,
+        )
+        .unwrap();
+        assert_eq!(snapshot.balance_usd, Cents(202_133));
+        assert_eq!(snapshot.holdings.len(), 1);
+        assert_eq!(snapshot.holdings[0].identifier, "ETH");
+        assert!(snapshot.holdings[0].asset.is_some());
+    }
+
+    #[test]
+    fn records_mixed_usd_and_eth_holdings_with_zero_residual_cash() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap();
+        let sink = TestSink { now };
+        let snapshot = investment_snapshot(
+            &SimpleFinAccount {
+                id: "mixed".to_owned(),
+                currency: "USD".to_owned(),
+                balance: "15".to_owned(),
+                holdings: vec![
+                    SimpleFinHolding {
+                        id: "vti".to_owned(),
+                        symbol: "VTI".to_owned(),
+                        shares: "1".to_owned(),
+                        market_value: "10".to_owned(),
+                        currency: "USD".to_owned(),
+                        ..Default::default()
+                    },
+                    SimpleFinHolding {
+                        id: "eth".to_owned(),
+                        symbol: "ETH".to_owned(),
+                        shares: "0.002".to_owned(),
+                        market_value: "5".to_owned(),
+                        currency: "ETH".to_owned(),
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            },
+            2,
+            1,
+            "USD",
+            &sink,
+            now,
+        )
+        .unwrap();
+        assert_eq!(snapshot.balance_usd, Cents(1500));
+        assert_eq!(
+            snapshot
+                .holdings
+                .iter()
+                .map(|holding| holding.identifier.as_str())
+                .collect::<Vec<_>>(),
+            ["VTI", "ETH"]
+        );
+    }
+
+    #[test]
     fn rejects_infinite_holding_prices() {
         assert!(
             holding_line(

@@ -153,14 +153,14 @@ pub async fn set_simple_fin_connection_health(
     conn_id: i64,
     state: &str,
     error_message: Option<&str>,
-    last_synced_at: DateTime<Utc>,
+    last_synced_at: Option<DateTime<Utc>>,
 ) -> Result<()> {
     queries::set_simple_fin_connection_health(
         executor,
         queries::SetSimpleFinConnectionHealthParams {
             health_state: state,
             health_error_message: error_message,
-            last_synced_at: Some(last_synced_at.into()),
+            last_synced_at: last_synced_at.map(Into::into),
             id: conn_id,
         },
     )

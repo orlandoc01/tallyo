@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use url::Url;
 
 use crate::{
@@ -59,6 +61,23 @@ pub fn fields_from_simplefin_account(account: &SimpleFinAccount) -> SimpleFinAcc
         mask,
         needs_review,
     }
+}
+
+pub fn skipped_accounts_messages(skipped: &[SimpleFinAccount]) -> HashMap<String, String> {
+    skipped
+        .iter()
+        .fold(HashMap::<String, Vec<String>>::new(), |mut by_conn, account| {
+            let (name, _) = simplefin_name_and_mask(&account.name);
+            let name = if name.is_empty() { &account.id } else { &name };
+            by_conn
+                .entry(account.conn_id.clone())
+                .or_default()
+                .push(format!("{name} ({})", account.currency.trim().to_ascii_uppercase()));
+            by_conn
+        })
+        .into_iter()
+        .map(|(conn_id, names)| (conn_id, format!("Skipped non-USD accounts: {}", names.join(", "))))
+        .collect()
 }
 
 pub fn new_upsert_simple_fin_connection_params(
