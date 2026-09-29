@@ -131,6 +131,58 @@ async fn persists_paginated_plaid_and_simplefin_sync_responses() -> Result<()> {
 }
 
 #[tokio::test]
+async fn simplefin_skipped_non_usd_accounts_are_noted_in_connection_health() -> Result<()> {
+    let pool = dbtest::open().await?;
+    let server = MockServer::start().await;
+    let mut response = simplefin_mock::full_accounts_response();
+    response["accounts"].as_array_mut().unwrap().push(json!({
+        "id":"eur-account",
+        "conn_id":"connection",
+        "name":"Euro Savings",
+        "currency":"EUR",
+        "balance":"10.00",
+    }));
+    simplefin_mock::mount_accounts(&server, response).await;
+    let owner = create_owner(&pool, "Owner").await?;
+    create_simple_fin_access_token(&pool, &access_url(&server), owner.id, "Bank").await?;
+    let syncer = Syncer::new(
+        pool.clone(),
+        vec![Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?))],
+    );
+    let health = || async {
+        sqlx::query_as::<_, (String, Option<String>)>(
+            "SELECT health_state, health_error_message FROM simplefin_connections WHERE external_id = 'connection'",
+        )
+        .fetch_one(&pool)
+        .await
+    };
+
+    assert!(syncer.sync_due().await.items.iter().all(|item| item.error.is_none()));
+    assert_eq!(
+        health().await?,
+        (
+            "HEALTHY".to_owned(),
+            Some("Skipped non-USD accounts: Euro Savings (EUR)".to_owned())
+        )
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM accounts WHERE external_id = 'eur-account'")
+            .fetch_one(&pool)
+            .await?,
+        0
+    );
+
+    server.reset().await;
+    simplefin_mock::mount_accounts(&server, simplefin_mock::full_accounts_response()).await;
+    sqlx::query("UPDATE simplefin_access_tokens SET next_sync_at = NULL")
+        .execute(&pool)
+        .await?;
+    assert!(syncer.sync_due().await.items.iter().all(|item| item.error.is_none()));
+    assert_eq!(health().await?, ("HEALTHY".to_owned(), None));
+    Ok(())
+}
+
+#[tokio::test]
 async fn simplefin_fetch_failures_record_sanitized_item_errors_and_audit_logs() -> Result<()> {
     let pool = dbtest::open().await?;
     let server = MockServer::start().await;

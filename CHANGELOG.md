@@ -4,6 +4,11 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-09-29
+
+### Fixed
+- A SimpleFIN connection no longer fails as a whole when one account or holding reports a non-USD currency. USD accounts sync as before, including holdings such as ETH whose market value SimpleFIN reports in the account's currency, so those holdings are recorded as assets rather than dropped or recounted as cash. Accounts whose own currency is not USD are skipped, and the connection's health note lists them until a later sync finds none. Thanks to @vivekrathod for the report and initial fix in #4.
+
 ## [0.3.4] - 2026-09-28
 
 ### Fixed

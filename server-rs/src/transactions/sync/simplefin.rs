@@ -7,7 +7,7 @@ use sqlx::SqlitePool;
 use crate::{
     accounts::{
         SimpleFinAccessTokenSecret, SimpleFinTokenSecretKind, SourceTable, new_upsert_simple_fin_connection_params,
-        simplefin_types::fields_from_simplefin_account,
+        simplefin_types::{fields_from_simplefin_account, skipped_accounts_messages},
         store::{
             hidden_account_ids_by_connection, link_simple_fin_connection, set_simple_fin_connection_health,
             set_simple_fin_token_synced, simple_fin_connection_ids_by_external_id, simple_fin_token_secret_by_conn_id,
@@ -154,11 +154,14 @@ impl SimpleFinSync {
         connections: &HashMap<String, (i64, i64)>,
         now: DateTime<Utc>,
     ) {
+        let skipped_messages = skipped_accounts_messages(&account_set.skipped_non_usd);
         for connection in &account_set.connections {
             let Some((connection_id, _)) = connections.get(&connection.conn_id) else {
                 continue;
             };
-            if let Err(error) = set_simple_fin_connection_health(&self.pool, *connection_id, "HEALTHY", None, now).await
+            let message = skipped_messages.get(&connection.conn_id).map(String::as_str);
+            if let Err(error) =
+                set_simple_fin_connection_health(&self.pool, *connection_id, "HEALTHY", message, Some(now)).await
             {
                 tracing::warn!(token_id = token.id, connection_id, %error, "set simplefin connection health");
             }
@@ -184,9 +187,14 @@ impl SimpleFinSync {
             let Some(connection_id) = connection_id else {
                 continue;
             };
-            if let Err(error) =
-                set_simple_fin_connection_health(&self.pool, connection_id, "SYNC_ERROR", Some(&error.message), now)
-                    .await
+            if let Err(error) = set_simple_fin_connection_health(
+                &self.pool,
+                connection_id,
+                "SYNC_ERROR",
+                Some(&error.message),
+                Some(now),
+            )
+            .await
             {
                 tracing::warn!(token_id = token.id, connection_id, %error, "set simplefin connection health");
             }
