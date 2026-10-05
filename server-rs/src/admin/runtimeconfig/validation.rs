@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow, bail, ensure};
 use chrono_tz::Tz;
 use url::Url;
 
-use crate::{apierror::ApiError, middleware::client_ip::parse_trusted_proxy_cidrs};
+use crate::{apierror::ApiError, clients::ollama::validate_base_url, middleware::client_ip::parse_trusted_proxy_cidrs};
 
 use super::{LlmConfig, LocaleConfig, McpConfig, Provider, Sections, SecurityConfig, WebAuthnConfig};
 
@@ -119,15 +119,13 @@ impl LlmConfig {
         if let Some(Provider::Unknown(provider)) = &self.provider {
             bail!("unknown llm provider {provider:?}");
         }
-        let url = self.ollama.url.as_deref().unwrap_or_default();
-        let trimmed = url.trim();
-        ensure!(!trimmed.is_empty(), ApiError::bad_input(OLLAMA_URL_REQUIRED));
-        let valid = Url::parse(trimmed)
-            .is_ok_and(|parsed| parsed.host_str().is_some() && matches!(parsed.scheme(), "http" | "https"));
-        ensure!(
-            valid,
-            ApiError::bad_input(format!("invalid ollama url {url:?}: must be an absolute URL"))
-        );
+        let url = self.ollama.url.as_deref().unwrap_or_default().trim();
+        ensure!(!url.is_empty(), ApiError::bad_input(OLLAMA_URL_REQUIRED));
+        validate_base_url(url).map_err(|error| ApiError::bad_input(error.to_string()))?;
+        self.ollama
+            .generation
+            .validate()
+            .map_err(|error| ApiError::bad_input(error.to_string()))?;
         Ok(())
     }
 }
@@ -156,7 +154,10 @@ impl McpConfig {
 #[cfg(test)]
 mod tests {
     use super::{McpConfig, Sections, WebAuthnConfig, validate_disable_all_auth_issuer, validate_runtime_config};
-    use crate::admin::{LlmConfig, LocaleConfig, Provider, Section, SecurityConfig};
+    use crate::{
+        admin::{LlmConfig, LocaleConfig, OllamaConfig, Provider, Section, SecurityConfig},
+        clients::ollama::{BATCH_SIZE_RANGE, GenerationOptions},
+    };
 
     #[test]
     fn validates_runtime_configuration_requirements() {
@@ -229,6 +230,32 @@ mod tests {
             .unwrap_err()
             .to_string(),
             "unknown llm provider \"future-provider\""
+        );
+        let ollama = |generation| OllamaConfig {
+            url: Some("http://localhost:11434".to_owned()),
+            model: "llama3".to_owned(),
+            generation,
+        };
+        assert!(
+            LlmConfig {
+                ollama: ollama(GenerationOptions::default()),
+                ..Default::default()
+            }
+            .validate(true)
+            .is_ok()
+        );
+        assert_eq!(
+            LlmConfig {
+                ollama: ollama(GenerationOptions {
+                    batch_size: 0,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
+            .validate(true)
+            .unwrap_err()
+            .to_string(),
+            BATCH_SIZE_RANGE
         );
         assert!(
             SecurityConfig {

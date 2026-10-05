@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
 use sqlx::SqlitePool;
@@ -8,7 +8,7 @@ use crate::{
         AccountType, PlaidClientFactory, PlaidItemSecret, PlaidSyncKind, SourceTable, store as accounts_store,
         type_from_plaid,
     },
-    clients::plaid::AccountBase,
+    clients::plaid::{AccountBase, PlaidApiError},
     money::Cents,
     utils::future::BoxFuture,
     wealth::{
@@ -17,6 +17,28 @@ use crate::{
         next_balance_sync_after, store,
     },
 };
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct ResolvedAccount {
+    pub(super) id: Option<i64>,
+    pub(super) account_type: AccountType,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) struct ResolvedAccounts(pub(super) HashMap<String, ResolvedAccount>);
+
+impl ResolvedAccounts {
+    pub(super) fn is_investment(&self, account: &AccountBase) -> bool {
+        self.0
+            .get(&account.account_id)
+            .map_or_else(|| type_from_plaid(&account.account_type), |entry| entry.account_type)
+            == AccountType::Investment
+    }
+
+    pub(super) fn persisted_id(&self, external_id: &str) -> Option<i64> {
+        self.0.get(external_id).and_then(|entry| entry.id)
+    }
+}
 
 pub struct PlaidSyncAdapter {
     pub(super) pool: SqlitePool,
@@ -27,6 +49,12 @@ pub struct PlaidSyncAdapter {
 impl PlaidSyncAdapter {
     pub fn new(pool: SqlitePool, clients: PlaidClientFactory) -> Result<Self> {
         Ok(Self::with_prices(pool.clone(), clients, YahooPriceProvider::new(pool)?))
+    }
+
+    async fn record_plaid_failure(&self, item_id: i64, error: &anyhow::Error) {
+        if error.downcast_ref::<PlaidApiError>().is_some() {
+            accounts_store::record_plaid_item_error(&self.pool, item_id, error).await;
+        }
     }
 
     pub fn with_prices(pool: SqlitePool, clients: PlaidClientFactory, prices: YahooPriceProvider) -> Self {
@@ -46,33 +74,75 @@ impl PlaidSyncAdapter {
             .accounts_balance_get(&item.plaid_items.access_token)
             .await
             .context("accounts balance get")?;
-        let has_investments = accounts
-            .iter()
-            .any(|account| type_from_plaid(&account.account_type) == AccountType::Investment);
-        if has_investments {
+        let resolved = self.resolve_accounts(&accounts).await?;
+        if accounts.iter().any(|account| resolved.is_investment(account)) {
             match client.investments_holdings_get(&item.plaid_items.access_token).await {
-                Ok(response) => self.sync_investments(&response, &accounts, sink).await?,
-                Err(error) => tracing::error!(item_id = item.plaid_items.id, %error, "investments holdings get failed"),
+                Ok(response) => self.sync_investments(&response, &accounts, &resolved, sink).await?,
+                Err(error) => {
+                    tracing::error!(
+                        item_id = item.plaid_items.id,
+                        error = %format_args!("{error:#}"),
+                        "investments holdings get failed"
+                    )
+                }
             }
         }
-        self.sync_cash_accounts(&accounts, sink).await?;
+        self.sync_cash_accounts(&accounts, &resolved, sink).await?;
         accounts_store::set_item_balance_synced(&self.pool, item.plaid_items.id, next_sync_at).await
     }
 
-    async fn sync_cash_accounts(&self, accounts: &[AccountBase], sink: &dyn PersistSink) -> Result<()> {
+    async fn resolve_accounts(&self, accounts: &[AccountBase]) -> Result<ResolvedAccounts> {
+        self.resolve_missing(ResolvedAccounts::default(), accounts).await
+    }
+
+    pub(super) async fn resolve_missing(
+        &self,
+        resolved: ResolvedAccounts,
+        accounts: &[AccountBase],
+    ) -> Result<ResolvedAccounts> {
+        let missing = accounts
+            .iter()
+            .filter(|account| !resolved.0.contains_key(&account.account_id))
+            .collect::<Vec<_>>();
+        let external_ids = missing
+            .iter()
+            .map(|account| account.account_id.clone())
+            .collect::<Vec<_>>();
+        let persisted = accounts_store::accounts_by_external_ids(&self.pool, &external_ids).await?;
+        let added = missing.into_iter().map(|account| {
+            let entry = persisted.get(&account.account_id).map_or_else(
+                || ResolvedAccount {
+                    id: None,
+                    account_type: type_from_plaid(&account.account_type),
+                },
+                |persisted| ResolvedAccount {
+                    id: Some(persisted.id),
+                    account_type: persisted.r#type,
+                },
+            );
+            (account.account_id.clone(), entry)
+        });
+        Ok(ResolvedAccounts(resolved.0.into_iter().chain(added).collect()))
+    }
+
+    async fn sync_cash_accounts(
+        &self,
+        accounts: &[AccountBase],
+        resolved: &ResolvedAccounts,
+        sink: &dyn PersistSink,
+    ) -> Result<()> {
         let usd = store::asset_by_id(&self.pool, 1)
             .await?
             .ok_or_else(|| anyhow!("USD asset not found"))?;
         for account in accounts
             .iter()
-            .filter(|account| type_from_plaid(&account.account_type) != AccountType::Investment)
+            .filter(|account| !resolved.is_investment(account))
             .filter_map(|account| account.balances.current.map(|balance| (account, balance)))
         {
             let (account, balance) = account;
-            let account_id = accounts_store::account_by_external_id(&self.pool, &account.account_id)
-                .await?
-                .ok_or_else(|| anyhow!("lookup account {}: not found", account.account_id))?
-                .id;
+            let account_id = resolved
+                .persisted_id(&account.account_id)
+                .ok_or_else(|| anyhow!("lookup account {}: not found", account.account_id))?;
             let snapshot = AccountBalanceSnapshot {
                 account_id,
                 wallet_address: String::new(),
@@ -131,7 +201,12 @@ impl SyncAdapter for PlaidSyncAdapter {
         Box::pin(async move {
             for item in accounts_store::plaid_items_due(&self.pool, PlaidSyncKind::Balance, sink.now()).await? {
                 if let Err(error) = self.sync_item(&item, sink.as_ref()).await {
-                    tracing::error!(item_id = item.plaid_items.id, %error, "plaid balance sync item failed");
+                    tracing::error!(
+                        item_id = item.plaid_items.id,
+                        error = %format_args!("{error:#}"),
+                        "plaid balance sync item failed"
+                    );
+                    self.record_plaid_failure(item.plaid_items.id, &error).await;
                 }
             }
             Ok(())
@@ -148,7 +223,11 @@ impl SyncAdapter for PlaidSyncAdapter {
                 accounts_store::plaid_item_secret_by_id(&self.pool, connection.source_id, PlaidSyncKind::Balance)
                     .await?
                     .ok_or_else(|| anyhow!("plaid item {} not found", connection.source_id))?;
-            self.sync_item(&item, sink).await
+            let result = self.sync_item(&item, sink).await;
+            if let Err(error) = &result {
+                self.record_plaid_failure(item.plaid_items.id, error).await;
+            }
+            result
         })
     }
 }
@@ -170,10 +249,12 @@ mod tests {
 
     use super::{PersistEvent, PersistSink, PlaidSyncAdapter, SyncAdapter};
     use crate::{
-        accounts::{PlaidClientFactory, PlaidSyncKind, SourceTable, store as accounts_store},
+        accounts::{PlaidClientFactory, PlaidItemHealthState, PlaidSyncKind, SourceTable, store as accounts_store},
         clients::plaid::{AccountBalance, AccountBase},
         database::{dbtest, queries},
-        testutil::store::{create_owner, seed_plaid_account, seed_plaid_item},
+        testutil::store::{
+            create_owner, plaid_item, seed_plaid_account, seed_plaid_investment_account, seed_plaid_item,
+        },
         utils::future::BoxFuture,
         wealth::{ConnectionRef, SnapshotDecision},
     };
@@ -208,20 +289,17 @@ mod tests {
             events: Mutex::new(Vec::new()),
         };
 
-        adapter
-            .sync_cash_accounts(
-                &[AccountBase {
-                    account_id: "cash".to_owned(),
-                    account_type: "depository".to_owned(),
-                    balances: AccountBalance {
-                        current: Some(12.34),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }],
-                &sink,
-            )
-            .await?;
+        let accounts = [AccountBase {
+            account_id: "cash".to_owned(),
+            account_type: "depository".to_owned(),
+            balances: AccountBalance {
+                current: Some(12.34),
+                ..Default::default()
+            },
+            ..Default::default()
+        }];
+        let resolved = adapter.resolve_accounts(&accounts).await?;
+        adapter.sync_cash_accounts(&accounts, &resolved, &sink).await?;
         assert!(adapter.handles(&ConnectionRef {
             connection_id: connection.id,
             source_table: SourceTable::PlaidItems,
@@ -234,6 +312,103 @@ mod tests {
         assert_eq!(snapshot.snapshot.account_id, account_id);
         assert_eq!(snapshot.snapshot.balance_usd.0, 1234);
         assert_eq!(snapshot.decision, SnapshotDecision::Clean);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn persisted_investment_type_wins_over_plaid_depository_type() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (item_id, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        seed_plaid_investment_account(&pool, &owner, &connection, "cashplus").await?;
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::path("/accounts/balance/get"))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "accounts":[{"account_id":"cashplus","type":"depository","balances":{"current":5.0}}]
+            })))
+            .mount(&server)
+            .await;
+        let holdings = wiremock::Mock::given(wiremock::matchers::path("/investments/holdings/get"))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "accounts":[{"account_id":"cashplus","type":"depository","balances":{"current":5.0}}],
+                "holdings":[{"account_id":"cashplus","security_id":"vgit","quantity":2.0,"institution_price":5.0}],
+                "securities":[{"security_id":"vgit","ticker_symbol":"VGIT"}]
+            })))
+            .expect(1)
+            .mount_as_scoped(&server)
+            .await;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::with_base_url(pool, server.uri()))?;
+        let sink = RecordingSink {
+            now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
+            events: Mutex::new(Vec::new()),
+        };
+
+        adapter
+            .sync_connection_into(
+                ConnectionRef {
+                    connection_id: connection.id,
+                    source_table: SourceTable::PlaidItems,
+                    source_id: item_id,
+                },
+                &sink,
+            )
+            .await?;
+
+        drop(holdings);
+        let events = sink.events.lock().unwrap();
+        assert_eq!(events.len(), 1);
+        let PersistEvent::Snapshot(snapshot) = &events[0] else {
+            panic!("expected snapshot")
+        };
+        assert!(
+            snapshot.snapshot.raw_payload.is_some(),
+            "cash snapshot was written instead"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unpersisted_accounts_fall_back_to_plaid_type_without_an_id() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+        let accounts = [AccountBase {
+            account_id: "ghost".to_owned(),
+            account_type: "investment".to_owned(),
+            ..Default::default()
+        }];
+
+        let resolved = adapter.resolve_accounts(&accounts).await?;
+
+        assert!(resolved.is_investment(&accounts[0]));
+        assert_eq!(resolved.persisted_id("ghost"), None);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cash_sync_errors_for_an_unpersisted_account_with_a_balance() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+        let sink = RecordingSink {
+            now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
+            events: Mutex::new(Vec::new()),
+        };
+        let accounts = [AccountBase {
+            account_id: "ghost".to_owned(),
+            account_type: "depository".to_owned(),
+            balances: AccountBalance {
+                current: Some(1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        }];
+        let resolved = adapter.resolve_accounts(&accounts).await?;
+
+        let error = adapter
+            .sync_cash_accounts(&accounts, &resolved, &sink)
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("lookup account ghost: not found"));
         Ok(())
     }
 
@@ -353,6 +528,102 @@ mod tests {
             source_table: SourceTable::EvmWallets,
             source_id: good_item_id,
         }));
+        Ok(())
+    }
+
+    async fn failing_balance_adapter(
+        pool: &sqlx::SqlitePool,
+        response: wiremock::ResponseTemplate,
+    ) -> Result<(PlaidSyncAdapter, wiremock::MockServer)> {
+        let server = wiremock::MockServer::start().await;
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/accounts/balance/get"))
+            .respond_with(response)
+            .mount(&server)
+            .await;
+        let adapter = PlaidSyncAdapter::new(
+            pool.clone(),
+            PlaidClientFactory::with_base_url(pool.clone(), server.uri()),
+        )?;
+        Ok((adapter, server))
+    }
+
+    fn login_required() -> wiremock::ResponseTemplate {
+        wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({"error_code":"ITEM_LOGIN_REQUIRED"}))
+    }
+
+    fn test_sink() -> RecordingSink {
+        RecordingSink {
+            now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
+            events: Mutex::new(Vec::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn balance_sync_failure_records_plaid_plaid_item() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (item_id, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let (adapter, _server) = failing_balance_adapter(&pool, login_required()).await?;
+
+        let result = adapter
+            .sync_connection_into(
+                ConnectionRef {
+                    connection_id: connection.id,
+                    source_table: SourceTable::PlaidItems,
+                    source_id: item_id,
+                },
+                &test_sink(),
+            )
+            .await;
+
+        assert!(result.is_err());
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::LinkUpdateRequired);
+        assert_eq!(item.health_error_code.as_deref(), Some("ITEM_LOGIN_REQUIRED"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn due_sync_failure_records_plaid_plaid_item() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+        let (adapter, _server) = failing_balance_adapter(&pool, login_required()).await?;
+
+        adapter.sync_due(Arc::new(test_sink())).await?;
+
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::LinkUpdateRequired);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn non_plaid_balance_sync_failure_leaves_health_untouched() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (item_id, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let unknown_account = wiremock::ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({"accounts":[{"account_id":"ghost","type":"depository","balances":{"current":1.0}}]}),
+        );
+        let (adapter, _server) = failing_balance_adapter(&pool, unknown_account).await?;
+
+        let result = adapter
+            .sync_connection_into(
+                ConnectionRef {
+                    connection_id: connection.id,
+                    source_table: SourceTable::PlaidItems,
+                    source_id: item_id,
+                },
+                &test_sink(),
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            plaid_item(&pool, item_id).await?.health_state,
+            PlaidItemHealthState::Healthy
+        );
         Ok(())
     }
 }

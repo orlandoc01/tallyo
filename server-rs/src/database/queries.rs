@@ -2420,13 +2420,12 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, CASE WHEN ?11 = 1 THEN 'TY
 ON CONFLICT(external_id) DO UPDATE SET
   connection_id = excluded.connection_id,
   owner_id = excluded.owner_id,
-  name = excluded.name,
-  -- type is classified once on insert and preserved on conflict so provider
-  -- re-syncs never clobber the stored (or user-corrected) account type.
+  -- name, type, subtype and mask are taken from the provider once on insert
+  -- and preserved on conflict so re-syncs never clobber user edits.
   -- needs_review/review_reason follow the same insert-only semantics and are
   -- cleared only by updateAccount when the user confirms the type.
   subtype = COALESCE(accounts.subtype, excluded.subtype),
-  mask = excluded.mask,
+  mask = COALESCE(accounts.mask, excluded.mask),
   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
 RETURNING id";
 #[derive(Debug, Clone, Default)]
@@ -11038,15 +11037,16 @@ pub async fn mark_account_balance_synced<'e>(
     let q = q.bind(params.last_balance_synced_at);
     q.execute(executor).await.map(|_| ())
 }
-pub const CATEGORIES_FOR_LLM: &str = r"SELECT c.id, c.name, cg.name AS group_name
+pub const CATEGORIES_FOR_LLM: &str = r"SELECT c.id, c.name, cg.name AS group_name, cg.kind AS group_kind
 FROM categories c
 JOIN category_groups cg ON cg.id = c.group_id
-WHERE cg.kind = 'EXPENSE'
-ORDER BY c.sort_order";
+WHERE c.id != 0
+ORDER BY cg.kind, cg.sort_order, c.sort_order";
 pub struct CategoriesForLlmRow {
     pub id: i64,
     pub name: String,
     pub group_name: String,
+    pub group_kind: String,
 }
 impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for CategoriesForLlmRow {
     fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
@@ -11054,6 +11054,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for CategoriesForLlmRow {
             id: sqlx::Row::try_get(row, 0)?,
             name: sqlx::Row::try_get(row, 1)?,
             group_name: sqlx::Row::try_get(row, 2)?,
+            group_kind: sqlx::Row::try_get(row, 3)?,
         })
     }
 }
@@ -11136,17 +11137,16 @@ pub async fn stage_uncategorized_for_llm<'e>(
     q.execute(executor).await.map(|result| result.rows_affected())
 }
 pub const TOP_MERCHANT_EXAMPLES: &str = r"SELECT
-  CAST(MIN(t.merchant_name) AS TEXT) AS merchant_name,
+  CAST(MIN(COALESCE(NULLIF(t.merchant_name, ''), NULLIF(t.original_name, ''))) AS TEXT) AS merchant_name,
   c.name AS category_name,
   c.id AS category_id
 FROM transactions t
 JOIN categories c ON t.category_id = c.id
-JOIN category_groups cg ON cg.id = c.group_id
-WHERE t.merchant_name IS NOT NULL
+WHERE COALESCE(NULLIF(t.merchant_name, ''), NULLIF(t.original_name, '')) IS NOT NULL
   AND t.is_reviewed = 1
-  AND cg.kind = 'EXPENSE'
+  AND c.id != 0
   AND t.datetime < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-7 days')
-GROUP BY LOWER(t.merchant_name), c.id
+GROUP BY LTRIM(LOWER(COALESCE(NULLIF(t.merchant_name, ''), t.original_name))), c.id
 ORDER BY COUNT(*) DESC
 LIMIT ?1";
 #[derive(Debug, Clone, Default)]

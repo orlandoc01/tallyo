@@ -102,7 +102,7 @@ export const configurationFixture: Configuration = {
     enabled: true,
     provider: 'OLLAMA',
     allowedProviders: ['OLLAMA'],
-    ollama: { url: 'http://ollama:11434', model: 'llama3' },
+    ollama: { url: 'http://ollama:11434', model: 'llama3', batchSize: 5, think: false, temperature: 0.1, maxOutputTokens: 2048, requestTimeoutSeconds: 300 },
   },
   googleAuthn: {
     enabled: true,

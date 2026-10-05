@@ -1,4 +1,5 @@
 import type { AccountSnapshot, Asset, Holding } from '../../types/graphql'
+import { formatUnitPrice } from '../../utils/currency'
 
 // Editable representation of a single holding within an account snapshot, plus
 // the pure transforms between snapshots/holdings and these lines. Shared by the
@@ -66,8 +67,26 @@ export function isCash(asset: Asset) {
   return asset.classifier === 'CASH'
 }
 
+export function isPriced(line: SnapshotLine): line is SnapshotLine & { quantity: number; price: number } {
+  return !isCash(line.asset) && line.quantity != null && line.price != null
+}
+
+export function quantityUnit(asset: Asset) {
+  return asset.assetType === 'SECURITY' ? 'shares' : 'units'
+}
+
+export function lineTicker(line: SnapshotLine) {
+  return isCash(line.asset) ? '$' : line.asset.identifier
+}
+
+export function lineMeta(line: SnapshotLine) {
+  if (isCash(line.asset)) return 'Cash'
+  if (line.quantity == null || line.price == null) return 'Value only'
+  return `Price ${formatUnitPrice(line.price)}`
+}
+
 function parseDecimal(value: string) {
-  const parsed = Number.parseFloat(value)
+  const parsed = Number.parseFloat(value.replace(',', '.'))
   return Number.isFinite(parsed) ? parsed : 0
 }
 

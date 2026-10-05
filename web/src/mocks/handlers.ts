@@ -237,7 +237,7 @@ export const configuration = {
     enabled: true,
     provider: 'OLLAMA',
     allowedProviders: ['OLLAMA'],
-    ollama: { __typename: 'OllamaProviderConfiguration', url: 'http://ollama:11434', model: 'llama3' },
+    ollama: { __typename: 'OllamaProviderConfiguration', url: 'http://ollama:11434', model: 'llama3', batchSize: 5, think: false, temperature: 0.1, maxOutputTokens: 2048, requestTimeoutSeconds: 300 },
   },
   googleAuthn: { __typename: 'GoogleAuthnConfiguration', enabled: true, googleClientId: 'stub-google-client', googleClientSecret: '********' },
   passKeyAuthn: { __typename: 'PassKeyAuthnConfiguration', enabled: true, webauthnRpId: 'localhost', webauthnRpName: 'Tallyo', webauthnRpOrigins: ['http://localhost:5173'] },
@@ -343,6 +343,7 @@ export const handlers = [
   api.query('Configuration', () => HttpResponse.json({ data: { configuration } })),
   api.query('GeneralConfiguration', () => HttpResponse.json({ data: { generalConfiguration: configuration.general } })),
   api.query('InstanceTimezone', () => HttpResponse.json({ data: { instanceTimezone: configuration.locale.timezone } })),
+  api.query('OllamaModels', () => HttpResponse.json({ data: { ollamaModels: ['llama3', 'qwen2.5:7b-instruct'] } })),
   api.mutation('UpdateConfiguration', () => HttpResponse.json({ data: { updateConfiguration: { __typename: 'UpdateConfigurationPayload', configuration } } })),
   api.mutation('ResolveBalanceReview', () => HttpResponse.json({ data: { resolveBalanceReview: { __typename: 'ResolveBalanceReviewPayload', success: true } } })),
   api.mutation('ChangeAccountSnapshot', ({ variables }) => {
@@ -357,15 +358,17 @@ export const handlers = [
         assetId: asset.id,
         asset: { ...asset, latestSnapshot: null },
         accountId: account.id,
-        account: { ...account, latestSnapshot: null },
+        account: { ...account, connection: null, latestSnapshot: null },
         quantity: holding.quantity === undefined ? current?.quantity ?? holding.valueUSD : holding.quantity,
         valueUSD: holding.valueUSD,
         manual: current?.manual ?? account.manual,
       }
     })
+    const balanceUSD = holdings.reduce((sum, holding) => sum + holding.valueUSD, 0)
     const snapshot: AccountSnapshot = {
       ...existing,
-      balanceUSD: holdings.reduce((sum, holding) => sum + holding.valueUSD, 0),
+      balanceUSD,
+      netContributionUSD: account.type === 'CREDIT' || account.type === 'LOAN' ? -balanceUSD : balanceUSD,
       flagged: false,
       holdings,
     }

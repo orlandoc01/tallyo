@@ -402,6 +402,16 @@ export interface OllamaProviderConfiguration {
   __typename?: 'OllamaProviderConfiguration';
   url?: Maybe<Scalars['String']['output']>;
   model: Scalars['String']['output'];
+  /** Transactions per /api/generate call. 1 to 200. */
+  batchSize: Scalars['Int']['output'];
+  /** Ask reasoning models to think before answering. */
+  think: Scalars['Boolean']['output'];
+  /** Sampling temperature. 0.0 to 2.0. Ignored by backends without sampling controls. */
+  temperature: Scalars['Float']['output'];
+  /** Output token budget per call (Ollama num_predict). 64 to 65535. */
+  maxOutputTokens: Scalars['Int']['output'];
+  /** HTTP timeout per call. 10 to 3600. */
+  requestTimeoutSeconds: Scalars['Int']['output'];
 }
 
 export interface GoogleAuthnConfiguration {
@@ -547,6 +557,12 @@ export interface LlmCategorizationConfigurationInput {
 export interface OllamaProviderConfigurationInput {
   url?: InputMaybe<Scalars['String']['input']>;
   model: Scalars['String']['input'];
+  /** Omit to keep the server default. */
+  batchSize?: InputMaybe<Scalars['Int']['input']>;
+  think?: InputMaybe<Scalars['Boolean']['input']>;
+  temperature?: InputMaybe<Scalars['Float']['input']>;
+  maxOutputTokens?: InputMaybe<Scalars['Int']['input']>;
+  requestTimeoutSeconds?: InputMaybe<Scalars['Int']['input']>;
 }
 
 export interface GoogleAuthnConfigurationInput {
@@ -670,6 +686,8 @@ export interface Query {
   generalConfiguration: GeneralConfiguration;
   /** The instance timezone (IANA). Readable by any authenticated user. */
   instanceTimezone: Scalars['String']['output'];
+  /** Model names reported by the Ollama-compatible server at `url` (GET /api/tags). Admin only. */
+  ollamaModels: Array<Scalars['String']['output']>;
   node?: Maybe<Node>;
   nodes?: Maybe<Array<Maybe<Node>>>;
   /** Aggregate budget totals for months with budget history. */
@@ -734,6 +752,11 @@ export interface QueryplaidItemsArgs {
 
 export interface QueryconnectionsArgs {
   input?: InputMaybe<ConnectionsInput>;
+}
+
+
+export interface QueryollamaModelsArgs {
+  url: Scalars['String']['input'];
 }
 
 

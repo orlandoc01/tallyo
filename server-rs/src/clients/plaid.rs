@@ -168,6 +168,7 @@ pub struct Transaction {
     pub authorized_datetime: Option<DateTime<Utc>>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub datetime: Option<DateTime<Utc>>,
+    #[serde(deserialize_with = "deserialize_null_default")]
     pub category: Vec<String>,
     pub personal_finance_category: Option<PersonalFinanceCategory>,
     pub counterparties: Option<Vec<TransactionCounterparty>>,
@@ -486,6 +487,14 @@ impl PlaidClient {
     }
 }
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> std::result::Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Option::unwrap_or_default)
+}
+
 fn deserialize_optional_datetime<'de, D>(deserializer: D) -> std::result::Result<Option<DateTime<Utc>>, D::Error>
 where
     D: Deserializer<'de>,
@@ -584,6 +593,15 @@ mod tests {
         assert_eq!(account.extra["official_name"], "Checking");
         assert_eq!(account.balances.extra["limit"], 2.0);
         assert_eq!(serde_json::to_value(account).unwrap()["official_name"], "Checking");
+    }
+
+    #[test]
+    fn null_transaction_category_decodes_as_empty() {
+        let response = serde_json::from_value::<super::TransactionsSyncResponse>(json!({
+            "added": [{"transaction_id": "t", "category": null}]
+        }))
+        .unwrap();
+        assert!(response.added[0].category.is_empty());
     }
 
     #[tokio::test]

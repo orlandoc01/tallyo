@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 use chrono::TimeZone;
 
 use crate::{
-    accounts::{AccountType, store as accounts_store, type_from_plaid},
+    accounts::{AccountType, store as accounts_store},
     clients::plaid::{AccountBase, Holding, InvestmentsHoldingsGetResponse, Security},
     schema::{AssetClassifier, AssetType, ConnectivityStatus},
     wealth::{
@@ -14,9 +14,12 @@ use crate::{
 };
 
 use super::{
-    plaid::PlaidSyncAdapter, plaid_dedupe::dedupe_aggregate_holdings, plaid_investment_valuation::RecalibrationEntry,
+    plaid::{PlaidSyncAdapter, ResolvedAccounts},
+    plaid_dedupe::dedupe_aggregate_holdings,
+    plaid_investment_valuation::RecalibrationEntry,
 };
 
+#[derive(Default)]
 struct InvestmentAccountDraft {
     account_id: i64,
     draft: InvestmentSnapshotDraft,
@@ -28,17 +31,19 @@ impl PlaidSyncAdapter {
         &self,
         response: &InvestmentsHoldingsGetResponse,
         balance_accounts: &[AccountBase],
+        resolved: &ResolvedAccounts,
         sink: &dyn PersistSink,
     ) -> Result<()> {
+        let resolved = &self.resolve_missing(resolved.clone(), &response.accounts).await?;
         let raw_payload = serde_json::to_string(response).context("marshal plaid investment payload")?;
         let securities = response
             .securities
             .iter()
             .map(|security| (security.security_id.as_str(), security))
             .collect::<HashMap<_, _>>();
-        let mut drafts = self.investment_account_drafts(&response.accounts).await?;
-        let target_balances = investment_account_balances(&response.accounts);
-        let balance_accounts = investment_account_balances(balance_accounts);
+        let mut drafts = investment_account_drafts(&response.accounts, resolved)?;
+        let target_balances = investment_account_balances(&response.accounts, resolved);
+        let balance_accounts = investment_account_balances(balance_accounts, resolved);
 
         for holding in dedupe_aggregate_holdings(&response.holdings, &target_balances) {
             let Some(account) = self.draft_for_holding(&mut drafts, &holding).await? else {
@@ -126,58 +131,27 @@ impl PlaidSyncAdapter {
         Ok(())
     }
 
-    async fn investment_account_drafts(
-        &self,
-        accounts: &[AccountBase],
-    ) -> Result<HashMap<String, InvestmentAccountDraft>> {
-        let mut drafts = HashMap::new();
-        for account in accounts {
-            let Some(account) = self.investment_account(account).await? else {
-                continue;
-            };
-            drafts.insert(account.0, account.1);
-        }
-        Ok(drafts)
-    }
-
     async fn draft_for_holding<'a>(
         &self,
         drafts: &'a mut HashMap<String, InvestmentAccountDraft>,
         holding: &Holding,
     ) -> Result<Option<&'a mut InvestmentAccountDraft>> {
         if !drafts.contains_key(&holding.account_id) {
-            let account = AccountBase {
-                account_id: holding.account_id.clone(),
-                account_type: "investment".to_owned(),
-                ..Default::default()
-            };
-            let Some((external_id, draft)) = self.investment_account(&account).await? else {
+            let persisted = accounts_store::account_by_external_id(&self.pool, &holding.account_id)
+                .await?
+                .ok_or_else(|| anyhow!("lookup account {}: not found", holding.account_id))?;
+            if persisted.r#type != AccountType::Investment {
                 return Ok(None);
-            };
-            drafts.insert(external_id, draft);
+            }
+            drafts.insert(
+                holding.account_id.clone(),
+                InvestmentAccountDraft {
+                    account_id: persisted.id,
+                    ..Default::default()
+                },
+            );
         }
         Ok(drafts.get_mut(&holding.account_id))
-    }
-
-    async fn investment_account(&self, account: &AccountBase) -> Result<Option<(String, InvestmentAccountDraft)>> {
-        let persisted = accounts_store::account_by_external_id(&self.pool, &account.account_id).await?;
-        let account_type = persisted
-            .as_ref()
-            .map_or_else(|| type_from_plaid(&account.account_type), |account| account.r#type);
-        if account_type != AccountType::Investment {
-            return Ok(None);
-        }
-        let account_id = persisted
-            .map(|account| account.id)
-            .ok_or_else(|| anyhow!("lookup account {}: not found", account.account_id))?;
-        Ok(Some((
-            account.account_id.clone(),
-            InvestmentAccountDraft {
-                account_id,
-                draft: InvestmentSnapshotDraft::default(),
-                recalibrations: Vec::new(),
-            },
-        )))
     }
 
     async fn pricing_asset_for_holding(&self, asset: &AssetUpsert) -> Result<Asset> {
@@ -189,10 +163,32 @@ impl PlaidSyncAdapter {
     }
 }
 
-fn investment_account_balances(accounts: &[AccountBase]) -> HashMap<String, f64> {
+fn investment_account_drafts(
+    accounts: &[AccountBase],
+    resolved: &ResolvedAccounts,
+) -> Result<HashMap<String, InvestmentAccountDraft>> {
     accounts
         .iter()
-        .filter(|account| type_from_plaid(&account.account_type) == AccountType::Investment)
+        .filter(|account| resolved.is_investment(account))
+        .map(|account| {
+            let account_id = resolved
+                .persisted_id(&account.account_id)
+                .ok_or_else(|| anyhow!("lookup account {}: not found", account.account_id))?;
+            Ok((
+                account.account_id.clone(),
+                InvestmentAccountDraft {
+                    account_id,
+                    ..Default::default()
+                },
+            ))
+        })
+        .collect()
+}
+
+fn investment_account_balances(accounts: &[AccountBase], resolved: &ResolvedAccounts) -> HashMap<String, f64> {
+    accounts
+        .iter()
+        .filter(|account| resolved.is_investment(account))
         .filter_map(|account| {
             account
                 .balances
@@ -277,25 +273,25 @@ fn transient_asset(asset: &AssetUpsert) -> Asset {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
+    use std::{collections::HashMap, sync::Mutex};
 
     use anyhow::Result;
     use chrono::{DateTime, TimeZone, Utc};
 
-    use super::{PlaidSyncAdapter, asset_from_security, investment_account_balances};
+    use super::{PlaidSyncAdapter, ResolvedAccounts, asset_from_security, investment_account_balances};
     use crate::{
-        accounts::{AccountType, PlaidClientFactory, store as accounts_store},
+        accounts::{AccountType, PlaidClientFactory},
         clients::{
             plaid::{AccountBalance, AccountBase, Holding, InvestmentsHoldingsGetResponse, Security},
             yahoo::Yahoo,
         },
         database::dbtest,
         money::Cents,
-        testutil::store::{create_owner, linked_account, seed_plaid_item},
+        testutil::store::{create_owner, seed_plaid_account, seed_plaid_investment_account, seed_plaid_item},
         utils::future::BoxFuture,
         wealth::{
             AccountBalanceSnapshot, AssetDailyHolding, PersistEvent, PersistSink, SnapshotDecision, SyncerId,
-            YahooPriceProvider, store,
+            YahooPriceProvider, adapters::plaid::ResolvedAccount, store,
         },
     };
     use wiremock::{
@@ -323,6 +319,16 @@ mod tests {
         }
     }
 
+    fn investment_resolved(id: i64, external_id: &str) -> ResolvedAccounts {
+        ResolvedAccounts(HashMap::from([(
+            external_id.to_owned(),
+            ResolvedAccount {
+                id: Some(id),
+                account_type: AccountType::Investment,
+            },
+        )]))
+    }
+
     #[test]
     fn maps_security_identity_classifier_and_close_timestamp() {
         let asset = asset_from_security(
@@ -348,28 +354,203 @@ mod tests {
 
     #[test]
     fn selects_only_investment_account_balances() {
-        let balances = investment_account_balances(&[
-            AccountBase {
-                account_id: "investment".to_owned(),
-                account_type: "investment".to_owned(),
-                balances: AccountBalance {
-                    current: Some(12.0),
+        let balances = investment_account_balances(
+            &[
+                AccountBase {
+                    account_id: "investment".to_owned(),
+                    account_type: "investment".to_owned(),
+                    balances: AccountBalance {
+                        current: Some(12.0),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            },
-            AccountBase {
-                account_id: "cash".to_owned(),
-                account_type: "depository".to_owned(),
-                balances: AccountBalance {
-                    current: Some(99.0),
+                AccountBase {
+                    account_id: "cash".to_owned(),
+                    account_type: "depository".to_owned(),
+                    balances: AccountBalance {
+                        current: Some(99.0),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                ..Default::default()
-            },
-        ]);
+            ],
+            &ResolvedAccounts::default(),
+        );
         assert_eq!(balances.len(), 1);
         assert_eq!(balances["investment"], 12.0);
+    }
+
+    #[test]
+    fn resolved_investment_type_wins_over_plaid_type_in_balances() {
+        let accounts = [AccountBase {
+            account_id: "cashplus".to_owned(),
+            account_type: "depository".to_owned(),
+            balances: AccountBalance {
+                current: Some(7.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        }];
+        assert_eq!(
+            investment_account_balances(&accounts, &investment_resolved(1, "cashplus"))["cashplus"],
+            7.0
+        );
+    }
+
+    #[tokio::test]
+    async fn empty_holdings_on_a_db_investment_account_use_the_balance_despite_plaid_depository_type() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "cashplus").await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+        let sink = RecordingSink {
+            now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
+            events: Mutex::new(Vec::new()),
+        };
+        let account = AccountBase {
+            account_id: "cashplus".to_owned(),
+            account_type: "depository".to_owned(),
+            balances: AccountBalance {
+                current: Some(0.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        adapter
+            .sync_investments(
+                &InvestmentsHoldingsGetResponse {
+                    accounts: vec![account.clone()],
+                    ..Default::default()
+                },
+                &[account],
+                &investment_resolved(account_id, "cashplus"),
+                &sink,
+            )
+            .await?;
+
+        let events = sink.events.lock().unwrap();
+        let PersistEvent::Snapshot(snapshot) = &events[0] else {
+            panic!("expected zero snapshot");
+        };
+        assert_eq!(snapshot.snapshot.account_id, account_id);
+        assert!(snapshot.snapshot.holdings.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn holdings_only_account_is_resolved_from_the_db() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "holdings-only").await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+        let sink = RecordingSink {
+            now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
+            events: Mutex::new(Vec::new()),
+        };
+        let account = AccountBase {
+            account_id: "holdings-only".to_owned(),
+            account_type: "depository".to_owned(),
+            balances: AccountBalance {
+                current: Some(10.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        adapter
+            .sync_investments(
+                &InvestmentsHoldingsGetResponse {
+                    accounts: vec![account],
+                    holdings: vec![Holding {
+                        account_id: "holdings-only".to_owned(),
+                        security_id: "security".to_owned(),
+                        quantity: 2.0,
+                        institution_price: 5.0,
+                        ..Default::default()
+                    }],
+                    securities: vec![Security {
+                        security_id: "security".to_owned(),
+                        ticker_symbol: Some("vti".to_owned()),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+                &[],
+                &ResolvedAccounts::default(),
+                &sink,
+            )
+            .await?;
+
+        let events = sink.events.lock().unwrap();
+        let PersistEvent::Snapshot(snapshot) = &events[0] else {
+            panic!("expected snapshot");
+        };
+        assert_eq!(snapshot.snapshot.account_id, account_id);
+        assert_eq!(snapshot.snapshot.holdings.len(), 1);
+        Ok(())
+    }
+
+    fn holding_for(account_id: &str) -> Holding {
+        Holding {
+            account_id: account_id.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn holding_fallback_errors_when_the_account_row_is_missing() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+
+        let error = adapter
+            .draft_for_holding(&mut HashMap::new(), &holding_for("ghost"))
+            .await
+            .map(|_| ())
+            .unwrap_err();
+
+        assert!(error.to_string().contains("lookup account ghost: not found"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn holding_fallback_skips_persisted_non_investment_accounts() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        seed_plaid_account(&pool, &owner, &connection, "cash").await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+
+        let mut drafts = HashMap::new();
+        assert!(
+            adapter
+                .draft_for_holding(&mut drafts, &holding_for("cash"))
+                .await?
+                .is_none()
+        );
+        assert!(drafts.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn holding_fallback_drafts_persisted_investment_accounts() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "Owner").await?;
+        let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "brokerage").await?;
+        let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
+
+        let mut drafts = HashMap::new();
+        let draft = adapter
+            .draft_for_holding(&mut drafts, &holding_for("brokerage"))
+            .await?
+            .expect("draft");
+
+        assert_eq!(draft.account_id, account_id);
+        Ok(())
     }
 
     #[tokio::test]
@@ -377,9 +558,7 @@ mod tests {
         let pool = dbtest::open().await?;
         let owner = create_owner(&pool, "Owner").await?;
         let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
-        let mut account = linked_account(&owner, connection.id, "investment");
-        account.account_type = AccountType::Investment;
-        let account_id = accounts_store::upsert_account(&pool, &account).await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "investment").await?;
         let adapter = PlaidSyncAdapter::new(pool.clone(), PlaidClientFactory::new(pool))?;
         let sink = RecordingSink {
             now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
@@ -413,7 +592,8 @@ mod tests {
                     }],
                     ..Default::default()
                 },
-                &[account],
+                std::slice::from_ref(&account),
+                &investment_resolved(account_id, "investment"),
                 &sink,
             )
             .await?;
@@ -452,6 +632,7 @@ mod tests {
                     },
                     ..Default::default()
                 }],
+                &investment_resolved(account_id, "investment"),
                 &sink,
             )
             .await?;
@@ -470,9 +651,7 @@ mod tests {
         let pool = dbtest::open().await?;
         let owner = create_owner(&pool, "Owner").await?;
         let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
-        let mut account = linked_account(&owner, connection.id, "investment");
-        account.account_type = AccountType::Investment;
-        let account_id = accounts_store::upsert_account(&pool, &account).await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "investment").await?;
         let asset_id = sqlx::query_scalar::<_, i64>(
             "INSERT INTO assets (asset_type, identifier, classifier, last_price, price_connectivity) VALUES ('SECURITY', 'VTI', 'PUBLIC', 2, 'IGNORE') RETURNING id",
         )
@@ -547,6 +726,7 @@ mod tests {
                     ..Default::default()
                 },
                 &[account],
+                &investment_resolved(account_id, "investment"),
                 &sink,
             )
             .await?;
@@ -568,9 +748,7 @@ mod tests {
         let pool = dbtest::open().await?;
         let owner = create_owner(&pool, "Owner").await?;
         let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
-        let mut account = linked_account(&owner, connection.id, "investment");
-        account.account_type = AccountType::Investment;
-        let account_id = accounts_store::upsert_account(&pool, &account).await?;
+        let account_id = seed_plaid_investment_account(&pool, &owner, &connection, "investment").await?;
         let asset_id = sqlx::query_scalar::<_, i64>(
             "INSERT INTO assets (asset_type, identifier, classifier, last_price, price_connectivity) VALUES ('SECURITY', 'VTI', 'PUBLIC', 11, 'IGNORE') RETURNING id",
         )

@@ -6,6 +6,7 @@ use sqlx::{Executor, Sqlite};
 
 use crate::{
     accounts::{PlaidItemHealthState, PlaidItemRecord, PlaidItemSecret, PlaidSyncKind},
+    clients::plaid::PlaidApiError,
     database::queries,
 };
 
@@ -157,6 +158,28 @@ pub async fn set_plaid_item_health(
     .map_err(Into::into)
 }
 
+pub async fn record_plaid_item_error(
+    executor: impl Executor<'_, Database = Sqlite>,
+    item_id: i64,
+    error: &anyhow::Error,
+) {
+    let api = error.downcast_ref::<PlaidApiError>();
+    let state = match api {
+        Some(api) if api.error_code.as_deref() == Some("ITEM_LOGIN_REQUIRED") => {
+            PlaidItemHealthState::LinkUpdateRequired
+        }
+        _ => PlaidItemHealthState::SyncError,
+    };
+    let code = api.and_then(|api| api.error_code.as_deref());
+    let message = api.map_or_else(
+        || format!("{error:#}"),
+        |api| api.error_message.clone().unwrap_or_else(|| api.to_string()),
+    );
+    if let Err(write_error) = set_plaid_item_health(executor, item_id, state, code, Some(&message)).await {
+        tracing::warn!(item_id, error = %format_args!("{write_error:#}"), "record plaid item health failed");
+    }
+}
+
 pub async fn set_item_balance_synced(
     executor: impl Executor<'_, Database = Sqlite>,
     item_id: i64,
@@ -180,7 +203,7 @@ mod tests {
 
     use crate::{
         database::{Timestamp, dbtest, queries},
-        testutil::store::{create_owner, create_plaid_credential},
+        testutil::store::{create_owner, create_plaid_credential, plaid_item, seed_plaid_item},
     };
 
     use super::*;
@@ -264,6 +287,69 @@ mod tests {
     async fn empty_batch_lookups_return_empty_maps() -> Result<()> {
         let pool = dbtest::open().await?;
         assert!(plaid_items_by_ids(&pool, &[]).await?.is_empty());
+        Ok(())
+    }
+
+    fn api_error(code: Option<&str>, message: Option<&str>) -> anyhow::Error {
+        PlaidApiError {
+            status: reqwest::StatusCode::BAD_REQUEST,
+            body: "raw body".to_owned(),
+            error_code: code.map(str::to_owned),
+            error_type: None,
+            error_message: message.map(str::to_owned),
+            request_id: None,
+        }
+        .into()
+    }
+
+    #[tokio::test]
+    async fn records_item_errors_by_kind() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "alex").await?;
+        let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+
+        record_plaid_item_error(
+            &pool,
+            item_id,
+            &api_error(Some("ITEM_LOGIN_REQUIRED"), Some("plaid message")),
+        )
+        .await;
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::LinkUpdateRequired);
+        assert_eq!(item.health_error_code.as_deref(), Some("ITEM_LOGIN_REQUIRED"));
+        assert_eq!(item.health_error_message.as_deref(), Some("plaid message"));
+
+        record_plaid_item_error(
+            &pool,
+            item_id,
+            &api_error(Some("INTERNAL_SERVER_ERROR"), Some("plaid message")),
+        )
+        .await;
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::SyncError);
+        assert_eq!(item.health_error_code.as_deref(), Some("INTERNAL_SERVER_ERROR"));
+
+        record_plaid_item_error(&pool, item_id, &anyhow::anyhow!("boom").context("outer")).await;
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::SyncError);
+        assert_eq!(item.health_error_code, None);
+        assert!(item.health_error_message.unwrap().contains("boom"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn plaid_error_without_envelope_records_its_display_text() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "alex").await?;
+        let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+        let error = api_error(None, None);
+
+        record_plaid_item_error(&pool, item_id, &error).await;
+
+        let item = plaid_item(&pool, item_id).await?;
+        assert_eq!(item.health_state, PlaidItemHealthState::SyncError);
+        assert_eq!(item.health_error_code, None);
+        assert_eq!(item.health_error_message, Some(error.to_string()));
         Ok(())
     }
 }

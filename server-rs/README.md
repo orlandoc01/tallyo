@@ -222,7 +222,7 @@ Env vars cover only what's needed before the database opens: `DB_PATH`, `DB_ENCR
 |---------|----------|
 | `authorization` | OAuth issuer URL, frontend redirect URIs, token lifetimes, dev CORS origins, master password |
 | `googleAuthn` / `emailCodeAuthn` / `passKeyAuthn` | Sign-in providers (Google OAuth, SMTP for OTP/magic links, WebAuthn relying party) |
-| `llmCategorization` | Ollama transaction categorization: enabled, URL, and model |
+| `llmCategorization` | Ollama transaction categorization: enabled, URL, model, and generation options (batch size 1–200, think, temperature 0–2, max output tokens 64–65535 and at least 20 × batch size, request timeout 10–3600 s). `Query.ollamaModels(url)` backs the settings Test connection button (`GET /api/tags`) |
 | `mcp` | MCP server enable + allowed dynamic-client redirect hosts |
 | `security` | Trusted proxy CIDRs |
 | `general` | Disable transaction tracking (hide transaction UI and skip background transaction + recurring sync polling), disable wealth tracking (hide wealth UI and skip background wealth adapter + portfolio polling) |

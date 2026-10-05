@@ -576,9 +576,9 @@ CREATE INDEX idx_transactions_category ON transactions(category_id);
 
 CREATE INDEX idx_transactions_datetime_id ON transactions(datetime DESC, id DESC);
 
-CREATE INDEX idx_transactions_reviewed_merchant_category_datetime
-ON transactions(LOWER(merchant_name), category_id, datetime DESC)
-WHERE merchant_name IS NOT NULL AND is_reviewed = 1;
+CREATE INDEX idx_transactions_reviewed_merchant_key_datetime
+ON transactions(LTRIM(LOWER(COALESCE(NULLIF(merchant_name, ''), original_name))), datetime DESC, id DESC)
+WHERE is_reviewed = 1;
 
 CREATE UNIQUE INDEX idx_transactions_source_external ON transactions(source, external_id);
 

@@ -543,6 +543,11 @@ export const CONFIGURATION_FIELDS = gql`
       ollama {
         url
         model
+        batchSize
+        think
+        temperature
+        maxOutputTokens
+        requestTimeoutSeconds
       }
     }
     googleAuthn {
@@ -596,6 +601,12 @@ export const GENERAL_CONFIGURATION_QUERY = gql`
 export const INSTANCE_TIMEZONE_QUERY = gql`
   query InstanceTimezone {
     instanceTimezone
+  }
+`
+
+export const OLLAMA_MODELS_QUERY = gql`
+  query OllamaModels($url: String!) {
+    ollamaModels(url: $url)
   }
 `
 

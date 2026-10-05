@@ -1,15 +1,17 @@
 use serde::{Deserialize, Serialize};
 
-use crate::schema::LlmProvider;
+use crate::{clients::ollama::GenerationOptions, schema::LlmProvider};
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct OllamaConfig {
     pub url: Option<String>,
     pub model: String,
+    #[serde(flatten)]
+    pub generation: GenerationOptions,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct LlmConfig {
     #[serde(default, skip_serializing_if = "Option::is_none", with = "provider_serde")]
@@ -58,7 +60,7 @@ mod provider_serde {
 #[cfg(test)]
 mod tests {
     use super::{LlmConfig, OllamaConfig, Provider};
-    use crate::schema::LlmProvider;
+    use crate::{clients::ollama::GenerationOptions, schema::LlmProvider};
 
     #[test]
     fn round_trips_ollama_configuration() {
@@ -73,7 +75,22 @@ mod tests {
                 ollama: OllamaConfig {
                     url: Some("http://localhost:11434".to_owned()),
                     model: "llama3".to_owned(),
+                    generation: GenerationOptions::default(),
                 },
+            }
+        );
+        let config: LlmConfig = serde_json::from_str(
+            r#"{"provider":"ollama","ollama":{"url":"http://localhost:11434","model":"llama3","batch_size":50,"think":true,"temperature":0.5,"max_output_tokens":4096,"request_timeout_seconds":900}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.ollama.generation,
+            GenerationOptions {
+                batch_size: 50,
+                think: true,
+                temperature: 0.5,
+                max_output_tokens: 4096,
+                request_timeout_seconds: 900,
             }
         );
     }
@@ -86,7 +103,7 @@ mod tests {
         };
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"provider":"ollama","ollama":{"url":null,"model":""}}"#
+            r#"{"provider":"ollama","ollama":{"url":null,"model":"","batch_size":5,"think":false,"temperature":0.1,"max_output_tokens":2048,"request_timeout_seconds":300}}"#
         );
         assert_eq!(
             serde_json::from_str::<LlmConfig>(r#"{"provider":"unknown"}"#)

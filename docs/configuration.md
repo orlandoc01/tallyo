@@ -124,8 +124,15 @@ Before a passkey-only setup can be enabled, at least one admin passkey must alre
 | Field | Default or initial value | Validation and behavior |
 |---|---|---|
 | Enabled | `false` | Applies live. The categorizer is active only when enabled and a URL is nonempty. |
-| Ollama URL | Empty | No connectivity check is made when saved. |
+| Ollama URL | Empty | Must be an absolute http(s) URL without query or fragment. Saving makes no request; the **Test connection** button next to the field lists the models the server reports (`GET /api/tags`) and warns when the entered model is not among them. |
 | Ollama model | Empty in storage; Settings seeds the field with `qwen2.5:7b-instruct` as the default | Passed to Ollama as the model name. Tallyo does not pull the model. |
+| Batch size | `5` | 1 to 200 transactions per `/api/generate` call. 5 suits a local CPU model; a hosted model handles 50 to 100. |
+| Thinking | `false` | Sent as the Ollama `think` field so reasoning models skip or keep their thinking block. |
+| Temperature | `0.1` | 0.0 to 2.0. Ignored by backends without sampling controls. |
+| Max output tokens | `2048` | 64 to 65535, sent as `num_predict`. Must be at least 20 times the batch size; the Settings form and the server both reject smaller budgets. |
+| Request timeout (seconds) | `300` | 10 to 3600 per call. |
+
+Changes to any of these fields re-prepare the background categorizer on save. The stable instructions (category list, examples, rules) are sent as the Ollama `system` prompt and the per-batch transactions as `prompt`, so a backend that caches the prefix reprocesses only the batch.
 
 ### MCP
 

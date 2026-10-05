@@ -2,7 +2,7 @@ use anyhow::Result;
 use sqlx::SqlitePool;
 
 use crate::{
-    accounts::{Account, AccountType, CreateManualAccount, Owner, UpsertAccount, store},
+    accounts::{Account, AccountType, CreateManualAccount, Owner, PlaidItem, UpsertAccount, store},
     database::queries,
 };
 
@@ -59,6 +59,19 @@ pub async fn seed_plaid_account(
     store::upsert_account(pool, &linked_account(owner, connection.id, external_id)).await
 }
 
+pub async fn seed_plaid_investment_account(
+    pool: &SqlitePool,
+    owner: &Owner,
+    connection: &crate::accounts::Connection,
+    external_id: &str,
+) -> Result<i64> {
+    let account = UpsertAccount {
+        account_type: AccountType::Investment,
+        ..linked_account(owner, connection.id, external_id)
+    };
+    store::upsert_account(pool, &account).await
+}
+
 pub fn linked_account(owner: &Owner, connection_id: i64, external_id: &str) -> UpsertAccount {
     UpsertAccount {
         external_id: external_id.to_owned(),
@@ -97,4 +110,8 @@ pub async fn seed_manual_account(pool: &SqlitePool, owner: &Owner, name: &str) -
         },
     )
     .await
+}
+
+pub async fn plaid_item(pool: &SqlitePool, item_id: i64) -> Result<PlaidItem> {
+    Ok(store::plaid_item_by_id(pool, item_id).await?.unwrap().item)
 }

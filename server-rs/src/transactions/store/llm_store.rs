@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Result;
 use sqlx::SqlitePool;
 
+use super::mapping::category_kind;
 use crate::{
     database::queries,
     money::Cents,
@@ -19,23 +20,24 @@ SELECT
   category_name
 FROM (
   SELECT
-    CAST(LOWER(t.merchant_name) AS TEXT) AS merchant_key,
-    t.merchant_name,
+    CAST(k.value AS TEXT) AS merchant_key,
+    CAST(COALESCE(NULLIF(t.merchant_name, ''), t.original_name, '') AS TEXT) AS merchant_name,
     t.amount_cents,
     cr.cat_id AS category_id,
     cr.cat_name AS category_name,
     t.datetime,
     t.id,
     CAST(ROW_NUMBER() OVER (
-      PARTITION BY LOWER(t.merchant_name)
+      PARTITION BY k.value
       ORDER BY t.datetime DESC, t.id DESC
     ) AS INTEGER) AS merchant_rank
-  FROM transactions t
+  FROM json_each(CAST(? AS TEXT)) k
+  JOIN transactions t
+    ON LTRIM(LOWER(COALESCE(NULLIF(t.merchant_name, ''), t.original_name))) >= k.value
+    AND LTRIM(LOWER(COALESCE(NULLIF(t.merchant_name, ''), t.original_name))) < k.value || char(1114111)
   JOIN category_rows cr ON cr.cat_id = t.category_id
-  WHERE t.merchant_name IS NOT NULL
-    AND t.is_reviewed = 1
-    AND LOWER(t.merchant_name) IN (SELECT value FROM json_each(CAST(? AS TEXT)))
-    AND cr.group_kind = 'EXPENSE'
+  WHERE t.is_reviewed = 1
+    AND cr.cat_id != 0
     AND t.datetime < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-7 days')
 ) ranked
 WHERE merchant_rank <= ?
@@ -60,6 +62,7 @@ pub(crate) async fn categories_for_llm(pool: &SqlitePool) -> Result<Vec<Category
                     id: category.id,
                     name: category.name,
                     group_name: category.group_name,
+                    group_kind: category_kind(&category.group_kind),
                 })
                 .collect()
         })
@@ -103,15 +106,23 @@ pub(crate) async fn top_merchant_examples(pool: &SqlitePool, limit: i64) -> Resu
         .map_err(Into::into)
 }
 
-pub(crate) async fn similar_examples_by_merchant(
+// ponytail: first-token prefix key; processor prefixes (SQ *, TST*) share a key.
+pub(crate) fn similar_merchant_key(name: &str) -> String {
+    let lowered = name.trim().to_ascii_lowercase();
+    lowered
+        .split_whitespace()
+        .next()
+        .map(|token| token.trim_end_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|token| !token.is_empty())
+        .unwrap_or(&lowered)
+        .to_owned()
+}
+
+pub(crate) async fn similar_examples_by_key(
     pool: &SqlitePool,
-    merchant_names: &[String],
+    keys: &[String],
 ) -> Result<HashMap<String, Vec<ExampleTransaction>>> {
-    let merchant_keys = merchant_names
-        .iter()
-        .filter(|merchant| !merchant.is_empty())
-        .map(|merchant| merchant.to_lowercase())
-        .collect::<Vec<_>>();
+    let merchant_keys = keys.iter().filter(|key| !key.is_empty()).collect::<BTreeSet<_>>();
     if merchant_keys.is_empty() {
         return Ok(HashMap::new());
     }
@@ -163,4 +174,27 @@ pub async fn count_staged(pool: &SqlitePool) -> Result<i64> {
 
 pub(crate) async fn stage_uncategorized(pool: &SqlitePool) -> Result<u64> {
     queries::stage_uncategorized_for_llm(pool).await.map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::similar_merchant_key;
+
+    #[test]
+    fn similar_merchant_key_takes_the_first_token() {
+        let cases = [
+            ("Google *Storage", "google"),
+            ("GOOGLE", "google"),
+            ("Terminal X", "terminal"),
+            ("7-Eleven", "7-eleven"),
+            ("*Fetch", "*fetch"),
+            ("SQ_*PAYPAL", "sq_*paypal"),
+            ("* UBER EATS", "* uber eats"),
+            ("", ""),
+            ("   ", ""),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(similar_merchant_key(name), expected, "{name:?}");
+        }
+    }
 }

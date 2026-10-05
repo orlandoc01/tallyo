@@ -8,14 +8,14 @@ import { USD_ASSET_ID, type SnapshotLine } from './accountSnapshotLines'
 
 // Permissions, the manual-holding asset catalog and the save mutation shared by
 // the desktop snapshot editor and the mobile expanded snapshot panel.
-export function useSnapshotEditorResources(account: Account) {
+export function useSnapshotEditorResources(account: Account, loadCatalog = account.manual) {
   const { canRead, canWrite } = usePermissions()
   const canReadAssets = canRead('assets')
   const canWriteWealth = canWrite('wealth')
   const [assetsResult] = useQuery<{ assets: AssetList }, { input: AssetsInput }>({
     query: ASSETS_QUERY,
     variables: { input: { includeHistorical: true } },
-    pause: !account.manual || !canReadAssets || !canWriteWealth,
+    pause: !canReadAssets || !canWriteWealth || !loadCatalog,
   })
   const [, changeSnapshot] = useMutation(CHANGE_ACCOUNT_SNAPSHOT_MUTATION)
   const usdAsset = assetsResult.data?.assets.items.find((asset) =>

@@ -15,13 +15,15 @@ const TONE_DOT: Record<SnapshotTone, string> = { sync: 'bg-brand-600', manual: '
 
 export function AccountValuationSheet({ account, onAccountUpdate }: { account: Account; onAccountUpdate: (account: Account) => void }) {
   const history = useSnapshotHistory(account, () => {}, FIRST_PAGE)
-  const resources = useSnapshotEditorResources(account)
+  const resources = useSnapshotEditorResources(account, true)
   const [openDate, setOpenDate] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const groups = groupSnapshotsByMonth(history.snapshots)
   const remaining = history.totalCount === null ? null : history.totalCount - history.snapshots.length
 
   function handleSaved(snapshot: AccountSnapshot, updatedAccount: Account | undefined) {
     history.applySavedSnapshot(snapshot)
+    setSaveError(null)
     onAccountUpdate(updatedAccount ?? account)
   }
 
@@ -64,7 +66,7 @@ export function AccountValuationSheet({ account, onAccountUpdate }: { account: A
                   <span className="min-w-[84px] text-right text-sm tabular-nums text-text-1">{formatSignedCurrency(snapshot.netContributionUSD)}</span>
                   <ChevronRight aria-hidden className={clsx('h-2.5 w-2.5 shrink-0 text-text-3 transition-transform', expanded && 'rotate-90')} />
                 </button>
-                {expanded ? <SnapshotExpandedPanel account={account} key={snapshot.id} onSaved={handleSaved} resources={resources} snapshot={snapshot} /> : null}
+                {expanded ? <SnapshotExpandedPanel account={account} key={snapshot.id} onSaved={handleSaved} onSaveError={setSaveError} resources={resources} snapshot={snapshot} /> : null}
               </div>
             )
           })}
@@ -84,6 +86,7 @@ export function AccountValuationSheet({ account, onAccountUpdate }: { account: A
         <div className="py-2 text-center text-xs text-text-3" ref={history.sentinelRef}>{history.loading ? 'Loading more...' : ''}</div>
       ) : null}
       {history.error ? <p className="py-2 text-sm text-negative">Could not load history: {history.error}</p> : null}
+      {saveError ? <p className="py-2 text-sm text-negative">Could not save {saveError}</p> : null}
     </div>
   )
 }

@@ -151,8 +151,9 @@ impl LlmWorker {
             global_examples = global_examples.len(),
             "running llm categorization"
         );
+        let system_prompt = categorizer.system_prompt(&global_examples);
         for (index, batch) in transactions.chunks(categorizer.batch_size()).enumerate() {
-            let results = categorizer.categorize_batch(batch, &global_examples).await?;
+            let results = categorizer.categorize_batch(&system_prompt, batch).await?;
             applied += self.apply_results(results, &pfc2_matches).await?;
             llm_store::clear_staged(
                 &self.pool,
@@ -173,21 +174,18 @@ impl LlmWorker {
     }
 
     async fn annotate_similar_examples(&self, mut transactions: Vec<LlmTransaction>) -> Vec<LlmTransaction> {
-        let merchants = transactions
+        let keys = transactions
             .iter()
-            .map(|transaction| transaction.merchant_name.clone())
+            .map(|transaction| llm_store::similar_merchant_key(transaction.display_name()))
             .collect::<Vec<_>>();
-        let examples_by_merchant = llm_store::similar_examples_by_merchant(&self.pool, &merchants)
+        let examples_by_key = llm_store::similar_examples_by_key(&self.pool, &keys)
             .await
             .unwrap_or_else(|error| {
                 tracing::error!(%error, "fetch similar llm examples");
                 HashMap::new()
             });
-        for transaction in &mut transactions {
-            transaction.similar_examples = examples_by_merchant
-                .get(&transaction.merchant_name.to_lowercase())
-                .cloned()
-                .unwrap_or_default();
+        for (transaction, key) in transactions.iter_mut().zip(&keys) {
+            transaction.similar_examples = examples_by_key.get(key).cloned().unwrap_or_default();
         }
         transactions
     }
@@ -226,6 +224,7 @@ mod tests {
 
     use super::LlmWorker;
     use crate::{
+        clients::ollama::GenerationOptions,
         database::{dbtest, queries},
         money::Cents,
         testutil::transactions,
@@ -240,7 +239,7 @@ mod tests {
         let target_category_id = categories
             .iter()
             .find(|category| category.id != original_category_id)
-            .expect("seeded distinct expense category")
+            .expect("seeded distinct category")
             .id;
         let account_id = transactions::account(&pool, "checking").await?;
         let transaction_id = transactions::transaction(
@@ -365,7 +364,7 @@ mod tests {
         let worker = Arc::new(LlmWorker::new(pool.clone()));
         worker
             .set_categorizer(Some(
-                OllamaCategorizer::new(pool, "http://localhost:11434", "test").await?,
+                OllamaCategorizer::new(pool, "http://localhost:11434", "test", GenerationOptions::default()).await?,
             ))
             .await?;
         Ok(worker)

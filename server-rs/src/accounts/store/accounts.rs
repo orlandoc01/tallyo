@@ -83,6 +83,29 @@ pub async fn account_by_external_id(
     .map_err(Into::into)
 }
 
+pub async fn accounts_by_external_ids(
+    executor: impl Executor<'_, Database = Sqlite>,
+    external_ids: &[String],
+) -> Result<HashMap<String, Account>> {
+    if external_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    queries::account_records(
+        executor,
+        queries::AccountRecordsParams {
+            external_ids: Some(external_ids),
+            ..Default::default()
+        },
+    )
+    .await
+    .map(|rows| {
+        rows.into_iter()
+            .map(|row| (row.accounts.external_id.clone(), row.into()))
+            .collect()
+    })
+    .map_err(Into::into)
+}
+
 pub async fn accounts_by_ids(
     executor: impl Executor<'_, Database = Sqlite>,
     ids: &[i64],
@@ -434,6 +457,35 @@ mod tests {
 
         update_account(&pool, id, account_update(Some(AccountType::Depository), None)).await?;
         assert!(!account_by_id(&pool, id).await?.unwrap().needs_review);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn resync_preserves_stored_name_and_mask() -> Result<()> {
+        let pool = dbtest::open().await?;
+        let owner = create_owner(&pool, "alex").await?;
+        let (_, connection) = seed_plaid_item(&pool, &owner, "item").await?;
+        let mut account = linked_account(&owner, connection.id, "card");
+        account.mask = None;
+        let id = upsert_account(&pool, &account).await?;
+        let rename = AccountUpdate {
+            name: Some("Travel card".into()),
+            ..account_update(None, None)
+        };
+        update_account(&pool, id, rename).await?;
+
+        account.name = "PROVIDER NAME".into();
+        account.mask = Some("4242".into());
+        account.account_type = AccountType::Credit;
+        upsert_account(&pool, &account).await?;
+        let stored = account_by_id(&pool, id).await?.unwrap();
+        assert_eq!(stored.name, "Travel card");
+        assert_eq!(stored.mask.as_deref(), Some("4242"));
+        assert_eq!(stored.r#type, AccountType::Depository);
+
+        account.mask = Some("9999".into());
+        upsert_account(&pool, &account).await?;
+        assert_eq!(account_by_id(&pool, id).await?.unwrap().mask.as_deref(), Some("4242"));
         Ok(())
     }
 

@@ -280,6 +280,7 @@ async fn prepares_commits_and_disables_llm_runtime_configuration() {
         ollama: OllamaConfig {
             url: Some("http://localhost:11434".to_owned()),
             model: "test".to_owned(),
+            ..Default::default()
         },
     };
     manager

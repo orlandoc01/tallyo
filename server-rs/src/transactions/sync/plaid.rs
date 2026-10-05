@@ -11,6 +11,7 @@ use crate::{
         fields_from_plaid_account,
         store::{
             connection_by_plaid_item_id, hidden_account_ids_by_connection, plaid_item_secret_by_id, plaid_items_due,
+            record_plaid_item_error,
         },
     },
     clients::plaid::{
@@ -65,9 +66,13 @@ impl PlaidSync {
     }
 
     async fn sync(&self, item: PlaidItemSecret, sink: &Persister) -> ItemReport {
+        let item_id = item.plaid_items.id;
         match self.sync_inner(item, sink).await {
             Ok(counts) => ItemReport::success(counts),
-            Err(error) => ItemReport::failure(ItemCounts::default(), error),
+            Err(error) => {
+                record_plaid_item_error(&self.pool, item_id, &error).await;
+                ItemReport::failure(ItemCounts::default(), error)
+            }
         }
     }
 
@@ -85,13 +90,9 @@ impl PlaidSync {
         let investment_events = if investment_account_ids.is_empty() {
             Vec::new()
         } else {
-            let result = self
-                .investment_events(&client, &item, &investment_account_ids, connection.connection.id)
-                .await;
-            if let Err(error) = &result {
-                self.record_error(item.plaid_items.id, error).await;
-            }
-            result.context(format!("sync investment transactions {}", item.plaid_items.id))?
+            self.investment_events(&client, &item, &investment_account_ids, connection.connection.id)
+                .await
+                .context(format!("sync investment transactions {}", item.plaid_items.id))?
         };
         if !account_drafts.iter().any(transaction_syncable) {
             let next_sync_at = next_after(&item.plaid_items.sync_cron, Utc::now())?;
@@ -209,14 +210,11 @@ impl PlaidSync {
                     continue;
                 }
                 Err(error) if is_pagination_mutation(&error) => {
-                    return Err(anyhow!(
-                        "transactions sync pagination mutated after {MAX_SYNC_PAGINATION_RESTARTS} restarts: {error}"
+                    return Err(error).context(format!(
+                        "transactions sync pagination mutated after {MAX_SYNC_PAGINATION_RESTARTS} restarts"
                     ));
                 }
-                Err(error) => {
-                    self.record_error(item.plaid_items.id, &error).await;
-                    return Err(error).context(format!("sync transactions {}", item.plaid_items.id));
-                }
+                Err(error) => return Err(error).context(format!("sync transactions {}", item.plaid_items.id)),
             };
             restarts = 0;
             let added = filter_out_investment_accounts(&response.added, investment_account_ids);
@@ -272,27 +270,6 @@ impl PlaidSync {
                 log_batch(&self.pool, &batch_log(item.plaid_items.id, &batch)?).await;
                 return Ok(counts);
             }
-        }
-    }
-
-    async fn record_error(&self, item_id: i64, error: &anyhow::Error) {
-        let Some(error) = error.downcast_ref::<PlaidApiError>() else {
-            return;
-        };
-        let state = match error.error_code.as_deref() {
-            Some("ITEM_LOGIN_REQUIRED") => PlaidItemHealthState::LinkUpdateRequired,
-            _ => PlaidItemHealthState::SyncError,
-        };
-        if let Err(error) = crate::accounts::store::set_plaid_item_health(
-            &self.pool,
-            item_id,
-            state,
-            error.error_code.as_deref(),
-            error.error_message.as_deref(),
-        )
-        .await
-        {
-            tracing::warn!(item_id, %error, "plaid sync failed");
         }
     }
 }
@@ -354,7 +331,7 @@ fn batch_log(item_id: i64, batch: &TransactionSyncBatch) -> Result<SyncBatchLog>
 
 pub(super) async fn log_batch(pool: &SqlitePool, batch: &SyncBatchLog) {
     if let Err(error) = plaid_sync::log_sync_batch(pool, batch).await {
-        tracing::error!(item_id = batch.item_id, %error, "failed to write sync log");
+        tracing::error!(item_id = batch.item_id, error = %format_args!("{error:#}"), "failed to write sync log");
     }
 }
 

@@ -25,20 +25,19 @@ WHERE c.source_table = @source_table
   AND c.source_id IN (sqlc.slice('source_ids'))
 ORDER BY c.source_id, o.name, a.name;
 
--- Used by the Plaid and SimpleFIN sync adapters (via accounts/db.Store.UpsertAccountWithExternalID) to upsert an externally-discovered account, preserving the stored/user-corrected subtype on re-sync.
+-- Used by the Plaid and SimpleFIN sync adapters (via accounts/db.Store.UpsertAccountWithExternalID) to upsert an externally-discovered account.
 -- name: UpsertAccount :one
 INSERT INTO accounts (external_id, connection_id, owner_id, name, type, subtype, mask, notes, is_closed, is_hidden, needs_review, review_reason, manual)
 VALUES (@external_id, @connection_id, @owner_id, @name, @type, @subtype, @mask, @notes, @is_closed, @is_hidden, @needs_review, CASE WHEN @needs_review = 1 THEN 'TYPE' ELSE NULL END, 0)
 ON CONFLICT(external_id) DO UPDATE SET
   connection_id = excluded.connection_id,
   owner_id = excluded.owner_id,
-  name = excluded.name,
-  -- type is classified once on insert and preserved on conflict so provider
-  -- re-syncs never clobber the stored (or user-corrected) account type.
+  -- name, type, subtype and mask are taken from the provider once on insert
+  -- and preserved on conflict so re-syncs never clobber user edits.
   -- needs_review/review_reason follow the same insert-only semantics and are
   -- cleared only by updateAccount when the user confirms the type.
   subtype = COALESCE(accounts.subtype, excluded.subtype),
-  mask = excluded.mask,
+  mask = COALESCE(accounts.mask, excluded.mask),
   updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now')
 RETURNING id;
 

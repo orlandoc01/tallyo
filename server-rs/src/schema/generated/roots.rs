@@ -54,6 +54,11 @@ pub trait QueryResolvers {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> impl std::future::Future<Output = async_graphql::Result<String>> + Send;
+    fn ollama_models(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        url: String,
+    ) -> impl std::future::Future<Output = async_graphql::Result<Vec<String>>> + Send;
     fn node(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -273,6 +278,17 @@ impl Query {
     async fn instance_timezone(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<String> {
         async_graphql::Guard::check(&crate::graph::ScopeGuard::new("read:owners"), ctx).await?;
         QueryResolvers::instance_timezone(self, ctx).await
+    }
+
+    /// Model names reported by the Ollama-compatible server at `url` (GET /api/tags). Admin only.
+    #[graphql(name = "ollamaModels")]
+    async fn ollama_models(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(name = "url")] url: String,
+    ) -> async_graphql::Result<Vec<String>> {
+        async_graphql::Guard::check(&crate::graph::ScopeGuard::new("write:settings"), ctx).await?;
+        QueryResolvers::ollama_models(self, ctx, url).await
     }
 
     #[graphql(name = "node")]

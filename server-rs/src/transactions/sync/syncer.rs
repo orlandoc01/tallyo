@@ -12,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     accounts::{AccountsCreated, EventBus, ItemSyncer, SourceTable},
+    clients::ollama::{GenerationOptions, validate_base_url},
     transactions::{
         ItemReport, ItemSyncResult, Persister, SyncAdapter, SyncReport, SyncResult,
         llm::{CategoryRef, OllamaCategorizer},
@@ -34,18 +35,18 @@ pub struct Syncer {
     initial_sync_delay: Duration,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LlmSettings {
     pub url: String,
     pub model: String,
+    pub generation: GenerationOptions,
 }
 
 impl LlmSettings {
     fn validate(&self) -> Result<()> {
-        anyhow::ensure!(!self.url.trim().is_empty(), "llm URL must not be empty");
+        validate_base_url(&self.url)?;
         anyhow::ensure!(!self.model.trim().is_empty(), "llm model must not be empty");
-        url::Url::parse(&self.url).context("validate llm URL")?;
-        Ok(())
+        self.generation.validate()
     }
 }
 
@@ -142,7 +143,8 @@ impl Syncer {
     ) -> Result<impl FnOnce() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send> {
         settings.validate()?;
         let categories = llm_categories(&self.pool).await?;
-        let categorizer = OllamaCategorizer::with_categories(settings.url, settings.model, categories)?;
+        let categorizer =
+            OllamaCategorizer::with_categories(settings.url, settings.model, settings.generation, categories)?;
         let category_count = categorizer.category_count();
         let llm = Arc::clone(&self.llm);
         Ok(move || {
@@ -212,7 +214,7 @@ impl Syncer {
                 added = counts.added,
                 modified = counts.modified,
                 removed = counts.removed,
-                %error,
+                error = %format_args!("{error:#}"),
                 "transaction sync item failed"
             );
             "sync failed".to_owned()
@@ -241,7 +243,11 @@ impl Syncer {
         let report = adapter.sync_connection_into(event.source_id, &self.persister).await;
         self.llm.signal();
         if let Some(error) = report.error {
-            tracing::error!(item_id = event.source_id, %error, "delayed initial sync failed");
+            tracing::error!(
+                item_id = event.source_id,
+                error = %format_args!("{error:#}"),
+                "delayed initial sync failed"
+            );
         }
     }
 
@@ -279,7 +285,7 @@ mod tests {
     use super::{LlmSettings, NO_TRANSACTION_SYNC_ADAPTER, Syncer};
     use crate::{
         accounts::{AccountsCreated, ItemSyncer, PlaidClientFactory, SourceTable},
-        clients::simplefin::SimpleFinClient,
+        clients::{ollama::GenerationOptions, simplefin::SimpleFinClient},
         database::dbtest,
         transactions::{ItemCounts, ItemReport, Persister, PlaidSync, SimpleFinSync, SyncAdapter, SyncReport},
         utils::future::BoxFuture,
@@ -336,6 +342,7 @@ mod tests {
             .prepare_llm(LlmSettings {
                 url: "http://localhost:11434".to_owned(),
                 model: "test".to_owned(),
+                generation: GenerationOptions::default(),
             })
             .await?;
         assert!(!syncer.llm().enabled().await);

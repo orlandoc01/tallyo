@@ -1417,6 +1417,22 @@ pub struct OllamaProviderConfigurationInput {
     #[graphql(name = "model")]
     #[serde(rename = "model")]
     pub model: String,
+    /// Omit to keep the server default.
+    #[graphql(name = "batchSize")]
+    #[serde(rename = "batchSize")]
+    pub batch_size: Option<i32>,
+    #[graphql(name = "think")]
+    #[serde(rename = "think")]
+    pub think: Option<bool>,
+    #[graphql(name = "temperature")]
+    #[serde(rename = "temperature")]
+    pub temperature: Option<f64>,
+    #[graphql(name = "maxOutputTokens")]
+    #[serde(rename = "maxOutputTokens")]
+    pub max_output_tokens: Option<i32>,
+    #[graphql(name = "requestTimeoutSeconds")]
+    #[serde(rename = "requestTimeoutSeconds")]
+    pub request_timeout_seconds: Option<i32>,
 }
 
 #[derive(async_graphql::InputObject, serde::Deserialize, schemars::JsonSchema, Clone, Debug, PartialEq)]

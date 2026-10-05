@@ -26,15 +26,20 @@ export function deferred() {
 
 export function captureQuery(name: string, data: Data | ((calls: number) => Data)) {
   let calls = 0
+  let variables: Data | undefined
 
   server.use(
-    graphql.link('/query').query(name, () => {
+    graphql.link('/query').query<Data, Data>(name, ({ variables: nextVariables }) => {
       calls += 1
+      variables = nextVariables
       return HttpResponse.json({ data: typeof data === 'function' ? data(calls) : data })
     }),
   )
 
-  return { get calls() { return calls } }
+  return {
+    get calls() { return calls },
+    get variables() { return variables },
+  }
 }
 
 export function mockGraphqlError(

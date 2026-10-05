@@ -88,6 +88,7 @@ pub const SCOPES: &[(&str, &str, &str)] = &[
     ("Query", "configuration", "read:settings"),
     ("Query", "generalConfiguration", "read:owners"),
     ("Query", "instanceTimezone", "read:owners"),
+    ("Query", "ollamaModels", "write:settings"),
     ("Query", "budgetReportHistory", "read:budgets"),
     ("Query", "budgetReport", "read:budgets"),
     ("Query", "analysis", "read:portfolio"),
@@ -1456,6 +1457,21 @@ pub struct OllamaProviderConfiguration {
     pub url: Option<String>,
     #[graphql(name = "model")]
     pub model: String,
+    /// Transactions per /api/generate call. 1 to 200.
+    #[graphql(name = "batchSize")]
+    pub batch_size: i32,
+    /// Ask reasoning models to think before answering.
+    #[graphql(name = "think")]
+    pub think: bool,
+    /// Sampling temperature. 0.0 to 2.0. Ignored by backends without sampling controls.
+    #[graphql(name = "temperature")]
+    pub temperature: f64,
+    /// Output token budget per call (Ollama num_predict). 64 to 65535.
+    #[graphql(name = "maxOutputTokens")]
+    pub max_output_tokens: i32,
+    /// HTTP timeout per call. 10 to 3600.
+    #[graphql(name = "requestTimeoutSeconds")]
+    pub request_timeout_seconds: i32,
 }
 
 /// A household owner that accounts and connections are attributed to.

@@ -29,7 +29,7 @@ pub struct Section<T> {
     pub fields: T,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Sections {
     pub auth: Section<AuthConfig>,
     pub email: Section<EmailConfig>,
@@ -69,7 +69,7 @@ impl<T: Default> Default for SectionPatch<T> {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Patch {
     pub auth: Option<SectionPatch<AuthConfig>>,
     pub email: Option<SectionPatch<EmailConfig>>,

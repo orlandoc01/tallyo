@@ -7,6 +7,7 @@ mod accounts;
 mod admin;
 mod balance_reviews;
 mod categories;
+mod llm;
 mod providers;
 mod recurring;
 mod rules_tags;

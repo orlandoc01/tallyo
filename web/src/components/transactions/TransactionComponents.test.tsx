@@ -92,6 +92,53 @@ describe('transaction components', () => {
     expect(onSelect).toHaveBeenCalledWith(categories[1])
   })
 
+  it('moves the highlighted category with arrow keys', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(<CategoryPicker categories={categories} onSelect={onSelect} />)
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[0])
+
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[1])
+  })
+
+  it('arrows through the filtered list and stops at the end', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(<CategoryPicker categories={categories} onSelect={onSelect} />)
+    await user.type(screen.getByPlaceholderText(/search categories/i), 'shop{ArrowDown}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[8])
+
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[8])
+  })
+
+  it('moves up with ArrowUp and never below the first match while searching', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(<CategoryPicker categories={categories} onSelect={onSelect} />)
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowUp}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[0])
+
+    await user.type(screen.getByPlaceholderText(/search categories/i), 'shop{ArrowUp}{ArrowUp}{Enter}')
+    expect(onSelect).toHaveBeenLastCalledWith(categories[4])
+    expect(screen.getByRole('button', { name: /shopping$/i })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('resets the highlight to the first match when the search changes', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+
+    render(<CategoryPicker categories={categories} onSelect={onSelect} />)
+    await user.type(screen.getByPlaceholderText(/search categories/i), 'shop{ArrowDown}p{Enter}')
+
+    expect(onSelect).toHaveBeenCalledWith(categories[4])
+  })
+
   it('filters account groups by search without narrowing group toggles', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
