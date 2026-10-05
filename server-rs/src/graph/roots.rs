@@ -75,6 +75,7 @@ delegate!(QueryResolvers for Query {
     configuration() -> Configuration => |resolver| async { Ok(resolver.configuration()) };
     general_configuration() -> GeneralConfiguration => |resolver| async { Ok(resolver.general_configuration()) };
     instance_timezone() -> String => |resolver| async { Ok(resolver.instance_timezone()) };
+    ollama_models(url: String) -> Vec<String> => |resolver| resolver.ollama_models(&url);
     node(id: ID) -> Option<Node> => |resolver, identity| resolver.node(&identity, &id);
     nodes(ids: Vec<ID>) -> Option<Vec<Option<Node>>> => |resolver, identity| async { resolver.nodes(&identity, &ids).await.map(Some) };
     budget_report_history(input: Option<BudgetReportHistoryInput>) -> BudgetReportHistory => |resolver, identity| resolver.budget_report_history(&identity, input);

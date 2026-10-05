@@ -1,10 +1,10 @@
--- Used by internal/transactions' background LLM categorizer to list expense categories as prompt context.
+-- Used by internal/transactions' background LLM categorizer to list categories as prompt context.
 -- name: CategoriesForLLM :many
-SELECT c.id, c.name, cg.name AS group_name
+SELECT c.id, c.name, cg.name AS group_name, cg.kind AS group_kind
 FROM categories c
 JOIN category_groups cg ON cg.id = c.group_id
-WHERE cg.kind = 'EXPENSE'
-ORDER BY c.sort_order;
+WHERE c.id != 0
+ORDER BY cg.kind, cg.sort_order, c.sort_order;
 
 -- Used by internal/transactions' background LLM categorizer to fetch transactions staged for categorization.
 -- name: UncategorizedForLLM :many
@@ -30,17 +30,16 @@ WHERE is_reviewed = 0
 -- Used by internal/transactions' background LLM categorizer to fetch already-reviewed examples per merchant as few-shot prompt context.
 -- name: TopMerchantExamples :many
 SELECT
-  CAST(MIN(t.merchant_name) AS TEXT) AS merchant_name,
+  CAST(MIN(COALESCE(NULLIF(t.merchant_name, ''), NULLIF(t.original_name, ''))) AS TEXT) AS merchant_name,
   c.name AS category_name,
   c.id AS category_id
 FROM transactions t
 JOIN categories c ON t.category_id = c.id
-JOIN category_groups cg ON cg.id = c.group_id
-WHERE t.merchant_name IS NOT NULL
+WHERE COALESCE(NULLIF(t.merchant_name, ''), NULLIF(t.original_name, '')) IS NOT NULL
   AND t.is_reviewed = 1
-  AND cg.kind = 'EXPENSE'
+  AND c.id != 0
   AND t.datetime < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-7 days')
-GROUP BY LOWER(t.merchant_name), c.id
+GROUP BY LTRIM(LOWER(COALESCE(NULLIF(t.merchant_name, ''), t.original_name))), c.id
 ORDER BY COUNT(*) DESC
 LIMIT @row_limit;
 

@@ -14,18 +14,21 @@ use wiremock::{
 use super::{PlaidSync, SimpleFinSync, Syncer};
 use crate::{
     accounts::{
-        AccountsCreated, PlaidClientFactory, SourceTable,
+        AccountsCreated, PlaidClientFactory, PlaidItemHealthState, SourceTable,
         simplefin_types::UpsertSimpleFinConnectionParams,
-        store::{create_simple_fin_access_token, link_simple_fin_connection, set_plaid_product_flags, upsert_account},
+        store::{
+            create_simple_fin_access_token, link_simple_fin_connection, set_plaid_item_health, set_plaid_product_flags,
+            upsert_account,
+        },
     },
-    clients::simplefin::SimpleFinClient,
+    clients::{ollama::GenerationOptions, simplefin::SimpleFinClient},
     database::dbtest,
     money::Cents,
     testutil::transactions,
     testutil::{
         plaid_mock,
         simplefin_mock::{self, access_url},
-        store::{create_owner, linked_account, seed_plaid_item},
+        store::{create_owner, linked_account, plaid_item, seed_plaid_item},
     },
     transactions::{
         llm::OllamaCategorizer,
@@ -70,16 +73,7 @@ async fn persists_paginated_plaid_and_simplefin_sync_responses() -> Result<()> {
     let owner = create_owner(&pool, "Owner").await?;
     let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
     create_simple_fin_access_token(&pool, &access_url(&simplefin_server), owner.id, "Bank").await?;
-    let syncer = Syncer::new(
-        pool.clone(),
-        vec![
-            Box::new(PlaidSync::new(
-                pool.clone(),
-                PlaidClientFactory::with_base_url(pool.clone(), plaid_server.uri()),
-            )),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
-        ],
-    );
+    let syncer = plaid_syncer(&pool, &plaid_server).await?;
 
     let report = syncer.sync_due().await;
 
@@ -273,18 +267,11 @@ async fn retries_a_plaid_pagination_mutation_from_the_persisted_cursor() -> Resu
 
     let owner = create_owner(&pool, "Owner").await?;
     let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
-    let syncer = Syncer::new(
-        pool.clone(),
-        vec![
-            Box::new(PlaidSync::new(
-                pool.clone(),
-                PlaidClientFactory::with_base_url(pool.clone(), server.uri()),
-            )),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
-        ],
-    );
+    let syncer = plaid_syncer(&pool, &server).await?;
     syncer
-        .set_llm(Some(OllamaCategorizer::new(&pool, "http://localhost", "model").await?))
+        .set_llm(Some(
+            OllamaCategorizer::new(&pool, "http://localhost", "model", GenerationOptions::default()).await?,
+        ))
         .await?;
 
     syncer.sync_item(item_id).await?;
@@ -350,16 +337,7 @@ async fn syncs_recurring_plaid_streams() -> Result<()> {
         }),
     )
     .await;
-    let syncer = Syncer::new(
-        pool.clone(),
-        vec![
-            Box::new(PlaidSync::new(
-                pool.clone(),
-                PlaidClientFactory::with_base_url(pool.clone(), server.uri()),
-            )),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
-        ],
-    );
+    let syncer = plaid_syncer(&pool, &server).await?;
 
     let report = syncer.sync_recurring_due().await;
 
@@ -689,11 +667,11 @@ async fn categorizes_staged_transactions_with_ollama() -> Result<()> {
         .await?
         .into_iter()
         .next()
-        .expect("seeded expense category");
+        .expect("seeded category");
     Mock::given(method("POST"))
         .and(path("/api/generate"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "response": format!("[{{\"transaction_index\":1,\"category_id\":{},\"confidence\":\"high\"}}]", category.id),
+            "response": format!("{{\"classifications\":[{{\"transaction_index\":1,\"category_id\":{},\"confidence\":\"high\"}}]}}", category.id),
         })))
         .mount(&server)
         .await;
@@ -723,7 +701,9 @@ async fn categorizes_staged_transactions_with_ollama() -> Result<()> {
     });
 
     syncer
-        .set_llm(Some(OllamaCategorizer::new(&pool, server.uri(), "model").await?))
+        .set_llm(Some(
+            OllamaCategorizer::new(&pool, server.uri(), "model", GenerationOptions::default()).await?,
+        ))
         .await?;
     for _ in 0..50 {
         let categorized = sqlx::query_scalar::<_, bool>("SELECT is_reviewed FROM transactions WHERE id = ?")
@@ -775,10 +755,130 @@ async fn disabling_llm_clears_staged_transactions() -> Result<()> {
     );
 
     syncer
-        .set_llm(Some(OllamaCategorizer::new(&pool, "http://localhost", "model").await?))
+        .set_llm(Some(
+            OllamaCategorizer::new(&pool, "http://localhost", "model", GenerationOptions::default()).await?,
+        ))
         .await?;
     syncer.set_llm(None).await?;
 
     assert!(llm_store::uncategorized_for_llm(&pool, 10).await?.is_empty());
+    Ok(())
+}
+
+async fn plaid_syncer(pool: &sqlx::SqlitePool, server: &MockServer) -> Result<Syncer> {
+    Ok(Syncer::new(
+        pool.clone(),
+        vec![
+            Box::new(PlaidSync::new(
+                pool.clone(),
+                PlaidClientFactory::with_base_url(pool.clone(), server.uri()),
+            )),
+            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+        ],
+    ))
+}
+
+#[tokio::test]
+async fn failed_accounts_fetch_marks_plaid_item_link_update_required() -> Result<()> {
+    let pool = dbtest::open().await?;
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/accounts/get"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({"error_code":"ITEM_LOGIN_REQUIRED"})))
+        .mount(&server)
+        .await;
+    let owner = create_owner(&pool, "Owner").await?;
+    let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+
+    let _ = plaid_syncer(&pool, &server).await?.sync_item(item_id).await;
+
+    assert_eq!(
+        plaid_item(&pool, item_id).await?.health_state,
+        PlaidItemHealthState::LinkUpdateRequired
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn null_transaction_category_syncs_and_leaves_item_healthy() -> Result<()> {
+    let pool = dbtest::open().await?;
+    let server = MockServer::start().await;
+    plaid_mock::mount_accounts(&server).await;
+    let mut transaction = plaid_transaction("null-category");
+    transaction["category"] = serde_json::Value::Null;
+    plaid_mock::mount_transactions_sync(
+        &server,
+        "",
+        json!({"added":[transaction],"modified":[],"removed":[],"next_cursor":"done","has_more":false}),
+    )
+    .await;
+    let owner = create_owner(&pool, "Owner").await?;
+    let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+
+    plaid_syncer(&pool, &server).await?.sync_item(item_id).await?;
+
+    assert_eq!(plaid_sync::sync_cursor(&pool, item_id).await?, "done");
+    assert_eq!(
+        plaid_item(&pool, item_id).await?.health_state,
+        PlaidItemHealthState::Healthy
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn exhausted_pagination_restarts_record_the_plaid_error_code() -> Result<()> {
+    let pool = dbtest::open().await?;
+    let server = MockServer::start().await;
+    plaid_mock::mount_accounts(&server).await;
+    Mock::given(method("POST"))
+        .and(path("/transactions/sync"))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .set_body_json(json!({"error_code":"TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION"})),
+        )
+        .mount(&server)
+        .await;
+    let owner = create_owner(&pool, "Owner").await?;
+    let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+
+    let _ = plaid_syncer(&pool, &server).await?.sync_item(item_id).await;
+
+    let item = plaid_item(&pool, item_id).await?;
+    assert_eq!(item.health_state, PlaidItemHealthState::SyncError);
+    assert_eq!(
+        item.health_error_code.as_deref(),
+        Some("TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn successful_sync_recovers_a_plaid_item_from_sync_error() -> Result<()> {
+    let pool = dbtest::open().await?;
+    let server = MockServer::start().await;
+    plaid_mock::mount_accounts(&server).await;
+    plaid_mock::mount_transactions_sync(
+        &server,
+        "",
+        json!({"added":[plaid_transaction("t")],"modified":[],"removed":[],"next_cursor":"done","has_more":false}),
+    )
+    .await;
+    let owner = create_owner(&pool, "Owner").await?;
+    let (item_id, _) = seed_plaid_item(&pool, &owner, "item").await?;
+    set_plaid_item_health(
+        &pool,
+        item_id,
+        PlaidItemHealthState::SyncError,
+        Some("CODE"),
+        Some("message"),
+    )
+    .await?;
+
+    plaid_syncer(&pool, &server).await?.sync_item(item_id).await?;
+
+    let item = plaid_item(&pool, item_id).await?;
+    assert_eq!(item.health_state, PlaidItemHealthState::Healthy);
+    assert_eq!(item.health_error_code, None);
+    assert_eq!(item.health_error_message, None);
     Ok(())
 }

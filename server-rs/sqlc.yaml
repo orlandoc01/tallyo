@@ -6,7 +6,7 @@ plugins:
       sha256: 4ac84c65bb0f8c548db850ea3a51baa831ba4fc339e4cb8775c0b888e4ad0066
 sql:
   - engine: sqlite
-    schema: [migrations/0001_schema_init.sql, migrations/0003_rules_fts.sql, sql/sqlc_fts_schema.sql]
+    schema: [migrations/0001_schema_init.sql, migrations/0003_rules_fts.sql, migrations/0004_llm_merchant_key_index.sql, sql/sqlc_fts_schema.sql]
     queries: sql/queries
     codegen:
       - plugin: sqlc-gen-rust

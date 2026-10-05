@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { graphql, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
@@ -72,7 +72,6 @@ describe('AccountValuationSheet', () => {
     expect(screen.getByText('Holdings on Thu, May 21')).toBeInTheDocument()
     expect(screen.getByText('US Dollar')).toBeInTheDocument()
     expect(screen.getAllByText('VTI').length).toBeGreaterThan(0)
-    expect(screen.getByText('69.0%')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Load 4 older snapshots' }))
     await waitFor(() => expect(inputs).toHaveLength(2))
@@ -80,26 +79,35 @@ describe('AccountValuationSheet', () => {
     expect(await screen.findByRole('button', { name: /Sun, May 17/ })).toBeInTheDocument()
   })
 
-  it('edits a manual snapshot inside the expanded panel', async () => {
+  it('edits a manual snapshot inside the expanded panel and undoes the save', async () => {
     const user = userEvent.setup()
     const account = accounts.find((item) => item.id === 'manual-company-equity')!
     const snapshot = accountSnapshots.find((item) => item.accountId === account.id)!
     const changeSnapshot = captureMutation<{ snapshotId: string; holdings: Array<{ assetId: string; valueUSD: number }> }>('ChangeAccountSnapshot', {
-      changeAccountSnapshot: { __typename: 'ChangeAccountSnapshotPayload', snapshot: { ...snapshot, balanceUSD: 2000 }, account },
+      changeAccountSnapshot: {
+        __typename: 'ChangeAccountSnapshotPayload',
+        snapshot: { ...snapshot, balanceUSD: 2000, holdings: [{ ...snapshot.holdings![0], quantity: 13.3333, valueUSD: 2000 }] },
+        account,
+      },
     })
     const onAccountUpdate = vi.fn()
     render(<AccountValuationSheet account={account} onAccountUpdate={onAccountUpdate} />, { wrapper: GraphqlTestProvider })
 
     await user.click(await screen.findByRole('button', { name: /Thu, May 21/ }))
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    const valuation = screen.getByLabelText(/^Valuation for/)
-    await user.clear(valuation)
-    await user.type(valuation, '2000')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Edit ACME' }))
+    const value = screen.getByLabelText(/^Value for/)
+    await user.clear(value)
+    await user.type(value, '2000')
+    fireEvent.pointerDown(document.body)
 
     await waitFor(() => expect(changeSnapshot.input?.snapshotId).toBe(snapshot.id))
     expect(changeSnapshot.input?.holdings[0].valueUSD).toBe(2000)
     expect(onAccountUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: account.id }))
+    expect(await screen.findByText(/Saved/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(changeSnapshot.calls).toBe(2))
+    expect(changeSnapshot.input?.holdings[0].valueUSD).toBe(1500)
   })
 
   it('shows the history error line and an empty state', async () => {
@@ -116,30 +124,40 @@ describe('AccountValuationSheet', () => {
     expect(screen.getByText('Not enough history for a chart yet.')).toBeInTheDocument()
   })
 
-  it('cancels an edit back to the saved lines and surfaces save errors', async () => {
+  it('reopens the edited line and surfaces save errors', async () => {
     const user = userEvent.setup()
     const account = accounts.find((item) => item.id === 'manual-company-equity')!
     mockGraphqlError('ChangeAccountSnapshot', 'snapshot locked', { kind: 'mutation' })
     render(<AccountValuationSheet account={account} onAccountUpdate={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
     await user.click(await screen.findByRole('button', { name: /Thu, May 21/ }))
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    const valuation = screen.getByLabelText(/^Valuation for/)
-    await user.clear(valuation)
-    await user.type(valuation, '2000')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Edit ACME' }))
+    const value = screen.getByLabelText(/^Value for/)
+    await user.clear(value)
+    await user.type(value, '2000')
+    fireEvent.pointerDown(document.body)
 
-    expect(screen.getAllByText('$1,500.00').length).toBeGreaterThan(1)
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(await screen.findByText(/Could not save ACME: .*snapshot locked/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Value for/)).toHaveValue('2000')
+    expect(screen.getByLabelText(/^Value for/)).toBeEnabled()
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    await user.clear(screen.getByLabelText(/^Valuation for/))
-    await user.type(screen.getByLabelText(/^Valuation for/), '2000')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+  it('surfaces a save error at the sheet level when the panel was collapsed mid-save', async () => {
+    const user = userEvent.setup()
+    const account = accounts.find((item) => item.id === 'manual-company-equity')!
+    mockGraphqlError('ChangeAccountSnapshot', 'snapshot locked', { kind: 'mutation' })
+    render(<AccountValuationSheet account={account} onAccountUpdate={vi.fn()} />, { wrapper: GraphqlTestProvider })
 
-    expect(await screen.findByText(/Could not save snapshot: .*snapshot locked/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    const row = await screen.findByRole('button', { name: /Thu, May 21/ })
+    await user.click(row)
+    await user.click(screen.getByRole('button', { name: 'Edit ACME' }))
+    const value = screen.getByLabelText(/^Value for/)
+    await user.clear(value)
+    await user.type(value, '2000')
+    await user.click(row)
+
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(await screen.findByText(/Could not save ACME: .*snapshot locked/)).toBeInTheDocument()
   })
 
   it('lists a single statement balance line for balance-only manual accounts', async () => {
@@ -149,8 +167,8 @@ describe('AccountValuationSheet', () => {
 
     await user.click(await screen.findByRole('button', { name: /Thu, May 21/ }))
 
-    expect(screen.getByText('Statement balance')).toBeInTheDocument()
-    expect(screen.getByText('100%')).toBeInTheDocument()
+    expect(screen.getByText('Balance on Thu, May 21')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Edit Statement balance' })).toHaveTextContent('$18,500.00')
     expect(screen.getByText('Manual')).toBeInTheDocument()
   })
 })

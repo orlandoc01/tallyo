@@ -30,6 +30,11 @@ describe('accountSnapshotLines rounding', () => {
     expect(updated.quantity).toBeNull()
   })
 
+  it('accepts a decimal comma', () => {
+    expect(updateLineValue([line({ quantity: 1, price: 3 })], id, '1,5')[0].valueUSD).toBe(1.5)
+    expect(updateLineCash([line({ price: 1 })], id, '1,5')[0].valueUSD).toBe(1.5)
+  })
+
   it('rounds a cash balance to cents', () => {
     const [updated] = updateLineCash([line({ price: 1 })], id, '500.999')
     expect(updated.valueUSD).toBe(501)

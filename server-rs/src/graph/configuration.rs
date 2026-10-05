@@ -6,12 +6,14 @@ use crate::{
         AuthConfig, EmailConfig, GeneralConfig, GoogleConfig, LlmConfig, LocaleConfig, McpConfig, OllamaConfig, Patch,
         Provider, Section, SectionPatch, SecurityConfig, SetupCompleteConfig, WebAuthnConfig,
     },
+    apierror::ApiError,
+    clients::ollama::{self, GenerationOptions},
     config::Config,
     schema::{
         AuthorizationConfiguration, Configuration, EmailCodeAuthnConfiguration, GeneralConfiguration,
         GoogleAuthnConfiguration, LlmCategorizationConfiguration, LlmProvider, Locale, McpConfiguration,
-        OllamaProviderConfiguration, PassKeyAuthnConfiguration, SecurityConfiguration, UpdateConfigurationInput,
-        UpdateConfigurationPayload,
+        OllamaProviderConfiguration, OllamaProviderConfigurationInput, PassKeyAuthnConfiguration,
+        SecurityConfiguration, UpdateConfigurationInput, UpdateConfigurationPayload,
     },
     utils::timezone::FALLBACK_TIMEZONE,
 };
@@ -51,6 +53,12 @@ impl Resolver {
         self.admin.manager.timezone()
     }
 
+    pub async fn ollama_models(&self, url: &str) -> Result<Vec<String>> {
+        ollama::list_models(url)
+            .await
+            .map_err(|error| ApiError::bad_input(format!("{error:#}")).into())
+    }
+
     pub async fn update_configuration(&self, input: UpdateConfigurationInput) -> Result<UpdateConfigurationPayload> {
         let current = self.admin.manager.sections();
         let patch = Patch {
@@ -88,6 +96,7 @@ impl Resolver {
                 fields: LlmConfig {
                     provider: Some(Provider::Known(LlmProvider::Ollama)),
                     ollama: OllamaConfig {
+                        generation: generation_options(&llm.ollama),
                         url: llm.ollama.url,
                         model: llm.ollama.model,
                     },
@@ -176,6 +185,7 @@ fn general_configuration(section: &Section<GeneralConfig>) -> GeneralConfigurati
 }
 
 fn llm_categorization_configuration(section: &Section<LlmConfig>) -> LlmCategorizationConfiguration {
+    let generation = &section.fields.ollama.generation;
     LlmCategorizationConfiguration {
         enabled: section.enabled,
         provider: LlmProvider::Ollama,
@@ -183,8 +193,35 @@ fn llm_categorization_configuration(section: &Section<LlmConfig>) -> LlmCategori
         ollama: OllamaProviderConfiguration {
             url: nonempty(section.fields.ollama.url.as_deref()),
             model: section.fields.ollama.model.clone(),
+            batch_size: graphql_int(generation.batch_size),
+            think: generation.think,
+            temperature: generation.temperature,
+            max_output_tokens: graphql_int(generation.max_output_tokens),
+            request_timeout_seconds: graphql_int(generation.request_timeout_seconds),
         },
     }
+}
+
+fn generation_options(input: &OllamaProviderConfigurationInput) -> GenerationOptions {
+    let defaults = GenerationOptions::default();
+    GenerationOptions {
+        batch_size: input.batch_size.map_or(defaults.batch_size, unsigned),
+        think: input.think.unwrap_or(defaults.think),
+        temperature: input.temperature.unwrap_or(defaults.temperature),
+        max_output_tokens: input.max_output_tokens.map_or(defaults.max_output_tokens, unsigned),
+        request_timeout_seconds: input
+            .request_timeout_seconds
+            .map_or(defaults.request_timeout_seconds, unsigned),
+    }
+}
+
+// Negative inputs collapse to zero so the range validation reports them.
+fn unsigned<T: TryFrom<i32> + Default>(value: i32) -> T {
+    T::try_from(value).unwrap_or_default()
+}
+
+fn graphql_int(value: impl TryInto<i32>) -> i32 {
+    value.try_into().unwrap_or(i32::MAX)
 }
 
 fn google_configuration(section: &Section<GoogleConfig>) -> GoogleAuthnConfiguration {

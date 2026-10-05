@@ -55,7 +55,7 @@ const setupConfiguration: Configuration = {
     enabled: false,
     provider: 'OLLAMA',
     allowedProviders: ['OLLAMA'],
-    ollama: { __typename: 'OllamaProviderConfiguration', url: null, model: '' },
+    ollama: { __typename: 'OllamaProviderConfiguration', url: null, model: '', batchSize: 5, think: false, temperature: 0.1, maxOutputTokens: 2048, requestTimeoutSeconds: 300 },
   },
   googleAuthn: { __typename: 'GoogleAuthnConfiguration', enabled: false, googleClientId: null, googleClientSecret: null },
   passKeyAuthn: { __typename: 'PassKeyAuthnConfiguration', enabled: false, webauthnRpId: null, webauthnRpName: 'Tallyo', webauthnRpOrigins: [] },

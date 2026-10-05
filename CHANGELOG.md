@@ -4,6 +4,23 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-10-04
+
+### Added
+- **LLM categorizer settings.** Settings › Configuration › LLM Categorization gains batch size, thinking, temperature, max output tokens, and request timeout, plus a Test connection button that lists the models the Ollama server serves. Responses are constrained with a JSON schema instead of parsed leniently. API: the new fields on `OllamaProviderConfiguration` and `Query.ollamaModels`. Existing configuration keeps today's defaults.
+- Arrow keys move a highlight through the category picker's filtered list, and Enter selects it.
+- On phones, holdings in a snapshot on the account Valuation tab are edited by tapping a line; tapping elsewhere or Enter saves, with a 6-second Undo.
+
+### Changed
+- The LLM categorizer can now pick income and transfer categories, not only expenses, and its examples include past income and transfer labels.
+- The LLM categorizer falls back to the raw transaction name when the merchant name is blank, and finds similar reviewed examples by the first word of the merchant name (so `Google`, `GOOGLE *Storage`, and `Google Play` share history). A migration replaces the old merchant-name index with one on that key.
+
+### Fixed
+- Plaid balance sync classifies accounts by their stored type instead of Plaid's. A cash-management account held as INVESTMENT (for example Morgan Stanley CashPlus) was written as a cash-only snapshot every day, replacing its holdings; net worth totals were unaffected, but the position showed as cash. Existing snapshots are not rewritten.
+- Plaid item health is recorded on every sync failure, so a connection that needs a re-link (`ITEM_LOGIN_REQUIRED`) is flagged in the UI instead of silently failing. A transaction with a null category no longer fails the whole sync page.
+- Renaming a Plaid or SimpleFIN account survives the next sync and re-link; the account mask is backfilled once and then kept.
+- The LLM structured-output schema no longer lists category id 0 twice, which some OpenAI-compatible servers rejected.
+
 ## [0.3.5] - 2026-09-29
 
 ### Fixed

@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use super::{all_scopes, code, global_id, seed};
 use crate::{
     auth::Identity,
+    clients::ollama::GenerationOptions,
     graph::Resolver,
     ids::GlobalIdType,
     money::Cents,
@@ -523,7 +524,13 @@ async fn reprocess_uncategorized_requires_an_enabled_llm() -> Result<()> {
     resolver
         .syncer
         .set_llm(Some(
-            OllamaCategorizer::new(&fixture.pool, "http://localhost:11434", "test").await?,
+            OllamaCategorizer::new(
+                &fixture.pool,
+                "http://localhost:11434",
+                "test",
+                GenerationOptions::default(),
+            )
+            .await?,
         ))
         .await?;
     let response = crate::graph::build_schema(resolver)

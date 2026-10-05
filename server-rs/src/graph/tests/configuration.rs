@@ -7,6 +7,7 @@ use crate::{
         AuthConfig, EmailConfig, GoogleConfig, McpConfig, Patch, SectionPatch, SecurityConfig, store as admin_store,
     },
     auth::Scope,
+    clients::ollama::BATCH_SIZE_RANGE,
     graph::configuration::OBFUSCATED_SECRET,
     schema::{
         AuthorizationConfigurationInput, EmailCodeAuthnConfigurationInput, GeneralConfigurationInput,
@@ -82,7 +83,7 @@ async fn configuration_obfuscates_secrets_and_reads_stored_sections() -> Result<
     let schema = crate::graph::build_schema(resolver);
     let response = schema
         .execute(super::request(
-            "{ configuration { dbPath port syncOff configFilePath locale { timezone } authorization { masterPassword disableAllAuth } googleAuthn { googleClientId googleClientSecret } emailCodeAuthn { smtpPassword smtpHost } mcp { enabled dynamicRedirectHosts } security { trustedProxyCidrs } llmCategorization { enabled provider allowedProviders ollama { url model } } passKeyAuthn { enabled webauthnRpOrigins } general { hideOwners } } generalConfiguration { disableWealthTracking } instanceTimezone }",
+            "{ configuration { dbPath port syncOff configFilePath locale { timezone } authorization { masterPassword disableAllAuth } googleAuthn { googleClientId googleClientSecret } emailCodeAuthn { smtpPassword smtpHost } mcp { enabled dynamicRedirectHosts } security { trustedProxyCidrs } llmCategorization { enabled provider allowedProviders ollama { url model batchSize think temperature maxOutputTokens requestTimeoutSeconds } } passKeyAuthn { enabled webauthnRpOrigins } general { hideOwners } } generalConfiguration { disableWealthTracking } instanceTimezone }",
             all_scopes(),
         ))
         .await;
@@ -107,7 +108,7 @@ async fn configuration_obfuscates_secrets_and_reads_stored_sections() -> Result<
     assert_eq!(configuration["security"]["trustedProxyCidrs"], json!(["10.0.0.0/24"]));
     assert_eq!(
         configuration["llmCategorization"],
-        json!({"enabled": false, "provider": "OLLAMA", "allowedProviders": ["OLLAMA"], "ollama": {"url": Value::Null, "model": ""}})
+        json!({"enabled": false, "provider": "OLLAMA", "allowedProviders": ["OLLAMA"], "ollama": {"url": Value::Null, "model": "", "batchSize": 5, "think": false, "temperature": 0.1, "maxOutputTokens": 2048, "requestTimeoutSeconds": 300}})
     );
     assert_eq!(
         configuration["passKeyAuthn"],
@@ -121,6 +122,23 @@ async fn configuration_obfuscates_secrets_and_reads_stored_sections() -> Result<
         .execute(super::request("{ configuration { dbPath } }", vec![Scope::ReadOwners]))
         .await;
     assert_eq!(response.errors[0].message, "forbidden: read:settings access required");
+    Ok(())
+}
+
+#[tokio::test]
+async fn ollama_models_requires_write_settings_and_rejects_invalid_urls() -> Result<()> {
+    let fixture = seed().await?;
+    let schema = crate::graph::build_schema(fixture.resolver());
+    let query = r#"{ ollamaModels(url: "ollama:11434") }"#;
+    let response = schema.execute(super::request(query, vec![Scope::ReadSettings])).await;
+    assert_eq!(response.errors[0].message, "forbidden: write:settings access required");
+
+    let response = schema.execute(super::request(query, all_scopes())).await;
+    assert_eq!(super::code(&response.errors[0]), "BAD_USER_INPUT");
+    assert_eq!(
+        response.errors[0].message,
+        "invalid ollama url \"ollama:11434\": must be an absolute http(s) URL without query or fragment"
+    );
     Ok(())
 }
 
@@ -194,6 +212,11 @@ async fn update_configuration_updates_dynamic_sections() -> Result<()> {
                 ollama: OllamaProviderConfigurationInput {
                     url: Some("http://ollama:11434".to_owned()),
                     model: "llama3".to_owned(),
+                    batch_size: Some(50),
+                    think: Some(true),
+                    temperature: None,
+                    max_output_tokens: Some(4096),
+                    request_timeout_seconds: None,
                 },
             }),
             mcp: Some(McpConfigurationInput {
@@ -208,6 +231,29 @@ async fn update_configuration_updates_dynamic_sections() -> Result<()> {
         .await?;
     let configuration = payload.configuration;
     assert_eq!(
+        resolver
+            .update_configuration(UpdateConfigurationInput {
+                llm_categorization: Some(LlmCategorizationConfigurationInput {
+                    enabled: true,
+                    provider: LlmProvider::Ollama,
+                    ollama: OllamaProviderConfigurationInput {
+                        url: Some("http://ollama:11434".to_owned()),
+                        model: "llama3".to_owned(),
+                        batch_size: Some(-1),
+                        think: None,
+                        temperature: None,
+                        max_output_tokens: None,
+                        request_timeout_seconds: None,
+                    },
+                }),
+                ..update_input()
+            })
+            .await
+            .unwrap_err()
+            .to_string(),
+        BATCH_SIZE_RANGE
+    );
+    assert_eq!(
         configuration.google_authn.google_client_id.as_deref(),
         Some("new-client")
     );
@@ -221,7 +267,18 @@ async fn update_configuration_updates_dynamic_sections() -> Result<()> {
             && configuration.general.hide_owners
     );
     assert!(configuration.llm_categorization.enabled);
-    assert_eq!(configuration.llm_categorization.ollama.model, "llama3");
+    let ollama = &configuration.llm_categorization.ollama;
+    assert_eq!(ollama.model, "llama3");
+    assert_eq!(
+        (
+            ollama.batch_size,
+            ollama.think,
+            ollama.temperature,
+            ollama.max_output_tokens,
+            ollama.request_timeout_seconds
+        ),
+        (50, true, 0.1, 4096, 300)
+    );
     assert!(configuration.mcp.enabled);
     assert_eq!(
         configuration.mcp.dynamic_redirect_hosts.as_deref(),

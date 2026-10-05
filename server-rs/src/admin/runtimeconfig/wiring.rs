@@ -125,6 +125,7 @@ impl Manager {
             let settings = LlmSettings {
                 url: config.fields.ollama.url.clone().unwrap_or_default(),
                 model: config.fields.ollama.model.clone(),
+                generation: config.fields.ollama.generation.clone(),
             };
             let commit = syncer.prepare_llm(settings).await?;
             return Ok(Some(Box::new(move || commit())));
@@ -383,6 +384,7 @@ mod tests {
             ollama: OllamaConfig {
                 url: Some("http://localhost:11434".to_owned()),
                 model: "llama3".to_owned(),
+                ..Default::default()
             },
         });
         manager.configure_syncer_llm(&syncer).await.unwrap();

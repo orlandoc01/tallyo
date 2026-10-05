@@ -1,5 +1,5 @@
 import { AlertCircle } from 'lucide-react'
-import type { FormEvent, ReactNode } from 'react'
+import { useId, type FormEvent, type ReactNode } from 'react'
 
 import { Button } from '../common/Button'
 import { ErrorState } from '../common/ErrorState'
@@ -7,6 +7,7 @@ import { Card, SectionLabel, TextField } from '../common/FormControls'
 import { QueryGate } from '../common/QueryGate'
 import { ToggleSwitch } from '../common/ToggleSwitch'
 import type { Configuration } from '../../types/graphql'
+import { numberInRange } from './configParsing'
 
 // Shared form primitives for the settings configuration tabs (runtime,
 // security). A dirty field is marked with a trailing asterisk; an optional
@@ -22,13 +23,13 @@ function LabelText({ label, dirty, warning }: { label: string; dirty: boolean; w
   )
 }
 
-export type ToggleInputProps = { label: string; checked: boolean; dirty: boolean; warning?: string; onChange: (value: boolean) => void }
+export type ToggleInputProps = { label: string; checked: boolean; dirty: boolean; disabled?: boolean; warning?: string; onChange: (value: boolean) => void }
 
-export function ToggleInput({ label, checked, dirty, warning, onChange }: ToggleInputProps) {
+export function ToggleInput({ label, checked, dirty, disabled, warning, onChange }: ToggleInputProps) {
   return (
     <div className="flex items-center justify-between gap-3 text-[13px] text-text-2">
       <LabelText dirty={dirty} label={label} warning={warning} />
-      <ToggleSwitch checked={checked} label={label} onChange={onChange} size="lg" />
+      <ToggleSwitch checked={checked} disabled={disabled} label={label} onChange={onChange} size="lg" />
     </div>
   )
 }
@@ -44,6 +45,31 @@ export function TextInput({ label, value, dirty, disabled, placeholder, onChange
       placeholder={placeholder}
       value={value}
     />
+  )
+}
+
+export function NumberInput({ label, value, dirty, disabled, min, max, step = 1, hint, error, onChange }: { label: string; value: string; dirty: boolean; disabled?: boolean; min: number; max: number; step?: number; hint?: string; error?: string; onChange: (value: string) => void }) {
+  const message = numberInRange(value, min, max) ? error : `Enter a number between ${min} and ${max}.`
+  const messageId = useId()
+  return (
+    <div>
+      <TextField
+        aria-describedby={message || hint ? messageId : undefined}
+        aria-invalid={message !== undefined}
+        disabled={disabled}
+        inputMode={Number.isInteger(step) ? 'numeric' : 'decimal'}
+        label={label}
+        labelSuffix={dirty ? <span aria-hidden="true">*</span> : null}
+        max={max}
+        min={min}
+        mono
+        onChange={onChange}
+        step={step}
+        type="number"
+        value={value}
+      />
+      {message ? <p className="mt-1 text-xs text-negative" id={messageId}>{message}</p> : hint ? <p className="mt-1 text-xs text-text-faint" id={messageId}>{hint}</p> : null}
+    </div>
   )
 }
 
