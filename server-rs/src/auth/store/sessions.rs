@@ -9,6 +9,8 @@ use super::{
 };
 use crate::auth::token_signature;
 
+const STALE_CLIENT_IDLE: chrono::TimeDelta = chrono::TimeDelta::days(90);
+
 impl Store {
     pub async fn create_login_session(&self, session: &LoginSession) -> Result<()> {
         queries::create_login_session(
@@ -24,10 +26,25 @@ impl Store {
                 callback_state: &session.callback_state,
                 expires_at: session.expires_at,
                 purpose: Some(&session.purpose),
+                browser_binding: (!session.browser_binding.is_empty()).then_some(session.browser_binding.as_str()),
             },
         )
         .await
         .context("create login session")
+    }
+
+    /// Binds a still-unbound session to a browser; false when it is already bound, missing, or expired.
+    pub async fn bind_login_session(&self, id: &str, binding_signature: &str) -> Result<bool> {
+        Ok(queries::bind_login_session(
+            &self.pool,
+            queries::BindLoginSessionParams {
+                browser_binding: Some(binding_signature),
+                id,
+                now: Utc::now().into(),
+            },
+        )
+        .await?
+            == 1)
     }
 
     pub async fn login_session_by_id(&self, id: &str) -> Result<Option<LoginSession>> {
@@ -169,6 +186,14 @@ impl Store {
             queries::CleanupExpiredWebAuthnRegistrationsParams { now },
         )
         .await?;
+        queries::cleanup_stale_o_auth_clients(
+            &self.pool,
+            queries::CleanupStaleOAuthClientsParams {
+                before: Some((Utc::now() - STALE_CLIENT_IDLE).into()),
+                now,
+            },
+        )
+        .await?;
         Ok(())
     }
 }
@@ -177,6 +202,103 @@ impl Store {
 mod tests {
     use chrono::{Duration, Utc};
     use sqlx::query_scalar;
+
+    #[tokio::test]
+    async fn binds_only_unbound_live_sessions_once() {
+        let store = Store::new(dbtest::open().await.unwrap());
+        store
+            .create_login_session(&LoginSession {
+                browser_binding: String::new(),
+                ..session()
+            })
+            .await
+            .unwrap();
+        assert!(store.bind_login_session("session", "first").await.unwrap());
+        assert!(!store.bind_login_session("session", "second").await.unwrap());
+        assert_eq!(
+            store
+                .login_session_by_id("session")
+                .await
+                .unwrap()
+                .unwrap()
+                .browser_binding,
+            "first"
+        );
+        assert!(!store.bind_login_session("missing", "first").await.unwrap());
+
+        store
+            .create_login_session(&LoginSession {
+                id: "expired".to_owned(),
+                callback_state: "expired-callback".to_owned(),
+                browser_binding: String::new(),
+                expires_at: (Utc::now() - Duration::seconds(1)).into(),
+                ..session()
+            })
+            .await
+            .unwrap();
+        assert!(!store.bind_login_session("expired", "first").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn removes_stale_dynamic_clients_that_hold_no_live_refresh_token() {
+        let pool = dbtest::open().await.unwrap();
+        let store = Store::new(pool.clone());
+        store
+            .upsert_frontend_client(&["https://client.test/callback".to_owned()])
+            .await
+            .unwrap();
+        let dynamic = |id: &str| crate::auth::OAuthClient {
+            id: id.to_owned(),
+            redirect_uris: vec!["https://client.test/callback".to_owned()],
+            grant_types: vec!["authorization_code".to_owned()],
+            response_types: vec!["code".to_owned()],
+            scopes: vec!["read".to_owned()],
+            application_type: "native".to_owned(),
+            client_name: String::new(),
+            public: true,
+            preseeded: false,
+        };
+        for id in [
+            "stale",
+            "stale-with-token",
+            "idle-with-expired-token",
+            "recently-used",
+            "fresh",
+        ] {
+            store.save_client(dynamic(id)).await.unwrap();
+        }
+        sqlx::query("UPDATE oauth_clients SET created_at = '2020-01-01T00:00:00Z' WHERE id != 'fresh'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        store.touch_client("recently-used").await.unwrap();
+        for (client_id, expires_at) in [
+            ("stale-with-token", Utc::now() + Duration::days(1)),
+            ("idle-with-expired-token", Utc::now() - Duration::days(1)),
+        ] {
+            store
+                .create_refresh_token(&OAuthToken {
+                    signature: format!("refresh-{client_id}"),
+                    client_id: client_id.to_owned(),
+                    subject: "person@example.com".to_owned(),
+                    scopes: vec!["read".to_owned()],
+                    expires_at,
+                    request_id: String::new(),
+                    active: true,
+                    first_issued_at: None,
+                })
+                .await
+                .unwrap();
+        }
+
+        store.cleanup_expired().await.unwrap();
+        let mut remaining = query_scalar::<_, String>("SELECT id FROM oauth_clients ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        remaining.sort();
+        assert_eq!(remaining, ["fresh", "recently-used", "stale-with-token", "tallyo-web"]);
+    }
 
     use super::{
         ERR_ALREADY_USED, ERR_EXPIRED, ERR_INVALID_CODE, ERR_TOO_MANY_ATTEMPTS, EmailOtpUpdate, LoginSession, Store,
@@ -207,6 +329,7 @@ mod tests {
             pkce_verifier: String::new(),
             webauthn_session: String::new(),
             purpose: String::new(),
+            browser_binding: String::new(),
         }
     }
 
@@ -367,6 +490,7 @@ mod tests {
                 expires_at,
                 request_id: String::new(),
                 active: true,
+                first_issued_at: None,
             };
             store.create_access_token(&token).await.unwrap();
             store

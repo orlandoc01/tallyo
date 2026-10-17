@@ -299,6 +299,7 @@ impl Service {
                 pkce_verifier: String::new(),
                 webauthn_session: String::new(),
                 purpose: purpose.to_owned(),
+                browser_binding: String::new(),
             })
             .await?;
         let token = random_token(32);
@@ -472,7 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn keeps_the_environment_master_password_across_auth_updates() {
-        let env_password = MasterPassword::try_from("env-password".to_owned()).unwrap();
+        let env_password = MasterPassword::try_from("env-password-sixteen".to_owned()).unwrap();
         let service = service(AuthSettings {
             master_password: Some(env_password.clone()),
             master_password_from_env: true,
@@ -481,7 +482,7 @@ mod tests {
         .await;
         let apply = service
             .prepare_auth_settings(AuthSettings {
-                master_password: Some(MasterPassword::try_from("configured".to_owned()).unwrap()),
+                master_password: Some(MasterPassword::try_from("configured-sixteen!".to_owned()).unwrap()),
                 master_password_from_env: true,
                 ..auth_settings()
             })
@@ -497,12 +498,12 @@ mod tests {
         for (password, from_env, expected) in [
             (None, false, MasterPasswordStatus::Disabled),
             (
-                Some(MasterPassword::try_from("password".to_owned()).unwrap()),
+                Some(MasterPassword::try_from("password-sixteen!".to_owned()).unwrap()),
                 false,
                 MasterPasswordStatus::Enabled,
             ),
             (
-                Some(MasterPassword::try_from("password".to_owned()).unwrap()),
+                Some(MasterPassword::try_from("password-sixteen!".to_owned()).unwrap()),
                 true,
                 MasterPasswordStatus::EnvVarOverride,
             ),

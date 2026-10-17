@@ -105,7 +105,7 @@ async fn simplefin_connection_syncs_through_the_http_client() -> Result<()> {
         },
     )
     .await?;
-    let adapter = SimpleFinSyncAdapter::with_client(pool, SimpleFinClient::new()?);
+    let adapter = SimpleFinSyncAdapter::with_client(pool, SimpleFinClient::unrestricted()?);
     let sink = RecordingSink {
         now: Utc.with_ymd_and_hms(2026, 9, 6, 12, 0, 0).unwrap(),
         events: Mutex::new(Vec::new()),
@@ -198,7 +198,7 @@ async fn simplefin_due_sync_continues_after_an_invalid_token_and_accepts_partial
         now,
         events: Mutex::new(Vec::new()),
     });
-    let adapter = SimpleFinSyncAdapter::with_client(pool.clone(), SimpleFinClient::new()?);
+    let adapter = SimpleFinSyncAdapter::with_client(pool.clone(), SimpleFinClient::unrestricted()?);
 
     adapter.sync_due(sink.clone()).await?;
 

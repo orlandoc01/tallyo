@@ -139,7 +139,7 @@ fn resolver(pool: SqlitePool) -> Resolver {
         }),
         simplefin: Arc::new(SimpleFinService {
             pool: pool.clone(),
-            client: SimpleFinClient::new().unwrap(),
+            client: SimpleFinClient::unrestricted().unwrap(),
             events,
         }),
         admin: Arc::new(AdminService::new(pool.clone(), manager)),
@@ -231,6 +231,30 @@ async fn protected_routes_reject_anonymous_requests() {
             "Bearer resource_metadata=\"https://tallyo.test/.well-known/oauth-protected-resource\""
         );
     }
+}
+
+#[tokio::test]
+async fn repeated_unauthorized_requests_are_throttled_per_address() {
+    let fixture = Fixture::new(Settings::default()).await;
+    for _ in 0..super::UNAUTHORIZED_LIMIT {
+        let response = fixture
+            .send(get("/query").header("Authorization", "Bearer expired"))
+            .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let response = fixture.send(get("/query").header("X-API-Key", "wrong-guess")).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+    let response = fixture.send(get("/query").header("X-API-Key", "wrong-guess")).await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let response = fixture.send(post("/mcp").header("X-API-Key", "wrong-guess")).await;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+
+    let response = fixture
+        .send(get("/query").header("Authorization", "Bearer expired"))
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let response = fixture.send(fixture.authorized(get("/playground"), &[])).await;
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]

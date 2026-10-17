@@ -141,7 +141,10 @@ async fn simplefin_skipped_non_usd_accounts_are_noted_in_connection_health() -> 
     create_simple_fin_access_token(&pool, &access_url(&server), owner.id, "Bank").await?;
     let syncer = Syncer::new(
         pool.clone(),
-        vec![Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?))],
+        vec![Box::new(SimpleFinSync::new(
+            pool.clone(),
+            SimpleFinClient::unrestricted()?,
+        ))],
     );
     let health = || async {
         sqlx::query_as::<_, (String, Option<String>)>(
@@ -206,7 +209,7 @@ async fn simplefin_fetch_failures_record_sanitized_item_errors_and_audit_logs() 
         pool.clone(),
         vec![
             Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
         ],
     ));
 
@@ -690,7 +693,7 @@ async fn categorizes_staged_transactions_with_ollama() -> Result<()> {
         pool.clone(),
         vec![
             Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
         ],
     ));
     let cancel = CancellationToken::new();
@@ -750,7 +753,7 @@ async fn disabling_llm_clears_staged_transactions() -> Result<()> {
         pool.clone(),
         vec![
             Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
         ],
     );
 
@@ -773,7 +776,7 @@ async fn plaid_syncer(pool: &sqlx::SqlitePool, server: &MockServer) -> Result<Sy
                 pool.clone(),
                 PlaidClientFactory::with_base_url(pool.clone(), server.uri()),
             )),
-            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+            Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
         ],
     ))
 }

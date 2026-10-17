@@ -25,7 +25,7 @@ fn config(db_path: PathBuf, port: u16, sync_off: bool) -> Config {
         sync_off,
         authorization: Authorization {
             disable_all_auth: false,
-            master_password: Some(MasterPassword::try_from("secret".to_owned()).unwrap()),
+            master_password: Some(MasterPassword::try_from("secret-sixteen-chars".to_owned()).unwrap()),
         },
     }
 }

@@ -1,11 +1,11 @@
-use std::{future::Future, pin::Pin};
-
 use axum::{
     extract::Request,
     http::header::{CONTENT_SECURITY_POLICY, HeaderName, HeaderValue, REFERRER_POLICY, STRICT_TRANSPORT_SECURITY},
     middleware::Next,
     response::Response,
 };
+
+use crate::utils::future::BoxFuture;
 
 const X_FRAME_OPTIONS: HeaderName = HeaderName::from_static("x-frame-options");
 const X_CONTENT_TYPE_OPTIONS: HeaderName = HeaderName::from_static("x-content-type-options");
@@ -14,7 +14,7 @@ const X_XSS_PROTECTION: HeaderName = HeaderName::from_static("x-xss-protection")
 pub fn security_headers(
     enable_hsts: bool,
     csp: Option<String>,
-) -> impl Fn(Request, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Clone {
+) -> impl Fn(Request, Next) -> BoxFuture<'static, Response> + Clone {
     let csp = csp.and_then(|value| match HeaderValue::from_str(&value) {
         Ok(value) => Some(value),
         Err(error) => {

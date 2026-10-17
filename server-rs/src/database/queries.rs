@@ -7506,9 +7506,9 @@ pub async fn save_signing_key_pem<'e>(
     q.execute(executor).await.map(|_| ())
 }
 pub const CREATE_LOGIN_SESSION: &str = r"INSERT INTO login_sessions (
-  id, client_id, redirect_uri, state, code_challenge, code_challenge_method, scopes, callback_state, expires_at, purpose
+  id, client_id, redirect_uri, state, code_challenge, code_challenge_method, scopes, callback_state, expires_at, purpose, browser_binding
 ) VALUES (
-  ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+  ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11
 )";
 #[derive(Debug, Clone, Default)]
 pub struct CreateLoginSessionParams<'a> {
@@ -7522,6 +7522,7 @@ pub struct CreateLoginSessionParams<'a> {
     pub callback_state: &'a str,
     pub expires_at: crate::database::Timestamp,
     pub purpose: Option<&'a str>,
+    pub browser_binding: Option<&'a str>,
 }
 pub async fn create_login_session<'e>(
     executor: impl sqlx::Executor<'e, Database = sqlx::Sqlite>,
@@ -7538,6 +7539,7 @@ pub async fn create_login_session<'e>(
     let q = q.bind(params.callback_state);
     let q = q.bind(params.expires_at);
     let q = q.bind(params.purpose);
+    let q = q.bind(params.browser_binding);
     q.execute(executor).await.map(|_| ())
 }
 pub const LOGIN_SESSIONS: &str = r"SELECT
@@ -7559,7 +7561,8 @@ pub const LOGIN_SESSIONS: &str = r"SELECT
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 WHERE
   id = ?1 -- :if $1
@@ -7585,7 +7588,8 @@ pub const LOGIN_SESSIONS_VARIANTS: &[&str] = &[
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 ORDER BY id",
     r"SELECT
@@ -7607,7 +7611,8 @@ ORDER BY id",
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 WHERE
   callback_state = $1
@@ -7631,7 +7636,8 @@ ORDER BY id",
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 WHERE
   id = $1
@@ -7655,7 +7661,8 @@ ORDER BY id",
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 WHERE
   id = $1
@@ -7691,9 +7698,9 @@ static LOGIN_SESSIONS_DYN: std::sync::LazyLock<dynfilter::Compiled> = std::sync:
         dynfilter::Dialect::Sqlite,
         &[1usize, 2usize],
         &[dynfilter::Clause {
-            header: 21usize,
+            header: 22usize,
             connector: dynfilter::Connector::And,
-            items: &[22usize, 23usize],
+            items: &[23usize, 24usize],
         }],
     )
 });
@@ -7723,6 +7730,7 @@ pub struct LoginSessionsRow {
     pub pkce_verifier: String,
     pub webauthn_session: String,
     pub purpose: String,
+    pub browser_binding: String,
 }
 impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for LoginSessionsRow {
     fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
@@ -7746,6 +7754,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for LoginSessionsRow {
             pkce_verifier: sqlx::Row::try_get(row, 16)?,
             webauthn_session: sqlx::Row::try_get(row, 17)?,
             purpose: sqlx::Row::try_get(row, 18)?,
+            browser_binding: sqlx::Row::try_get(row, 19)?,
         })
     }
 }
@@ -7795,6 +7804,27 @@ pub async fn mark_login_session_authenticated<'e>(
 ) -> Result<u64, sqlx::Error> {
     let q = sqlx::query(MARK_LOGIN_SESSION_AUTHENTICATED);
     let q = q.bind(params.subject);
+    let q = q.bind(params.id);
+    let q = q.bind(params.now);
+    q.execute(executor).await.map(|result| result.rows_affected())
+}
+pub const BIND_LOGIN_SESSION: &str = r"UPDATE login_sessions
+SET browser_binding = ?1
+WHERE id = ?2
+  AND browser_binding IS NULL
+  AND expires_at > ?3";
+#[derive(Debug, Clone, Default)]
+pub struct BindLoginSessionParams<'a> {
+    pub browser_binding: Option<&'a str>,
+    pub id: &'a str,
+    pub now: crate::database::Timestamp,
+}
+pub async fn bind_login_session<'e>(
+    executor: impl sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    params: BindLoginSessionParams<'_>,
+) -> Result<u64, sqlx::Error> {
+    let q = sqlx::query(BIND_LOGIN_SESSION);
+    let q = q.bind(params.browser_binding);
     let q = q.bind(params.id);
     let q = q.bind(params.now);
     q.execute(executor).await.map(|result| result.rows_affected())
@@ -7854,7 +7884,8 @@ SET email = ?1,
     email_otp_expires_at = ?3,
     email_otp_attempts = 0,
     email_magic_token = ?4,
-    pkce_verifier = ?5
+    pkce_verifier = ?5,
+    expires_at = ?3
 WHERE id = ?6";
 #[derive(Debug, Clone, Default)]
 pub struct SaveEmailOtpParams<'a> {
@@ -8216,8 +8247,8 @@ pub async fn delete_access_tokens_by_request_id<'e>(
     let q = q.bind(params.request_id);
     q.execute(executor).await.map(|_| ())
 }
-pub const CREATE_REFRESH_TOKEN: &str = r"INSERT INTO oauth_refresh_tokens (signature, client_id, subject, scopes, expires_at, request_id)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+pub const CREATE_REFRESH_TOKEN: &str = r"INSERT INTO oauth_refresh_tokens (signature, client_id, subject, scopes, expires_at, request_id, first_issued_at)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 #[derive(Debug, Clone, Default)]
 pub struct CreateRefreshTokenParams<'a> {
     pub signature: &'a str,
@@ -8226,6 +8257,7 @@ pub struct CreateRefreshTokenParams<'a> {
     pub scopes: Option<&'a str>,
     pub expires_at: crate::database::Timestamp,
     pub request_id: Option<&'a str>,
+    pub first_issued_at: Option<crate::database::Timestamp>,
 }
 pub async fn create_refresh_token<'e>(
     executor: impl sqlx::Executor<'e, Database = sqlx::Sqlite>,
@@ -8238,6 +8270,7 @@ pub async fn create_refresh_token<'e>(
     let q = q.bind(params.scopes);
     let q = q.bind(params.expires_at);
     let q = q.bind(params.request_id);
+    let q = q.bind(params.first_issued_at);
     q.execute(executor).await.map(|_| ())
 }
 pub const REFRESH_TOKEN: &str = r"SELECT
@@ -8246,7 +8279,8 @@ pub const REFRESH_TOKEN: &str = r"SELECT
   COALESCE(scopes, '') AS scopes,
   expires_at,
   COALESCE(request_id, '') AS request_id,
-  active
+  active,
+  COALESCE(first_issued_at, created_at) AS first_issued_at
 FROM oauth_refresh_tokens
 WHERE
   active = 1 -- :if $3
@@ -8259,7 +8293,8 @@ pub const REFRESH_TOKEN_VARIANTS: &[&str] = &[
   COALESCE(scopes, '') AS scopes,
   expires_at,
   COALESCE(request_id, '') AS request_id,
-  active
+  active,
+  COALESCE(first_issued_at, created_at) AS first_issued_at
 FROM oauth_refresh_tokens
 WHERE
   signature = $1
@@ -8270,7 +8305,8 @@ WHERE
   COALESCE(scopes, '') AS scopes,
   expires_at,
   COALESCE(request_id, '') AS request_id,
-  active
+  active,
+  COALESCE(first_issued_at, created_at) AS first_issued_at
 FROM oauth_refresh_tokens
 WHERE
   active = 1
@@ -8296,9 +8332,9 @@ static REFRESH_TOKEN_DYN: std::sync::LazyLock<dynfilter::Compiled> = std::sync::
         dynfilter::Dialect::Sqlite,
         &[1usize, 2usize],
         &[dynfilter::Clause {
-            header: 8usize,
+            header: 9usize,
             connector: dynfilter::Connector::And,
-            items: &[9usize, 10usize, 11usize],
+            items: &[10usize, 11usize, 12usize],
         }],
     )
 });
@@ -8315,6 +8351,7 @@ pub struct RefreshTokenRow {
     pub expires_at: crate::database::Timestamp,
     pub request_id: String,
     pub active: bool,
+    pub first_issued_at: crate::database::Timestamp,
 }
 impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for RefreshTokenRow {
     fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
@@ -8325,6 +8362,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for RefreshTokenRow {
             expires_at: sqlx::Row::try_get(row, 3)?,
             request_id: sqlx::Row::try_get(row, 4)?,
             active: sqlx::Row::try_get(row, 5)?,
+            first_issued_at: sqlx::Row::try_get(row, 6)?,
         })
     }
 }
@@ -8715,6 +8753,47 @@ pub async fn cleanup_expired_web_authn_registrations<'e>(
     params: CleanupExpiredWebAuthnRegistrationsParams,
 ) -> Result<(), sqlx::Error> {
     let q = sqlx::query(CLEANUP_EXPIRED_WEB_AUTHN_REGISTRATIONS);
+    let q = q.bind(params.now);
+    q.execute(executor).await.map(|_| ())
+}
+pub const TOUCH_O_AUTH_CLIENT: &str = r"UPDATE oauth_clients
+SET last_used_at = ?1
+WHERE id = ?2";
+#[derive(Debug, Clone, Default)]
+pub struct TouchOAuthClientParams<'a> {
+    pub now: Option<crate::database::Timestamp>,
+    pub id: &'a str,
+}
+pub async fn touch_o_auth_client<'e>(
+    executor: impl sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    params: TouchOAuthClientParams<'_>,
+) -> Result<(), sqlx::Error> {
+    let q = sqlx::query(TOUCH_O_AUTH_CLIENT);
+    let q = q.bind(params.now);
+    let q = q.bind(params.id);
+    q.execute(executor).await.map(|_| ())
+}
+pub const CLEANUP_STALE_O_AUTH_CLIENTS: &str = r"DELETE FROM oauth_clients
+WHERE oauth_clients.is_preseeded = 0
+  AND COALESCE(oauth_clients.last_used_at, oauth_clients.created_at) < ?1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM oauth_refresh_tokens t
+    WHERE t.client_id = oauth_clients.id
+      AND t.active = 1
+      AND t.expires_at > ?2
+  )";
+#[derive(Debug, Clone, Default)]
+pub struct CleanupStaleOAuthClientsParams {
+    pub before: Option<crate::database::Timestamp>,
+    pub now: crate::database::Timestamp,
+}
+pub async fn cleanup_stale_o_auth_clients<'e>(
+    executor: impl sqlx::Executor<'e, Database = sqlx::Sqlite>,
+    params: CleanupStaleOAuthClientsParams,
+) -> Result<(), sqlx::Error> {
+    let q = sqlx::query(CLEANUP_STALE_O_AUTH_CLIENTS);
+    let q = q.bind(params.before);
     let q = q.bind(params.now);
     q.execute(executor).await.map(|_| ())
 }
@@ -16321,6 +16400,7 @@ pub const QUERIES: &[(&str, &str)] = &[
     ("CreateLoginSession", CREATE_LOGIN_SESSION),
     ("LoginSessions", LOGIN_SESSIONS),
     ("MarkLoginSessionAuthenticated", MARK_LOGIN_SESSION_AUTHENTICATED),
+    ("BindLoginSession", BIND_LOGIN_SESSION),
     ("SaveLoginSessionWebAuthn", SAVE_LOGIN_SESSION_WEB_AUTHN),
     ("ClaimAuthenticatedLoginSession", CLAIM_AUTHENTICATED_LOGIN_SESSION),
     ("DeleteLoginSession", DELETE_LOGIN_SESSION),
@@ -16353,6 +16433,8 @@ pub const QUERIES: &[(&str, &str)] = &[
         "CleanupExpiredWebAuthnRegistrations",
         CLEANUP_EXPIRED_WEB_AUTHN_REGISTRATIONS,
     ),
+    ("TouchOAuthClient", TOUCH_O_AUTH_CLIENT),
+    ("CleanupStaleOAuthClients", CLEANUP_STALE_O_AUTH_CLIENTS),
     ("InsertSnapshotProviderState", INSERT_SNAPSHOT_PROVIDER_STATE),
     (
         "DeleteSnapshotProviderStatesBetweenDates",

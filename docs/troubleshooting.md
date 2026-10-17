@@ -25,7 +25,7 @@ A healthy HTTP process returns `204 No Content` from `/healthz`.
 > `/healthz` is a shallow liveness check. It returns 204 without querying SQLite or any provider. It does not prove that authentication, Plaid, SimpleFIN, reports, background sync, or outbound networking works.
 
 > [!WARNING]
-> Treat logs as sensitive. Provider errors can contain institution/account context, and when email authentication is enabled without an SMTP host, Tallyo deliberately logs the complete OTP email body, including the one-time code and magic link. Redact email addresses, identifiers, callback query strings, and credentials before sharing logs. Do not publish an unredacted `docker compose config`; it can contain resolved environment secrets.
+> Treat logs as sensitive. Provider errors can contain institution/account context. Redact email addresses, identifiers, callback query strings, and credentials before sharing logs. Do not publish an unredacted `docker compose config`; it can contain resolved environment secrets.
 
 ## Startup And Containers
 
@@ -177,10 +177,10 @@ The access token issuer/audience is the configured issuer. Changing the issuer i
 ### Email OTP and magic links
 
 - Only users already present in Tallyo can sign in. The send endpoint intentionally gives the same success-style response for unknown addresses.
-- Codes and magic links expire after 10 minutes. A new-code request is limited to once per 60 seconds, and too many incorrect attempts require starting over.
+- Codes and magic links expire 10 minutes after they are sent. A new-code request is limited to once per 60 seconds, and too many incorrect attempts require starting over.
 - Check SMTP host, port, sender, username, password, outbound DNS, and firewall. Tallyo sends through the lettre SMTP transport with plain authentication over TLS.
-- If SMTP host is blank, Tallyo uses development log delivery and prints the full OTP and magic link to stdout. This is not production mail delivery and makes logs authentication-sensitive.
-- A magic link can open in a new tab because its short-lived PKCE verifier is carried through the server flow. Use the same external hostname so its callback cookie reaches `/auth/callback`.
+- Email sign-in cannot be enabled without an SMTP host. In debug builds without SMTP the message body is logged; release builds log only the recipient and subject.
+- A magic link must be opened in the same browser that started the sign-in: the login session is bound to that browser by the `__Host-tallyo_login` cookie, so a link opened on another device fails with "login session expired". Use the same external hostname so the cookie reaches `/authorize`.
 
 ### Passkeys
 

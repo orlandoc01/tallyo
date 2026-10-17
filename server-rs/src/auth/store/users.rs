@@ -54,21 +54,6 @@ impl Store {
             .next()
             .map(|user| user.email))
     }
-
-    pub async fn update_user_role(&self, id: i64, role: Role) -> Result<()> {
-        let role = role.to_string().to_ascii_lowercase();
-        queries::update_user_role(&self.pool, queries::UpdateUserRoleParams { role: &role, id })
-            .await
-            .context("update user role")
-    }
-
-    pub async fn revoke_user_tokens(&self, subject: &str) -> Result<()> {
-        queries::delete_access_tokens_by_subject(&self.pool, queries::DeleteAccessTokensBySubjectParams { subject })
-            .await?;
-        queries::delete_refresh_tokens_by_subject(&self.pool, queries::DeleteRefreshTokensBySubjectParams { subject })
-            .await?;
-        Ok(())
-    }
 }
 
 impl TryFrom<queries::UsersRow> for User {
@@ -127,7 +112,15 @@ mod tests {
         .unwrap();
         assert!(store.user_role("person@example.com").await.is_err());
         assert!(store.users(Some(user.id), None).await.is_err());
-        store.update_user_role(user.id, Role::Admin).await.unwrap();
+        queries::update_user_role(
+            &pool,
+            queries::UpdateUserRoleParams {
+                role: "admin",
+                id: user.id,
+            },
+        )
+        .await
+        .unwrap();
         let loaded = store.users(Some(user.id), None).await.unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].id, user.id);

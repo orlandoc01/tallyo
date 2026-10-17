@@ -56,7 +56,7 @@ export function EmailChallengePage() {
       if (msg === 'too_many_attempts') {
         setError('Too many incorrect attempts. Please refresh and start over.')
       } else if (msg === 'expired') {
-        setError('Code has expired. Please go back and request a new one.')
+        setError('Your code or sign-in session has expired. Please start over.')
       } else if (msg === 'invalid_code') {
         setError('Incorrect code. Please try again.')
       } else {
@@ -86,7 +86,7 @@ export function EmailChallengePage() {
           {step === 'email'
             ? 'Enter your email address to receive a sign-in code.'
             : otpSent
-              ? `We sent a sign-in link and a code to ${email}. Click the link in the email or enter the code below. Both expire in 10 minutes.`
+              ? `We sent a sign-in link and a code to ${email}. Click the link in the email or enter the code below. The code and link only work in this browser and expire in 10 minutes.`
               : 'Sending code...'}
         </p>
       </div>

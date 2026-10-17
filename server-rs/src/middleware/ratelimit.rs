@@ -1,20 +1,19 @@
 use std::{
     collections::HashMap,
-    future::Future,
     net::{IpAddr, SocketAddr},
-    pin::Pin,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use axum::{
     extract::{Request, connect_info::ConnectInfo},
-    http::StatusCode,
+    http::{HeaderName, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 
 use super::client_ip::{ClientIpResolver, canonicalize_ip};
+use crate::utils::future::BoxFuture;
 
 #[derive(Clone)]
 struct RateLimit {
@@ -29,37 +28,80 @@ struct Window {
     requests: usize,
 }
 
+type Middleware = BoxFuture<'static, Response>;
+
 pub fn rate_limit_with_client_ip(
     request_limit: usize,
     window: Duration,
     resolver: ClientIpResolver,
-) -> impl Fn(Request, Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Clone {
-    let rate_limit = RateLimit {
-        request_limit,
-        window,
-        resolver,
-        windows: Arc::new(Mutex::new(HashMap::new())),
-    };
+) -> impl Fn(Request, Next) -> Middleware + Clone {
+    let rate_limit = RateLimit::new(request_limit, window, resolver);
     move |request, next| {
         let rate_limit = rate_limit.clone();
         Box::pin(async move {
-            if rate_limit.permits(&request) {
-                next.run(request).await
-            } else {
-                (StatusCode::TOO_MANY_REQUESTS, "too many requests").into_response()
+            if !rate_limit.reserve(rate_limit.key(&request)) {
+                return too_many_requests();
             }
+            next.run(request).await
         })
     }
 }
 
+/// Limits per client address, counting only 401 responses to requests that present `credential_header`.
+/// Requests without that header are neither counted nor blocked, so a full bucket cannot lock out
+/// clients authenticating another way from the same address.
+pub fn rate_limit_unauthorized(
+    request_limit: usize,
+    window: Duration,
+    resolver: ClientIpResolver,
+    credential_header: HeaderName,
+) -> impl Fn(Request, Next) -> Middleware + Clone {
+    let rate_limit = RateLimit::new(request_limit, window, resolver);
+    move |request, next| {
+        let rate_limit = rate_limit.clone();
+        let credential_header = credential_header.clone();
+        Box::pin(async move {
+            if !request.headers().contains_key(&credential_header) {
+                return next.run(request).await;
+            }
+            let key = rate_limit.key(&request);
+            if !rate_limit.reserve(key) {
+                return too_many_requests();
+            }
+            let response = next.run(request).await;
+            if response.status() != StatusCode::UNAUTHORIZED {
+                rate_limit.release(key);
+            }
+            response
+        })
+    }
+}
+
+fn too_many_requests() -> Response {
+    (StatusCode::TOO_MANY_REQUESTS, "too many requests").into_response()
+}
+
 impl RateLimit {
-    fn permits(&self, request: &Request) -> bool {
+    fn new(request_limit: usize, window: Duration, resolver: ClientIpResolver) -> Self {
+        Self {
+            request_limit,
+            window,
+            resolver,
+            windows: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn key(&self, request: &Request) -> IpAddr {
         let remote = request
             .extensions()
             .get::<ConnectInfo<SocketAddr>>()
             .map(|address| address.0.ip())
             .unwrap_or(IpAddr::from([0, 0, 0, 0]));
-        let key = canonicalize_ip(self.resolver.client_ip(remote, request.headers()));
+        canonicalize_ip(self.resolver.client_ip(remote, request.headers()))
+    }
+
+    /// Atomically takes one permit from the key's current window; false when the window is full.
+    fn reserve(&self, key: IpAddr) -> bool {
         let now = Instant::now();
         let Ok(mut windows) = self.windows.lock() else {
             return false;
@@ -70,8 +112,19 @@ impl RateLimit {
             started: now,
             requests: 0,
         });
+        if window.requests >= self.request_limit {
+            return false;
+        }
         window.requests += 1;
-        window.requests <= self.request_limit
+        true
+    }
+
+    fn release(&self, key: IpAddr) {
+        if let Ok(mut windows) = self.windows.lock()
+            && let Some(window) = windows.get_mut(&key)
+        {
+            window.requests = window.requests.saturating_sub(1);
+        }
     }
 }
 
@@ -82,14 +135,113 @@ mod tests {
     use axum::{
         Router,
         extract::connect_info::ConnectInfo,
-        http::{HeaderValue, Request as HttpRequest, StatusCode},
+        http::{HeaderName, HeaderValue, Request as HttpRequest, StatusCode},
         middleware,
         routing::get,
     };
     use tower::ServiceExt;
 
-    use super::rate_limit_with_client_ip;
+    use super::{rate_limit_unauthorized, rate_limit_with_client_ip};
     use crate::middleware::{client_ip::ClientIpResolver, logging::request_logger, security::security_headers};
+
+    #[tokio::test]
+    async fn unauthorized_limiter_counts_only_rejected_credential_requests() {
+        let app = Router::new()
+            .route("/ok", get(|| async { StatusCode::NO_CONTENT }))
+            .route("/denied", get(|| async { StatusCode::UNAUTHORIZED }))
+            .layer(middleware::from_fn(rate_limit_unauthorized(
+                2,
+                std::time::Duration::from_secs(60),
+                ClientIpResolver::new(&[]).unwrap(),
+                HeaderName::from_static("x-api-key"),
+            )));
+        let get = |uri: &str, key: bool| {
+            let request = HttpRequest::builder().uri(uri);
+            let request = if key { request.header("X-API-Key", "guess") } else { request };
+            request.body(axum::body::Body::empty()).unwrap()
+        };
+        for _ in 0..3 {
+            assert_eq!(
+                app.clone().oneshot(get("/ok", true)).await.unwrap().status(),
+                StatusCode::NO_CONTENT
+            );
+            assert_eq!(
+                app.clone().oneshot(get("/denied", false)).await.unwrap().status(),
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        for _ in 0..2 {
+            assert_eq!(
+                app.clone().oneshot(get("/denied", true)).await.unwrap().status(),
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        assert_eq!(
+            app.clone().oneshot(get("/denied", true)).await.unwrap().status(),
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        assert_eq!(
+            app.clone().oneshot(get("/ok", true)).await.unwrap().status(),
+            StatusCode::TOO_MANY_REQUESTS
+        );
+        assert_eq!(
+            app.oneshot(get("/denied", false)).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_bursts_cannot_exceed_the_limit() {
+        let app = Router::new()
+            .route(
+                "/",
+                get(|| async {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    StatusCode::UNAUTHORIZED
+                }),
+            )
+            .layer(middleware::from_fn(rate_limit_unauthorized(
+                3,
+                std::time::Duration::from_secs(60),
+                ClientIpResolver::new(&[]).unwrap(),
+                HeaderName::from_static("x-api-key"),
+            )));
+        let requests = (0..10)
+            .map(|_| {
+                let app = app.clone();
+                tokio::spawn(async move {
+                    app.oneshot(
+                        HttpRequest::builder()
+                            .uri("/")
+                            .header("X-API-Key", "guess")
+                            .body(axum::body::Body::empty())
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap()
+                    .status()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut statuses = Vec::new();
+        for request in requests {
+            statuses.push(request.await.unwrap());
+        }
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|status| **status == StatusCode::UNAUTHORIZED)
+                .count(),
+            3
+        );
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|status| **status == StatusCode::TOO_MANY_REQUESTS)
+                .count(),
+            7
+        );
+    }
 
     #[tokio::test]
     async fn limits_trusted_forwarded_clients_but_not_untrusted_headers() {

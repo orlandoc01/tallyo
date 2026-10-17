@@ -4,7 +4,7 @@ import { getApiBaseUrl } from '../utils/apiUrl'
 import { markActivity } from '../hooks/useIdleTimeout'
 
 export const PKCE_VERIFIER_KEY = 'tallyo-pkce-verifier'
-const STATE_KEY = 'tallyo-oauth-state'
+export const STATE_KEY = 'tallyo-oauth-state'
 
 /**
  * Starts the OAuth authorization-code + PKCE flow by navigating to the server
@@ -39,17 +39,16 @@ export async function completeOAuthCallback(search: string) {
   const code = params.get('code')
   const state = params.get('state')
 
-  // Magic link flow: verifier arrives via a short-lived cookie set by the server.
-  // Normal flow: verifier is in localStorage from when the auth was initiated.
+  // Invite links: the server-held verifier arrives via a short-lived cookie and the session carries no state,
+  // so a stale state left by an abandoned login must not block it. Every flow this browser started carries
+  // state and must match the stored one.
   const cookieVerifier = getCookieVerifier()
+  const inviteCallback = state === null && cookieVerifier !== null
+  if (inviteCallback) localStorage.removeItem(STATE_KEY)
   const verifier = cookieVerifier ?? localStorage.getItem(PKCE_VERIFIER_KEY)
   const expectedState = localStorage.getItem(STATE_KEY)
 
-  if (!code || !state || !verifier) {
-    throw new Error('Invalid OAuth callback state')
-  }
-  // Only enforce state match for non-magic-link flows; the magic token already verified identity.
-  if (!cookieVerifier && state !== expectedState) {
+  if (!code || !verifier || state !== expectedState) {
     throw new Error('Invalid OAuth callback state')
   }
 

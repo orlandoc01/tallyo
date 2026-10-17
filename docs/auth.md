@@ -107,16 +107,17 @@ Enable **Email Sign-In** and configure:
 
 | Field | Purpose |
 |---|---|
-| SMTP host | Mail server hostname; leaving it empty selects development log delivery |
+| SMTP host | Mail server hostname; required while email sign-in is enabled |
 | SMTP port | SMTP port; the setup wizard initially suggests `587` |
 | SMTP from | Envelope sender and `From` address |
 | SMTP username | SMTP authentication username |
 | SMTP password | SMTP authentication password |
 
 Each sign-in email contains both a six-digit code and a one-time magic link.
-Both expire after 10 minutes. A user must wait 60 seconds before requesting a
-replacement, and an OTP is limited to five verification attempts. A consumed
-magic link cannot be reused.
+Both expire after 10 minutes and must be used in the browser that started the
+sign-in; the login session is bound to that browser with an `HttpOnly` cookie. A user must wait 60 seconds before requesting a replacement, and an OTP
+is limited to five verification attempts. A consumed magic link cannot be
+reused.
 
 Email sign-in also requires the address to exist in Tallyo. Requests for an
 unknown address return a generic success response to avoid disclosing the user

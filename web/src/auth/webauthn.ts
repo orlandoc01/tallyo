@@ -1,11 +1,10 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/browser'
-import { PKCE_VERIFIER_KEY, completeOAuthCallback, locationAssigner } from './oauth'
+import { PKCE_VERIFIER_KEY, STATE_KEY, completeOAuthCallback, locationAssigner } from './oauth'
 import { authorizedFetch } from './tokenStore'
 import { getApiBaseUrl } from '../utils/apiUrl'
 import { pkceChallenge, randomString } from './pkce'
 
-const OAUTH_STATE_KEY = 'tallyo-oauth-state'
 
 type WrappedCreationOptions = { publicKey: PublicKeyCredentialCreationOptionsJSON }
 type WrappedRequestOptions = { publicKey: PublicKeyCredentialRequestOptionsJSON }
@@ -21,7 +20,7 @@ export async function beginPasskeyOAuthLogin() {
   const verifier = randomString(48)
   const state = randomString(24)
   localStorage.setItem(PKCE_VERIFIER_KEY, verifier)
-  localStorage.setItem(OAUTH_STATE_KEY, state)
+  localStorage.setItem(STATE_KEY, state)
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -37,7 +36,7 @@ export async function beginPasskeyOAuthLogin() {
   const res = await fetch(`${getApiBaseUrl()}/authorize?${params.toString()}`)
   if (!res.ok) {
     localStorage.removeItem(PKCE_VERIFIER_KEY)
-    localStorage.removeItem(OAUTH_STATE_KEY)
+    localStorage.removeItem(STATE_KEY)
     throw new Error(await res.text() || 'Failed to start passkey login')
   }
   const { login_session_id: loginSessionId } = await res.json() as { login_session_id: string }

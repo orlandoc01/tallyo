@@ -160,7 +160,7 @@ mod tests {
                 auth: Some(SectionPatch {
                     enabled: true,
                     fields: AuthConfig {
-                        master_password: Some("password".to_owned()),
+                        master_password: Some("password-sixteen!".to_owned()),
                         ..Default::default()
                     },
                 }),

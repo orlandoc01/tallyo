@@ -44,9 +44,9 @@ VALUES ('primary', 'ES256', @private_pem, @public_pem);
 -- Used by internal/auth's authorize endpoint to create a login session at the start of every OAuth/OIDC login (Google, email OTP/magic link, WebAuthn).
 -- name: CreateLoginSession :exec
 INSERT INTO login_sessions (
-  id, client_id, redirect_uri, state, code_challenge, code_challenge_method, scopes, callback_state, expires_at, purpose
+  id, client_id, redirect_uri, state, code_challenge, code_challenge_method, scopes, callback_state, expires_at, purpose, browser_binding
 ) VALUES (
-  @id, @client_id, @redirect_uri, @state, @code_challenge, @code_challenge_method, @scopes, @callback_state, @expires_at, @purpose
+  @id, @client_id, @redirect_uri, @state, @code_challenge, @code_challenge_method, @scopes, @callback_state, @expires_at, @purpose, @browser_binding
 );
 
 -- Used throughout internal/auth's login handlers to look up a login session by ID or callback state.
@@ -70,7 +70,8 @@ SELECT
   COALESCE(email_magic_token, '') AS email_magic_token,
   COALESCE(pkce_verifier, '') AS pkce_verifier,
   COALESCE(webauthn_session, '') AS webauthn_session,
-  COALESCE(purpose, '') AS purpose
+  COALESCE(purpose, '') AS purpose,
+  COALESCE(browser_binding, '') AS browser_binding
 FROM login_sessions
 WHERE
   id = @id -- :if @id
@@ -84,6 +85,14 @@ SET subject = @subject,
     authenticated = 1
 WHERE id = @id
   AND authenticated = 0
+  AND expires_at > @now;
+
+-- Binds a server-created (invite) login session to the first browser that opens its magic link.
+-- name: BindLoginSession :execrows
+UPDATE login_sessions
+SET browser_binding = @browser_binding
+WHERE id = @id
+  AND browser_binding IS NULL
   AND expires_at > @now;
 
 -- Used by internal/auth's WebAuthn login-begin handler to persist the ceremony challenge/session JSON on the login session.
@@ -112,7 +121,8 @@ SET email = @email,
     email_otp_expires_at = @email_otp_expires_at,
     email_otp_attempts = 0,
     email_magic_token = @email_magic_token,
-    pkce_verifier = @pkce_verifier
+    pkce_verifier = @pkce_verifier,
+    expires_at = @email_otp_expires_at
 WHERE id = @id;
 
 -- Used by internal/auth's VerifyEmailOTP to track failed attempts and enforce the OTP retry limit.
@@ -190,8 +200,8 @@ WHERE request_id = @request_id;
 
 -- Used by internal/auth's Fosite refresh-token store to persist a new refresh token at the token endpoint.
 -- name: CreateRefreshToken :exec
-INSERT INTO oauth_refresh_tokens (signature, client_id, subject, scopes, expires_at, request_id)
-VALUES (@signature, @client_id, @subject, @scopes, @expires_at, @request_id);
+INSERT INTO oauth_refresh_tokens (signature, client_id, subject, scopes, expires_at, request_id, first_issued_at)
+VALUES (@signature, @client_id, @subject, @scopes, @expires_at, @request_id, @first_issued_at);
 
 -- Used by internal/auth's Store.RefreshToken for Fosite refresh-token lookups, optionally requiring the token to still be active.
 -- name: RefreshToken :one
@@ -201,7 +211,8 @@ SELECT
   COALESCE(scopes, '') AS scopes,
   expires_at,
   COALESCE(request_id, '') AS request_id,
-  active
+  active,
+  COALESCE(first_issued_at, created_at) AS first_issued_at
 FROM oauth_refresh_tokens
 WHERE
   active = 1 -- :flag @active_only
@@ -288,3 +299,22 @@ WHERE expires_at < @now;
 -- name: CleanupExpiredWebAuthnRegistrations :exec
 DELETE FROM webauthn_registrations
 WHERE expires_at < @now;
+
+-- Records that a client started an authorization or exchanged a token, so idle-client cleanup spares it.
+-- name: TouchOAuthClient :exec
+UPDATE oauth_clients
+SET last_used_at = @now
+WHERE id = @id;
+
+-- Used by the periodic cleanup to drop dynamically registered clients that hold no live refresh token and have been idle since @before.
+-- name: CleanupStaleOAuthClients :exec
+DELETE FROM oauth_clients
+WHERE oauth_clients.is_preseeded = 0
+  AND COALESCE(oauth_clients.last_used_at, oauth_clients.created_at) < @before
+  AND NOT EXISTS (
+    SELECT 1
+    FROM oauth_refresh_tokens t
+    WHERE t.client_id = oauth_clients.id
+      AND t.active = 1
+      AND t.expires_at > @now
+  );

@@ -1,4 +1,5 @@
 mod authorize;
+mod binding;
 mod identity_provider;
 mod metadata;
 mod token;
@@ -48,6 +49,7 @@ pub fn router(service: Arc<Service>) -> Router {
         .merge(
             Router::new()
                 .route("/token", post(token::exchange))
+                .route("/auth/logout", post(token::logout))
                 .route_layer(middleware::from_fn(token_limiter))
                 .route_layer(DefaultBodyLimit::max(MAX_AUTH_REQUEST_BODY))
                 .route_layer(middleware::from_fn_with_state(Arc::clone(&service), require_oauth)),

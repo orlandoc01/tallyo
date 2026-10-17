@@ -3,12 +3,14 @@ use std::sync::Arc;
 use axum::{
     body::Body,
     extract::{Request, State},
-    http::{HeaderValue, Method, StatusCode},
+    http::{HeaderName, HeaderValue, Method, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 
 use super::{ALL_SCOPES, Identity, Service, roles::parse_scopes};
+
+pub const API_KEY_HEADER: HeaderName = HeaderName::from_static("x-api-key");
 
 pub async fn protect(State(service): State<Arc<Service>>, request: Request, next: Next) -> Response {
     protect_resource(service, request, next, "/.well-known/oauth-protected-resource").await
@@ -28,7 +30,7 @@ async fn protect_resource(service: Arc<Service>, mut request: Request, next: Nex
     let master_password = service.master_password().and_then(|password| {
         request
             .headers()
-            .get("X-API-Key")
+            .get(&API_KEY_HEADER)
             .is_some_and(|value| subtle::ConstantTimeEq::ct_eq(value.as_bytes(), password.as_str().as_bytes()).into())
             .then_some(password)
     });

@@ -43,6 +43,18 @@ impl Store {
         .context("save oauth client")
     }
 
+    pub async fn touch_client(&self, id: &str) -> Result<()> {
+        queries::touch_o_auth_client(
+            &self.pool,
+            queries::TouchOAuthClientParams {
+                now: Some(chrono::Utc::now().into()),
+                id,
+            },
+        )
+        .await
+        .context("touch oauth client")
+    }
+
     pub async fn client(&self, id: &str) -> Result<Option<OAuthClient>> {
         queries::o_auth_client_opt(&self.pool, queries::OAuthClientParams { id })
             .await?

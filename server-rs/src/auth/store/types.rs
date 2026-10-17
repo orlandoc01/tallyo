@@ -47,4 +47,6 @@ pub struct OAuthToken {
     pub expires_at: DateTime<Utc>,
     pub request_id: String,
     pub active: bool,
+    /// Issue time of the first refresh token in this rotation chain; `None` on access tokens.
+    pub first_issued_at: Option<DateTime<Utc>>,
 }

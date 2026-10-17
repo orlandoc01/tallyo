@@ -89,6 +89,9 @@ fn validate_patch(patch: &mut Patch) -> Result<()> {
     if let Some(security) = patch.security.as_ref() {
         security.fields.validate(security.enabled)?;
     }
+    if let Some(email) = patch.email.as_ref() {
+        email.fields.validate(email.enabled)?;
+    }
     Ok(())
 }
 

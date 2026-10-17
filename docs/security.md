@@ -7,6 +7,9 @@ Tallyo stores financial account data, Plaid access tokens, OAuth refresh tokens,
 - Complete setup with a strong `MASTER_PASSWORD` or with Google Sign-In, email OTP/magic links, or passkeys enabled.
 - `MASTER_PASSWORD` is a valid standalone self-hosted auth method. It grants all scopes when used as `X-API-Key`, so store it like an admin credential and prefer a long random value.
 - `DISABLE_ALL_AUTH=true` is for local development only. Startup rejects it when the configured OAuth issuer is not `http://localhost` or another loopback HTTP URL.
+- Every browser login session is bound to the browser that started it with an `HttpOnly` cookie (`__Host-tallyo_login`). Email codes, magic links, Google and passkey sign-in must finish in that same browser (within two minutes of starting, or within the 10-minute code window once an email has been sent); a magic link opened on another device no longer works. Invite links bind to the first browser that opens them.
+- Signing out calls `POST /auth/logout`, which revokes the refresh-token chain server-side. Changing a user's role revokes all of that user's tokens, and a refresh-token chain cannot be rotated for longer than 30 days.
+- Email sign-in requires an SMTP host; without SMTP the server logs only the recipient and subject of each message, never the code or link.
 
 ## Network Boundary
 

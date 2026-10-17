@@ -1,9 +1,9 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
     extract::{Path, Query, Request, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, patch, post},
@@ -12,16 +12,17 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use webauthn_rs_core::proto::PublicKeyCredential;
 
-use super::{MAX_AUTH_REQUEST_BODY, json_response};
+use super::{MAX_AUTH_REQUEST_BODY, binding::bound_login_session, json_response};
 use crate::auth::{
     Identity, Service, WebAuthnCredential,
     middleware::{protect, require_oauth},
     webauthn::WebAuthnError,
 };
+use crate::utils::future::BoxFuture;
 
 pub(super) fn routes<F>(service: Arc<Service>, limiter: F) -> Router<Arc<Service>>
 where
-    F: Fn(Request, middleware::Next) -> Pin<Box<dyn Future<Output = Response> + Send>> + Clone + Send + Sync + 'static,
+    F: Fn(Request, middleware::Next) -> BoxFuture<'static, Response> + Clone + Send + Sync + 'static,
 {
     Router::new()
         .merge(
@@ -215,6 +216,7 @@ async fn delete_credential(
 
 async fn login_begin(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     request: Result<Json<LoginBeginRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if let Some(response) = webauthn_or_404(&service) {
@@ -224,6 +226,9 @@ async fn login_begin(
         Ok(Json(request)) if !request.login_session_id.is_empty() => request,
         _ => return (StatusCode::BAD_REQUEST, "login session not found or expired").into_response(),
     };
+    if let Err(error) = bound_login_session(&service, &request.login_session_id, &headers).await {
+        return error.into_response();
+    }
     match crate::auth::webauthn::begin_login(&service, &request.login_session_id).await {
         Ok(options) => json_response(StatusCode::OK, options),
         Err(WebAuthnError::Expired) => (StatusCode::BAD_REQUEST, "login session not found or expired").into_response(),
@@ -240,6 +245,7 @@ async fn login_begin(
 
 async fn login_finish(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     request: Result<Json<LoginFinishRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if let Some(response) = webauthn_or_404(&service) {
@@ -249,6 +255,9 @@ async fn login_finish(
         Ok(Json(request)) if !request.login_session_id.is_empty() => request,
         _ => return (StatusCode::BAD_REQUEST, "login session not found or expired").into_response(),
     };
+    if let Err(error) = bound_login_session(&service, &request.login_session_id, &headers).await {
+        return error.into_response();
+    }
     match crate::auth::webauthn::finish_login(&service, &request.login_session_id, request.assertion).await {
         Ok(redirect_url) => json_response(StatusCode::OK, serde_json::json!({"redirect_url": redirect_url})),
         Err(WebAuthnError::Expired) => (StatusCode::BAD_REQUEST, "login session not found or expired").into_response(),

@@ -9,14 +9,21 @@ use chrono::Utc;
 use serde::Deserialize;
 use url::Url;
 
-use super::{json_response, oauth_error, public_json};
+use super::{
+    binding::{Binding, bound_login_session, login_session_expired},
+    json_response, oauth_error, public_json,
+};
 use crate::auth::store::split_scopes;
 use crate::auth::{
-    AuthCode, CLIENT_ALLOWED_SCOPES, LoginSession, OAuthClient, Service, granted_scopes_for_role, random_token,
+    AuthCode, CLIENT_ALLOWED_SCOPES, LOGIN_SESSION_LIFETIME, LoginSession, OAuthClient, Service,
+    granted_scopes_for_role, random_token,
 };
 use crate::schema::Role;
 
-const AUTHORIZE_LIFETIME: chrono::TimeDelta = chrono::TimeDelta::seconds(600);
+const AUTH_CODE_LIFETIME: chrono::TimeDelta = chrono::TimeDelta::seconds(60);
+const MAX_REDIRECT_URIS: usize = 10;
+const MAX_REDIRECT_URI_BYTES: usize = 512;
+const MAX_CLIENT_NAME_BYTES: usize = 256;
 const INVALID_REQUEST: &str = "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.";
 const INVALID_CLIENT: &str = "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).";
 const INVALID_SCOPE: &str = "The requested scope is invalid, unknown, or malformed.";
@@ -65,7 +72,7 @@ pub(super) async fn authorize(
     headers: HeaderMap,
 ) -> Response {
     if let Some(session_id) = request.session_id.filter(|id| !id.is_empty()) {
-        return complete_authorize(&service, &session_id, false, accepts_json(&headers)).await;
+        return complete_authorize(&service, &session_id, false, &headers).await;
     }
 
     let client = match service
@@ -117,6 +124,7 @@ pub(super) async fn authorize(
         return authorize_error(&redirect_uri, request.state.as_deref(), error, description);
     }
 
+    let binding = Binding::generate();
     let session = LoginSession {
         id: random_token(16),
         client_id: client.id,
@@ -128,7 +136,7 @@ pub(super) async fn authorize(
         callback_state: random_token(24),
         subject: String::new(),
         authenticated: false,
-        expires_at: (Utc::now() + AUTHORIZE_LIFETIME).into(),
+        expires_at: (Utc::now() + LOGIN_SESSION_LIFETIME).into(),
         email: String::new(),
         email_otp: String::new(),
         email_otp_expires_at: None,
@@ -137,11 +145,15 @@ pub(super) async fn authorize(
         pkce_verifier: String::new(),
         webauthn_session: String::new(),
         purpose: String::new(),
+        browser_binding: binding.signature(),
     };
     if service.store().create_login_session(&session).await.is_err() {
         return (StatusCode::INTERNAL_SERVER_ERROR, "save login session").into_response();
     }
-    match request.auth_method.as_deref() {
+    if let Err(error) = service.store().touch_client(&session.client_id).await {
+        tracing::warn!(%error, "touch oauth client");
+    }
+    let response = match request.auth_method.as_deref() {
         Some("email") if !service.email_enabled() => {
             (StatusCode::BAD_REQUEST, "email auth is not enabled").into_response()
         }
@@ -168,7 +180,8 @@ pub(super) async fn authorize(
             service.issuer_url(),
             session.id
         )),
-    }
+    };
+    binding.attach(response, &service)
 }
 
 pub(super) async fn consent_form(
@@ -206,7 +219,7 @@ pub(super) async fn consent(
         Err(_) => return (StatusCode::BAD_REQUEST, "invalid form").into_response(),
     };
     if consent.consent.as_deref() == Some("allow") {
-        return complete_authorize(&service, &consent.session_id, true, accepts_json(&headers)).await;
+        return complete_authorize(&service, &consent.session_id, true, &headers).await;
     }
     deny_authorize(&service, &consent.session_id).await
 }
@@ -223,6 +236,12 @@ pub(super) async fn register(
         Err(_) => return (StatusCode::BAD_REQUEST, "invalid registration").into_response(),
     };
     if request.redirect_uris.is_empty()
+        || request.redirect_uris.len() > MAX_REDIRECT_URIS
+        || request
+            .redirect_uris
+            .iter()
+            .any(|uri| uri.len() > MAX_REDIRECT_URI_BYTES)
+        || request.client_name.len() > MAX_CLIENT_NAME_BYTES
         || (!request.token_endpoint_auth_method.is_empty() && request.token_endpoint_auth_method != "none")
     {
         return (StatusCode::BAD_REQUEST, "invalid registration").into_response();
@@ -276,12 +295,13 @@ pub(super) async fn complete_authorize(
     service: &Service,
     session_id: &str,
     consent_approved: bool,
-    wants_json: bool,
+    headers: &HeaderMap,
 ) -> Response {
-    let session = match service.store().login_session_by_id(session_id).await {
-        Ok(Some(session)) if session.authenticated && session.expires_at() > Utc::now() => session,
-        Ok(_) => return (StatusCode::BAD_REQUEST, "login session expired").into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "load login session").into_response(),
+    let wants_json = accepts_json(headers);
+    let session = match bound_login_session(service, session_id, headers).await {
+        Ok(session) if session.authenticated => session,
+        Ok(_) => return login_session_expired(),
+        Err(error) => return error.into_response(),
     };
     let client = match service.store().client(&session.client_id).await {
         Ok(Some(client)) => client,
@@ -300,7 +320,7 @@ pub(super) async fn complete_authorize(
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "claim login session").into_response(),
     };
     if !claimed {
-        return (StatusCode::BAD_REQUEST, "login session expired").into_response();
+        return login_session_expired();
     }
     let code = random_token(32);
     let auth_code = AuthCode {
@@ -310,7 +330,7 @@ pub(super) async fn complete_authorize(
         redirect_uri: session.redirect_uri.clone(),
         code_challenge: session.code_challenge.clone(),
         code_challenge_method: session.code_challenge_method.clone(),
-        expires_at: (Utc::now() + AUTHORIZE_LIFETIME).into(),
+        expires_at: (Utc::now() + AUTH_CODE_LIFETIME).into(),
         active: true,
     };
     if service.store().create_auth_code(&code, &auth_code).await.is_err() {

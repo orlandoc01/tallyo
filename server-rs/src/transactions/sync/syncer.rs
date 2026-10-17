@@ -334,7 +334,7 @@ mod tests {
             pool.clone(),
             vec![
                 Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
             ],
         );
 
@@ -362,7 +362,7 @@ mod tests {
             pool.clone(),
             vec![
                 Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
             ],
         );
         let result = syncer.sync_result(SyncReport {
@@ -400,7 +400,7 @@ mod tests {
             pool.clone(),
             vec![
                 Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
             ],
         );
         syncer.update_tracking_disabled(true);
@@ -427,7 +427,7 @@ mod tests {
             pool.clone(),
             vec![
                 Box::new(PlaidSync::new(pool.clone(), PlaidClientFactory::new(pool.clone()))),
-                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::new()?)),
+                Box::new(SimpleFinSync::new(pool.clone(), SimpleFinClient::unrestricted()?)),
             ],
         )
         .with_initial_sync_delay(Duration::from_secs(60));

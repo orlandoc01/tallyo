@@ -14,6 +14,7 @@ strip = true
 panic = "unwind"
 
 [dependencies]
+tower = { version = "0.5.3", features = ["util"] }
 anyhow = "1.0.104"
 async-graphql = { version = "7.2.1", features = ["chrono", "dataloader"] }
 async-graphql-axum = "7.2.1"
@@ -55,7 +56,6 @@ webauthn-rs-core = "0.5.5"
 [dev-dependencies]
 figment = { version = "0.10.19", features = ["test"] }
 tempfile = "3.23.0"
-tower = { version = "0.5.3", features = ["util"] }
 webauthn-authenticator-rs = { version = "0.5.5", features = ["softpasskey"] }
 wiremock = "0.6.5"
 

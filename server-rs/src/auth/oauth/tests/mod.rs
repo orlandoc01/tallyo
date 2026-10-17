@@ -27,6 +27,7 @@ use crate::{
 const ISSUER: &str = "https://tallyo.test";
 const REDIRECT_URI: &str = "https://web.test/auth/callback";
 const VERIFIER: &str = "verifier";
+const BINDING: &str = "binding";
 
 async fn setup_service(
     passkeys: bool,
@@ -87,19 +88,47 @@ async fn add_user(pool: &sqlx::SqlitePool, email: &str, role: Role) -> i64 {
     .id
 }
 
+// Requests built by these helpers carry the browser-binding cookie that `login_session()` sessions expect.
 fn request(method: &str, uri: &str) -> Request<Body> {
+    bound_request(method, uri, BINDING)
+}
+
+fn unbound_request(method: &str, uri: &str) -> Request<Body> {
     Request::builder().method(method).uri(uri).body(Body::empty()).unwrap()
+}
+
+fn bound_request(method: &str, uri: &str, binding: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::COOKIE, login_cookie(binding))
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn login_cookie(binding: &str) -> String {
+    format!("__Host-tallyo_login={binding}")
 }
 
 fn json_request(method: &str, uri: &str, value: Value, token: Option<&str>) -> Request<Body> {
     let mut request = Request::builder()
         .method(method)
         .uri(uri)
-        .header(header::CONTENT_TYPE, "application/json");
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, login_cookie(BINDING));
     if let Some(token) = token {
         request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
     }
     request.body(Body::from(value.to_string())).unwrap()
+}
+
+fn unbound_json_request(method: &str, uri: &str, value: Value) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(value.to_string()))
+        .unwrap()
 }
 
 fn bearer(service: &Service, email: &str) -> String {
@@ -114,6 +143,7 @@ fn form_request(uri: &str, form: &[(&str, &str)]) -> Request<Body> {
         .method("POST")
         .uri(uri)
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .header(header::COOKIE, login_cookie(BINDING))
         .body(Body::from(body))
         .unwrap()
 }
@@ -124,6 +154,29 @@ async fn json(response: axum::response::Response) -> Value {
 
 fn location(response: &axum::response::Response) -> Url {
     Url::parse(response.headers()[header::LOCATION].to_str().unwrap()).unwrap()
+}
+
+fn set_cookie_value(response: &axum::response::Response, name: &str) -> Option<String> {
+    response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|cookie| cookie.split(';').next())
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(cookie_name, _)| *cookie_name == name)
+        .map(|(_, value)| value.to_owned())
+}
+
+fn login_binding_cookie(response: &axum::response::Response) -> String {
+    set_cookie_value(response, "__Host-tallyo_login").expect("login binding cookie")
+}
+
+fn login_session_id(response: &axum::response::Response) -> String {
+    location(response)
+        .query_pairs()
+        .find_map(|(key, value)| (key == "login_session").then_some(value.into_owned()))
+        .unwrap()
 }
 
 fn authorize_uri(auth_method: Option<&str>) -> String {
@@ -144,21 +197,23 @@ fn authorize_uri(auth_method: Option<&str>) -> String {
 
 async fn authorization_code(service: &Arc<Service>) -> String {
     let start = router(Arc::clone(service))
-        .oneshot(request("GET", &authorize_uri(None)))
+        .oneshot(unbound_request("GET", &authorize_uri(None)))
         .await
         .unwrap();
     assert_eq!(start.status(), StatusCode::FOUND);
-    let session_id = location(&start)
-        .query_pairs()
-        .find_map(|(key, value)| (key == "login_session").then_some(value.into_owned()))
-        .unwrap();
+    let session_id = login_session_id(&start);
+    let binding = login_binding_cookie(&start);
     service
         .store()
         .mark_login_session_authenticated(&session_id, "admin@example.com")
         .await
         .unwrap();
     let completed = router(Arc::clone(service))
-        .oneshot(request("GET", &format!("/authorize?session_id={session_id}")))
+        .oneshot(bound_request(
+            "GET",
+            &format!("/authorize?session_id={session_id}"),
+            &binding,
+        ))
         .await
         .unwrap();
     assert_eq!(completed.status(), StatusCode::FOUND);
@@ -758,7 +813,7 @@ async fn sends_and_verifies_email_codes_without_enumerating_unknown_addresses() 
         .oneshot(json_request(
             "POST",
             "/auth/email/send",
-            serde_json::json!({"login_session_id":"email-session","email":"unknown@example.com","code_verifier":VERIFIER}),
+            serde_json::json!({"login_session_id":"email-session","email":"unknown@example.com"}),
             None,
         ))
         .await
@@ -996,7 +1051,10 @@ async fn exchanges_google_callbacks_against_the_overridden_wiremock_endpoints() 
         .await;
     Mock::given(method("GET"))
         .and(path("/userinfo"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"email":"ADMIN@example.com"})))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"email":"ADMIN@example.com","verified_email":true})),
+        )
         .mount(&server)
         .await;
     service
@@ -1056,7 +1114,10 @@ async fn google_callback_rejects_disallowed_emails_without_authenticating_the_se
         .await;
     Mock::given(method("GET"))
         .and(path("/userinfo"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"email":"unknown@example.com"})))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"email":"unknown@example.com","verified_email":true})),
+        )
         .mount(&server)
         .await;
     service
@@ -1095,6 +1156,702 @@ async fn google_callback_rejects_disallowed_emails_without_authenticating_the_se
     );
 }
 
+#[tokio::test]
+async fn login_sessions_are_bound_to_the_browser_that_started_them() {
+    let (service, _) = setup_service(true, true, false).await;
+    service
+        .update_google_settings(GoogleSettings {
+            enabled: true,
+            client_id: "google-client".to_owned(),
+            client_secret: "google-secret".to_owned(),
+            ..Default::default()
+        })
+        .unwrap();
+    let start = router(Arc::clone(&service))
+        .oneshot(unbound_request("GET", &authorize_uri(None)))
+        .await
+        .unwrap();
+    assert_eq!(start.status(), StatusCode::FOUND);
+    let session_id = login_session_id(&start);
+    let binding = login_binding_cookie(&start);
+    let set_cookie = start.headers()[header::SET_COOKIE].to_str().unwrap();
+    assert!(
+        set_cookie.contains("; Path=/; Max-Age=120; SameSite=Lax; HttpOnly; Secure"),
+        "{set_cookie}"
+    );
+
+    let app = router(Arc::clone(&service));
+    let email = serde_json::json!({"login_session_id": session_id, "email": "admin@example.com", "code": "123456"});
+    for request in [
+        unbound_json_request("POST", "/auth/email/send", email.clone()),
+        unbound_json_request("POST", "/auth/email/verify", email.clone()),
+    ] {
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = json(response).await;
+        assert_eq!(body["error"], "expired");
+        assert_eq!(body["message"], "Your sign-in session has expired. Please start over.");
+    }
+    for request in [
+        unbound_json_request(
+            "POST",
+            "/auth/webauthn/login/begin",
+            serde_json::json!({"login_session_id": session_id}),
+        ),
+        unbound_request("GET", &format!("/auth/google?login_session={session_id}")),
+        bound_request(
+            "GET",
+            &format!("/auth/google?login_session={session_id}"),
+            "other-browser",
+        ),
+    ] {
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            to_bytes(response.into_body(), usize::MAX).await.unwrap().as_ref(),
+            b"login session expired"
+        );
+    }
+    let google = app
+        .clone()
+        .oneshot(bound_request(
+            "GET",
+            &format!("/auth/google?login_session={session_id}"),
+            &binding,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(google.status(), StatusCode::FOUND);
+
+    service
+        .store()
+        .mark_login_session_authenticated(&session_id, "admin@example.com")
+        .await
+        .unwrap();
+    let redeem_uri = format!("/authorize?session_id={session_id}");
+    for request in [
+        unbound_request("GET", &redeem_uri),
+        bound_request("GET", &redeem_uri, "other-browser"),
+    ] {
+        assert_eq!(
+            app.clone().oneshot(request).await.unwrap().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let redeemed = app.oneshot(bound_request("GET", &redeem_uri, &binding)).await.unwrap();
+    assert_eq!(redeemed.status(), StatusCode::FOUND);
+    assert!(location(&redeemed).query_pairs().any(|(key, _)| key == "code"));
+}
+
+#[tokio::test]
+async fn invite_links_bind_the_first_browser_that_opens_them() {
+    let (service, _) = setup().await;
+    let (link, _) = service
+        .create_invite_link("admin@example.com", Role::Admin)
+        .await
+        .unwrap();
+    let link = Url::parse(&link).unwrap();
+    let magic_uri = format!("{}?{}", link.path(), link.query().unwrap());
+    let app = router(Arc::clone(&service));
+    let clicked = app.clone().oneshot(unbound_request("GET", &magic_uri)).await.unwrap();
+    assert_eq!(clicked.status(), StatusCode::FOUND);
+    let binding = login_binding_cookie(&clicked);
+    assert!(set_cookie_value(&clicked, "pkce-verifier").is_some());
+    let redeem_uri = format!("{}?{}", location(&clicked).path(), location(&clicked).query().unwrap());
+
+    assert_eq!(
+        app.clone()
+            .oneshot(unbound_request("GET", &redeem_uri))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    let redeemed = app.oneshot(bound_request("GET", &redeem_uri, &binding)).await.unwrap();
+    assert_eq!(redeemed.status(), StatusCode::FOUND);
+    assert!(location(&redeemed).query_pairs().any(|(key, _)| key == "code"));
+}
+
+#[tokio::test]
+async fn logout_revokes_the_presented_refresh_token_chain() {
+    let (service, _) = setup().await;
+    let code = authorization_code(&service).await;
+    let token = exchange_code(&service, &code).await;
+    let refresh = token["refresh_token"].as_str().unwrap();
+    let logout = router(Arc::clone(&service))
+        .oneshot(form_request("/auth/logout", &[("refresh_token", refresh)]))
+        .await
+        .unwrap();
+    assert_eq!(logout.status(), StatusCode::NO_CONTENT);
+    assert_token_headers(&logout);
+    let refreshed = router(Arc::clone(&service))
+        .oneshot(form_request(
+            "/token",
+            &[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", refresh),
+                ("client_id", "tallyo-web"),
+            ],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refreshed.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(json(refreshed).await["error"], "invalid_grant");
+    assert!(
+        service
+            .store()
+            .access_token(
+                token["access_token"].as_str().unwrap().rsplit_once('.').unwrap().1,
+                Utc::now()
+            )
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let unknown = router(service)
+        .oneshot(form_request("/auth/logout", &[("refresh_token", "unknown")]))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn refresh_chains_expire_after_the_absolute_cap() {
+    let (service, _) = setup().await;
+    let code = authorization_code(&service).await;
+    let token = exchange_code(&service, &code).await;
+    let refresh = token["refresh_token"].as_str().unwrap();
+    let signature = token_signature(refresh);
+    let stored = service
+        .store()
+        .refresh_token(&signature, Utc::now(), true)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        stored
+            .first_issued_at
+            .is_some_and(|first| Utc::now() - first < Duration::minutes(1))
+    );
+    service.store().revoke_refresh_token(&signature).await.unwrap();
+    service
+        .store()
+        .create_refresh_token(&crate::auth::OAuthToken {
+            signature: token_signature("old-chain"),
+            first_issued_at: Some(Utc::now() - Duration::days(31)),
+            active: true,
+            ..stored
+        })
+        .await
+        .unwrap();
+    let refreshed = router(service)
+        .oneshot(form_request(
+            "/token",
+            &[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", "old-chain"),
+                ("client_id", "tallyo-web"),
+            ],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refreshed.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(json(refreshed).await["error"], "invalid_grant");
+}
+
+#[tokio::test]
+async fn dcr_rejects_oversized_registrations() {
+    let (service, _) = setup().await;
+    let app = router(service);
+    let uri = "https://client.test/callback";
+    for body in [
+        serde_json::json!({"redirect_uris": vec![uri; 11]}),
+        serde_json::json!({"redirect_uris": [format!("{uri}?{}", "x".repeat(512))]}),
+        serde_json::json!({"redirect_uris": [uri], "client_name": "n".repeat(257)}),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(json_request("POST", "/register", body, None))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+    let accepted = app
+        .oneshot(json_request(
+            "POST",
+            "/register",
+            serde_json::json!({"redirect_uris": vec![uri; 10], "client_name": "n".repeat(256)}),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(accepted.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn bound_sessions_magic_links_require_the_binding_cookie_and_stay_usable() {
+    let (service, _) = setup().await;
+    let session = login_session("bound-magic", "tallyo-web", REDIRECT_URI, "read write");
+    service.store().create_login_session(&session).await.unwrap();
+    service
+        .store()
+        .save_email_otp(&EmailOtpUpdate {
+            session_id: session.id.clone(),
+            email: "admin@example.com".to_owned(),
+            hashed_otp: String::new(),
+            hashed_magic_token: token_signature("magic"),
+            pkce_verifier: String::new(),
+            expires_at: Utc::now() + Duration::minutes(10),
+        })
+        .await
+        .unwrap();
+    let uri = "/auth/email/magic?token=magic&session_id=bound-magic&email=admin%40example.com";
+    let app = router(service);
+    let foreign = app.clone().oneshot(unbound_request("GET", uri)).await.unwrap();
+    assert_eq!(foreign.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        to_bytes(foreign.into_body(), usize::MAX).await.unwrap().as_ref(),
+        b"login session expired"
+    );
+    let own = app.oneshot(request("GET", uri)).await.unwrap();
+    assert_eq!(own.status(), StatusCode::FOUND);
+    assert!(set_cookie_value(&own, "__Host-tallyo_login").is_none());
+}
+
+#[tokio::test]
+async fn only_one_of_two_racing_browsers_binds_an_invite_link() {
+    let (service, _) = setup().await;
+    let (link, _) = service
+        .create_invite_link("admin@example.com", Role::Admin)
+        .await
+        .unwrap();
+    let link = Url::parse(&link).unwrap();
+    let magic_uri = format!("{}?{}", link.path(), link.query().unwrap());
+    let app = router(service);
+    let (first, second) = tokio::join!(
+        app.clone().oneshot(unbound_request("GET", &magic_uri)),
+        app.oneshot(unbound_request("GET", &magic_uri))
+    );
+    let responses = [first.unwrap(), second.unwrap()];
+    assert_eq!(
+        responses
+            .iter()
+            .filter(|response| response.status() == StatusCode::FOUND
+                && set_cookie_value(response, "__Host-tallyo_login").is_some())
+            .count(),
+        1
+    );
+    assert_eq!(
+        responses
+            .iter()
+            .filter(|response| response.status() == StatusCode::BAD_REQUEST)
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn consent_requires_the_binding_cookie() {
+    let (service, pool) = setup().await;
+    add_user(&pool, "writer@example.com", Role::Writer).await;
+    service
+        .store()
+        .save_client(OAuthClient {
+            id: "dynamic-client".to_owned(),
+            redirect_uris: vec!["https://client.test/callback".to_owned()],
+            grant_types: vec!["authorization_code".to_owned()],
+            response_types: vec!["code".to_owned()],
+            scopes: vec!["read:transactions".to_owned()],
+            application_type: "native".to_owned(),
+            client_name: "Dynamic Client".to_owned(),
+            public: true,
+            preseeded: false,
+        })
+        .await
+        .unwrap();
+    let session = login_session(
+        "consent-bound",
+        "dynamic-client",
+        "https://client.test/callback",
+        "read:transactions",
+    );
+    service.store().create_login_session(&session).await.unwrap();
+    service
+        .store()
+        .mark_login_session_authenticated(&session.id, "writer@example.com")
+        .await
+        .unwrap();
+    let form = url::form_urlencoded::Serializer::new(String::new())
+        .extend_pairs([("session_id", "consent-bound"), ("consent", "allow")])
+        .finish();
+    let app = router(service);
+    let unbound = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/consent")
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(unbound.status(), StatusCode::BAD_REQUEST);
+    let granted = app
+        .oneshot(form_request(
+            "/consent",
+            &[("session_id", "consent-bound"), ("consent", "allow")],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(granted.status(), StatusCode::FOUND);
+}
+
+#[tokio::test]
+async fn rotation_keeps_the_chains_first_issue_time_and_legacy_rows_fall_back_to_created_at() {
+    let (service, pool) = setup().await;
+    let code = authorization_code(&service).await;
+    let initial = exchange_code(&service, &code).await;
+    let initial_refresh = initial["refresh_token"].as_str().unwrap();
+    let first_issued_at = service
+        .store()
+        .refresh_token(&token_signature(initial_refresh), Utc::now(), true)
+        .await
+        .unwrap()
+        .unwrap()
+        .first_issued_at
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    let rotated = router(Arc::clone(&service))
+        .oneshot(form_request(
+            "/token",
+            &[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", initial_refresh),
+                ("client_id", "tallyo-web"),
+            ],
+        ))
+        .await
+        .unwrap();
+    assert_eq!(rotated.status(), StatusCode::OK);
+    let rotated = service
+        .store()
+        .refresh_token(
+            &token_signature(json(rotated).await["refresh_token"].as_str().unwrap()),
+            Utc::now(),
+            true,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(rotated.first_issued_at, Some(first_issued_at));
+
+    sqlx::query(
+        "INSERT INTO oauth_refresh_tokens (signature, client_id, subject, scopes, expires_at, request_id, created_at, first_issued_at) VALUES ('legacy', 'tallyo-web', 'admin@example.com', 'read', '2099-01-01T00:00:00Z', 'legacy-request', '2026-01-02T03:04:05Z', NULL)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let legacy = service
+        .store()
+        .refresh_token("legacy", Utc::now(), true)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        legacy.first_issued_at,
+        Some("2026-01-02T03:04:05Z".parse::<chrono::DateTime<Utc>>().unwrap())
+    );
+}
+
+fn google_mock_settings(server: &MockServer) -> GoogleSettings {
+    GoogleSettings {
+        enabled: true,
+        client_id: "google-client".to_owned(),
+        client_secret: "google-secret".to_owned(),
+        endpoints: GoogleEndpoints {
+            auth: format!("{}/auth", server.uri()),
+            token: format!("{}/token", server.uri()),
+            userinfo: format!("{}/userinfo", server.uri()),
+        },
+    }
+}
+
+async fn mount_google(server: &MockServer, email: &str) {
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"access_token":"token"})))
+        .mount(server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/userinfo"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({"email": email, "verified_email": true})),
+        )
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn google_callback_requires_the_binding_cookie_of_the_starting_browser() {
+    let (service, _) = setup().await;
+    let server = MockServer::start().await;
+    mount_google(&server, "admin@example.com").await;
+    service.update_google_settings(google_mock_settings(&server)).unwrap();
+    let start = router(Arc::clone(&service))
+        .oneshot(unbound_request("GET", &authorize_uri(Some("google"))))
+        .await
+        .unwrap();
+    assert_eq!(start.status(), StatusCode::FOUND);
+    let session_id = login_session_id(&start);
+    let binding = login_binding_cookie(&start);
+    let app = router(Arc::clone(&service));
+    let begin = app
+        .clone()
+        .oneshot(bound_request(
+            "GET",
+            &format!("/auth/google?login_session={session_id}"),
+            &binding,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(begin.status(), StatusCode::FOUND);
+    let state = location(&begin)
+        .query_pairs()
+        .find_map(|(key, value)| (key == "state").then_some(value.into_owned()))
+        .unwrap();
+    let callback_uri = format!("/auth/google/callback?state={state}&code=code");
+
+    for request in [
+        unbound_request("GET", &callback_uri),
+        bound_request("GET", &callback_uri, "other-browser"),
+    ] {
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            to_bytes(response.into_body(), usize::MAX).await.unwrap().as_ref(),
+            b"login session expired"
+        );
+        assert!(
+            service
+                .store()
+                .login_session_by_id(&session_id)
+                .await
+                .unwrap()
+                .is_some_and(|session| !session.authenticated)
+        );
+    }
+    let callback = app
+        .oneshot(bound_request("GET", &callback_uri, &binding))
+        .await
+        .unwrap();
+    assert_eq!(callback.status(), StatusCode::FOUND);
+    assert!(
+        service
+            .store()
+            .login_session_by_id(&session_id)
+            .await
+            .unwrap()
+            .is_some_and(|session| session.authenticated)
+    );
+}
+
+#[tokio::test]
+async fn sending_a_code_extends_the_session_to_the_code_lifetime() {
+    let (service, _) = setup().await;
+    let start = router(Arc::clone(&service))
+        .oneshot(unbound_request("GET", &authorize_uri(Some("email"))))
+        .await
+        .unwrap();
+    let session_id = login_session_id(&start);
+    let binding = login_binding_cookie(&start);
+    let send = router(Arc::clone(&service))
+        .oneshot(bound_json_request(
+            "POST",
+            "/auth/email/send",
+            serde_json::json!({"login_session_id": session_id, "email": "admin@example.com"}),
+            &binding,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(send.status(), StatusCode::OK);
+    let session = service.store().login_session_by_id(&session_id).await.unwrap().unwrap();
+    assert!(session.expires_at() > Utc::now() + Duration::minutes(9));
+    assert_eq!(Some(session.expires_at()), session.email_otp_expires_at());
+}
+
+#[tokio::test]
+async fn email_verify_works_past_the_initial_session_window_and_reports_expiry_as_json() {
+    let (service, _) = setup().await;
+    let session = LoginSession {
+        expires_at: (Utc::now() - Duration::seconds(1)).into(),
+        ..login_session("late-email", "tallyo-web", REDIRECT_URI, "read write")
+    };
+    service.store().create_login_session(&session).await.unwrap();
+    let verify = serde_json::json!({"login_session_id":"late-email","email":"admin@example.com","code":"123456"});
+    let expired = router(Arc::clone(&service))
+        .oneshot(json_request("POST", "/auth/email/verify", verify.clone(), None))
+        .await
+        .unwrap();
+    assert_eq!(expired.status(), StatusCode::BAD_REQUEST);
+    let body = json(expired).await;
+    assert_eq!(body["error"], "expired");
+    assert!(body["message"].as_str().unwrap().contains("start over"));
+
+    service
+        .store()
+        .save_email_otp(&EmailOtpUpdate {
+            session_id: session.id.clone(),
+            email: "admin@example.com".to_owned(),
+            hashed_otp: token_signature("123456"),
+            hashed_magic_token: token_signature("magic"),
+            pkce_verifier: String::new(),
+            expires_at: Utc::now() + Duration::minutes(10),
+        })
+        .await
+        .unwrap();
+    let verified = router(service)
+        .oneshot(json_request("POST", "/auth/email/verify", verify, None))
+        .await
+        .unwrap();
+    assert_eq!(verified.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn unbound_invite_sessions_reject_every_leg_until_the_magic_link_binds_them() {
+    let (service, _) = setup_service(true, true, false).await;
+    service
+        .update_google_settings(GoogleSettings {
+            enabled: true,
+            client_id: "google-client".to_owned(),
+            client_secret: "google-secret".to_owned(),
+            ..Default::default()
+        })
+        .unwrap();
+    let (link, _) = service
+        .create_invite_link("admin@example.com", Role::Admin)
+        .await
+        .unwrap();
+    let session_id = Url::parse(&link)
+        .unwrap()
+        .query_pairs()
+        .find_map(|(key, value)| (key == "session_id").then_some(value.into_owned()))
+        .unwrap();
+    let app = router(Arc::clone(&service));
+    let send = bound_json_request(
+        "POST",
+        "/auth/email/send",
+        serde_json::json!({"login_session_id": session_id, "email": "admin@example.com"}),
+        "some-cookie",
+    );
+    assert_eq!(
+        app.clone().oneshot(send).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    for request in [
+        bound_json_request(
+            "POST",
+            "/auth/webauthn/login/begin",
+            serde_json::json!({"login_session_id": session_id}),
+            "some-cookie",
+        ),
+        bound_request(
+            "GET",
+            &format!("/auth/google?login_session={session_id}"),
+            "some-cookie",
+        ),
+    ] {
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            to_bytes(response.into_body(), usize::MAX).await.unwrap().as_ref(),
+            b"login session expired"
+        );
+    }
+    service
+        .store()
+        .mark_login_session_authenticated(&session_id, "admin@example.com")
+        .await
+        .unwrap();
+    let redeem = app
+        .oneshot(bound_request(
+            "GET",
+            &format!("/authorize?session_id={session_id}"),
+            "some-cookie",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(redeem.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn expired_invite_sessions_cannot_be_bound_by_a_still_valid_link() {
+    let (service, pool) = setup().await;
+    let (link, _) = service
+        .create_invite_link("admin@example.com", Role::Admin)
+        .await
+        .unwrap();
+    let link = Url::parse(&link).unwrap();
+    let session_id = link
+        .query_pairs()
+        .find_map(|(key, value)| (key == "session_id").then_some(value.into_owned()))
+        .unwrap();
+    sqlx::query("UPDATE login_sessions SET expires_at = '2020-01-01T00:00:00Z' WHERE id = ?")
+        .bind(&session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let response = router(service)
+        .oneshot(unbound_request(
+            "GET",
+            &format!("{}?{}", link.path(), link.query().unwrap()),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        to_bytes(response.into_body(), usize::MAX).await.unwrap().as_ref(),
+        b"Invalid or already used magic link."
+    );
+}
+
+#[tokio::test]
+async fn logout_rejects_malformed_bodies_and_token_exchange_touches_the_client() {
+    let (service, pool) = setup().await;
+    for form in [vec![], vec![("token", "nope")]] {
+        let response = router(Arc::clone(&service))
+            .oneshot(form_request("/auth/logout", &form))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(json(response).await["error"], "invalid_request");
+    }
+
+    let code = authorization_code(&service).await;
+    sqlx::query("UPDATE oauth_clients SET last_used_at = NULL")
+        .execute(&pool)
+        .await
+        .unwrap();
+    exchange_code(&service, &code).await;
+    let last_used_at: Option<String> =
+        sqlx::query_scalar("SELECT last_used_at FROM oauth_clients WHERE id = 'tallyo-web'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(last_used_at.is_some_and(|value| value.ends_with('Z')));
+}
+
+fn bound_json_request(method: &str, uri: &str, value: Value, binding: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, login_cookie(binding))
+        .body(Body::from(value.to_string()))
+        .unwrap()
+}
+
 fn login_session(id: &str, client_id: &str, redirect_uri: &str, scopes: &str) -> LoginSession {
     LoginSession {
         id: id.to_owned(),
@@ -1116,6 +1873,7 @@ fn login_session(id: &str, client_id: &str, redirect_uri: &str, scopes: &str) ->
         pkce_verifier: String::new(),
         webauthn_session: String::new(),
         purpose: String::new(),
+        browser_binding: token_signature(BINDING),
     }
 }
 

@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::{apierror::ApiError, clients::ollama::validate_base_url, middleware::client_ip::parse_trusted_proxy_cidrs};
 
-use super::{LlmConfig, LocaleConfig, McpConfig, Provider, Sections, SecurityConfig, WebAuthnConfig};
+use super::{EmailConfig, LlmConfig, LocaleConfig, McpConfig, Provider, Sections, SecurityConfig, WebAuthnConfig};
 
 const AUTH_METHOD_REQUIRED: &str =
     "at least one auth method required: configure MASTER_PASSWORD or enable google, email, or passkey";
@@ -16,6 +16,7 @@ const OAUTH_REDIRECT_REQUIRED: &str = "oauth auth methods require at least one f
 const OAUTH_LIFETIME_REQUIRED: &str = "access_token_lifetime and refresh_token_lifetime must be greater than zero";
 const TIMEZONE_REQUIRED: &str = "timezone is required";
 const OLLAMA_URL_REQUIRED: &str = "ollama url is required when the ollama provider is enabled";
+const SMTP_HOST_REQUIRED: &str = "smtp host is required when email sign-in is enabled";
 
 pub(super) fn validate_runtime_config(config: &Sections) -> Result<()> {
     let auth = &config.auth.fields;
@@ -75,6 +76,16 @@ impl LocaleConfig {
 impl SecurityConfig {
     pub(crate) fn validate(&self, _: bool) -> Result<()> {
         parse_trusted_proxy_cidrs(&self.trusted_proxy_cidrs).map_err(ApiError::public)?;
+        Ok(())
+    }
+}
+
+impl EmailConfig {
+    pub(crate) fn validate(&self, enabled: bool) -> Result<()> {
+        ensure!(
+            !enabled || self.smtp_host.as_deref().is_some_and(|host| !host.trim().is_empty()),
+            ApiError::bad_input(SMTP_HOST_REQUIRED)
+        );
         Ok(())
     }
 }
@@ -153,7 +164,9 @@ impl McpConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{McpConfig, Sections, WebAuthnConfig, validate_disable_all_auth_issuer, validate_runtime_config};
+    use super::{
+        EmailConfig, McpConfig, Sections, WebAuthnConfig, validate_disable_all_auth_issuer, validate_runtime_config,
+    };
     use crate::{
         admin::{LlmConfig, LocaleConfig, OllamaConfig, Provider, Section, SecurityConfig},
         clients::ollama::{BATCH_SIZE_RANGE, GenerationOptions},
@@ -173,6 +186,33 @@ mod tests {
             super::AUTH_METHOD_REQUIRED
         );
         assert!(validate_runtime_config(&Sections::default()).is_ok());
+    }
+
+    #[test]
+    fn email_requires_an_smtp_host_only_when_enabled() {
+        assert!(EmailConfig::default().validate(false).is_ok());
+        assert_eq!(
+            EmailConfig::default().validate(true).unwrap_err().to_string(),
+            super::SMTP_HOST_REQUIRED
+        );
+        assert_eq!(
+            EmailConfig {
+                smtp_host: Some("  ".to_owned()),
+                ..Default::default()
+            }
+            .validate(true)
+            .unwrap_err()
+            .to_string(),
+            super::SMTP_HOST_REQUIRED
+        );
+        assert!(
+            EmailConfig {
+                smtp_host: Some("smtp.example".to_owned()),
+                ..Default::default()
+            }
+            .validate(true)
+            .is_ok()
+        );
     }
 
     #[test]

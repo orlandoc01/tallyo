@@ -2,25 +2,31 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Query, State},
-    http::{HeaderValue, StatusCode},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
 use serde::Deserialize;
 
-use super::json_response;
-use crate::auth::{
-    ERR_ALREADY_USED, ERR_EMAIL_AUTH_NOT_ENABLED, ERR_EXPIRED, ERR_INVALID_CODE, ERR_INVALID_TOKEN,
-    ERR_LOGIN_SESSION_ALREADY_AUTHENTICATED, ERR_LOGIN_SESSION_NOT_FOUND_OR_EXPIRED, ERR_OTP_COOLDOWN,
-    ERR_TOO_MANY_ATTEMPTS, EmailMagicLink, EmailSend, EmailVerify, GOOGLE_CALLBACK_TIMEOUT, GoogleClient, Service,
+use super::{
+    binding::{
+        Binding, BindingError, Cookie, append_cookie, bound_login_session, login_binding, login_session_expired,
+        session_bound,
+    },
+    json_response,
 };
+use crate::auth::{
+    ERR_EMAIL_AUTH_NOT_ENABLED, ERR_EXPIRED, ERR_INVALID_CODE, ERR_LOGIN_SESSION_ALREADY_AUTHENTICATED,
+    ERR_LOGIN_SESSION_NOT_FOUND_OR_EXPIRED, ERR_OTP_COOLDOWN, ERR_TOO_MANY_ATTEMPTS, EmailMagicLink, EmailSend,
+    EmailVerify, GOOGLE_CALLBACK_TIMEOUT, GoogleClient, Service,
+};
+
+const MAGIC_COOKIE_MAX_AGE_SECONDS: i64 = 300;
 
 #[derive(Deserialize)]
 pub(super) struct EmailSendRequest {
     login_session_id: String,
     email: String,
-    #[serde(default)]
-    code_verifier: String,
 }
 
 #[derive(Deserialize)]
@@ -50,6 +56,7 @@ pub(super) struct GoogleCallbackRequest {
 
 pub(super) async fn email_send(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     request: Result<axum::Json<EmailSendRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if !service.email_enabled() {
@@ -62,11 +69,13 @@ pub(super) async fn email_send(
     if request.login_session_id.is_empty() || request.email.is_empty() {
         return (StatusCode::BAD_REQUEST, "missing required fields").into_response();
     }
+    if let Err(error) = bound_login_session(&service, &request.login_session_id, &headers).await {
+        return email_session_error(error);
+    }
     match service
         .send_email_code(EmailSend {
             login_session_id: request.login_session_id,
             email: request.email,
-            code_verifier: request.code_verifier,
         })
         .await
     {
@@ -92,6 +101,7 @@ pub(super) async fn email_send(
 
 pub(super) async fn email_verify(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     request: Result<axum::Json<EmailVerifyRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     if !service.email_enabled() {
@@ -103,6 +113,9 @@ pub(super) async fn email_verify(
     };
     if request.login_session_id.is_empty() || request.email.is_empty() || request.code.is_empty() {
         return (StatusCode::BAD_REQUEST, "missing required fields").into_response();
+    }
+    if let Err(error) = bound_login_session(&service, &request.login_session_id, &headers).await {
+        return email_session_error(error);
     }
     match service
         .verify_email_code(EmailVerify {
@@ -123,7 +136,7 @@ pub(super) async fn email_verify(
             email_verification_error("too_many_attempts", "Too many incorrect attempts. Please start over.")
         }
         Err(error) if error.to_string() == ERR_EXPIRED => {
-            email_verification_error("expired", "Code has expired. Please request a new one.")
+            email_verification_error("expired", "Code has expired. Please start over.")
         }
         Err(_) => (StatusCode::BAD_REQUEST, "verification failed").into_response(),
     }
@@ -131,6 +144,7 @@ pub(super) async fn email_verify(
 
 pub(super) async fn email_magic(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     Query(request): Query<MagicLinkRequest>,
 ) -> Response {
     if request.token.is_empty() || request.session_id.is_empty() || request.email.trim().is_empty() {
@@ -144,7 +158,11 @@ pub(super) async fn email_magic(
     if !allowed {
         return invalid_magic_link();
     }
-    match service
+    let unbound = match magic_link_session_unbound(&service, &request.session_id, &headers).await {
+        Ok(unbound) => unbound,
+        Err(response) => return response,
+    };
+    let session = match service
         .verify_email_magic_link(EmailMagicLink {
             token: request.token,
             session_id: request.session_id,
@@ -152,47 +170,84 @@ pub(super) async fn email_magic(
         })
         .await
     {
-        Ok(session) => {
-            let mut response =
-                super::authorize::redirect(&format!("{}/authorize?session_id={}", service.issuer_url(), session.id));
-            if !session.pkce_verifier.is_empty() {
-                set_magic_cookie(
-                    &mut response,
-                    "pkce-verifier",
-                    &session.pkce_verifier,
-                    "/auth/callback",
-                    &service,
-                );
-            }
-            if session.purpose == "passkey" {
-                let value: String =
-                    url::form_urlencoded::byte_serialize(b"/settings/passkeys?onboarding=passkey").collect();
-                set_magic_cookie(&mut response, "st_post_login", &value, "/", &service);
-            }
-            response
+        Ok(session) => session,
+        Err(error) if error.to_string() == ERR_EXPIRED => {
+            return (
+                StatusCode::BAD_REQUEST,
+                "Magic link has expired. Please request a new sign-in email.",
+            )
+                .into_response();
         }
-        Err(error) if error.to_string() == ERR_EXPIRED => (
-            StatusCode::BAD_REQUEST,
-            "Magic link has expired. Please request a new sign-in email.",
-        )
-            .into_response(),
-        Err(error) if matches!(error.to_string().as_str(), ERR_INVALID_TOKEN | ERR_ALREADY_USED) => {
-            invalid_magic_link()
+        Err(_) => return invalid_magic_link(),
+    };
+    let redirect = super::authorize::redirect(&format!("{}/authorize?session_id={}", service.issuer_url(), session.id));
+    let mut response = if unbound {
+        match bind_first_browser(&service, &session.id).await {
+            Ok(binding) => binding.attach(redirect, &service),
+            Err(response) => return response,
         }
-        Err(_) => invalid_magic_link(),
+    } else {
+        redirect
+    };
+    if !session.pkce_verifier.is_empty() {
+        append_cookie(
+            &mut response,
+            &service,
+            magic_cookie("pkce-verifier", &session.pkce_verifier, "/auth/callback"),
+        );
+    }
+    if session.purpose == "passkey" {
+        let value: String = url::form_urlencoded::byte_serialize(b"/settings/passkeys?onboarding=passkey").collect();
+        append_cookie(&mut response, &service, magic_cookie("st_post_login", &value, "/"));
+    }
+    response
+}
+
+/// Sessions started by a browser must present their binding before the link is consumed; sessions created
+/// server-side (invites) carry none yet and are bound to the first browser after the link verifies.
+async fn magic_link_session_unbound(
+    service: &Service,
+    session_id: &str,
+    headers: &HeaderMap,
+) -> Result<bool, Response> {
+    let session = service
+        .store()
+        .login_session_by_id(session_id)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "load login session").into_response())?
+        .ok_or_else(invalid_magic_link)?;
+    if session.browser_binding.is_empty() {
+        return Ok(true);
+    }
+    session_bound(&session, login_binding(headers, service).as_deref())
+        .then_some(false)
+        .ok_or_else(login_session_expired)
+}
+
+async fn bind_first_browser(service: &Service, session_id: &str) -> Result<Binding, Response> {
+    let binding = Binding::generate();
+    match service
+        .store()
+        .bind_login_session(session_id, &binding.signature())
+        .await
+    {
+        Ok(true) => Ok(binding),
+        Ok(false) => Err(invalid_magic_link()),
+        Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "bind login session").into_response()),
     }
 }
 
 pub(super) async fn google_login(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     Query(request): Query<GoogleLoginRequest>,
 ) -> Response {
     if !service.google_enabled() {
         return (StatusCode::NOT_FOUND, "google auth is not enabled").into_response();
     }
-    let session = match service.store().login_session_by_id(&request.login_session).await {
-        Ok(Some(session)) if session.expires_at() > Utc::now() => session,
-        Ok(_) | Err(_) => return (StatusCode::BAD_REQUEST, "login session expired").into_response(),
+    let session = match bound_login_session(&service, &request.login_session, &headers).await {
+        Ok(session) => session,
+        Err(error) => return error.into_response(),
     };
     let Some(client) = service.google_client() else {
         return (StatusCode::NOT_FOUND, "google auth is not enabled").into_response();
@@ -202,6 +257,7 @@ pub(super) async fn google_login(
 
 pub(super) async fn google_callback(
     State(service): State<Arc<Service>>,
+    headers: HeaderMap,
     Query(request): Query<GoogleCallbackRequest>,
 ) -> Response {
     if !service.google_enabled() {
@@ -212,7 +268,7 @@ pub(super) async fn google_callback(
     };
     match tokio::time::timeout(
         GOOGLE_CALLBACK_TIMEOUT,
-        google_callback_inner(&service, &client, request),
+        google_callback_inner(&service, &client, &headers, request),
     )
     .await
     {
@@ -220,6 +276,7 @@ pub(super) async fn google_callback(
             super::authorize::redirect(&format!("{}/authorize?session_id={}", service.issuer_url(), session_id))
         }
         Ok(Err(GoogleCallbackError::State)) => (StatusCode::BAD_REQUEST, "authorization state expired").into_response(),
+        Ok(Err(GoogleCallbackError::Binding)) => login_session_expired(),
         Ok(Err(GoogleCallbackError::Token)) | Err(_) => {
             (StatusCode::BAD_GATEWAY, "google token exchange failed").into_response()
         }
@@ -236,6 +293,7 @@ pub(super) async fn google_callback(
 
 enum GoogleCallbackError {
     State,
+    Binding,
     Token,
     Email,
     Allowed,
@@ -246,6 +304,7 @@ enum GoogleCallbackError {
 async fn google_callback_inner(
     service: &Service,
     client: &GoogleClient,
+    headers: &HeaderMap,
     request: GoogleCallbackRequest,
 ) -> Result<String, GoogleCallbackError> {
     let session = service
@@ -255,6 +314,10 @@ async fn google_callback_inner(
         .map_err(|_| GoogleCallbackError::State)?
         .filter(|session| session.expires_at() > Utc::now())
         .ok_or(GoogleCallbackError::State)?;
+    // Google's redirect is a top-level navigation, so the SameSite=Lax binding cookie travels with it.
+    if !session_bound(&session, login_binding(headers, service).as_deref()) {
+        return Err(GoogleCallbackError::Binding);
+    }
     let token = client
         .exchange(&request.code)
         .await
@@ -280,6 +343,15 @@ async fn google_callback_inner(
     Ok(session.id)
 }
 
+fn email_session_error(error: BindingError) -> Response {
+    match error {
+        BindingError::Expired => {
+            email_verification_error("expired", "Your sign-in session has expired. Please start over.")
+        }
+        BindingError::Internal => error.into_response(),
+    }
+}
+
 fn email_verification_error(error: &'static str, message: &'static str) -> Response {
     json_response(
         StatusCode::BAD_REQUEST,
@@ -291,10 +363,12 @@ fn invalid_magic_link() -> Response {
     (StatusCode::BAD_REQUEST, "Invalid or already used magic link.").into_response()
 }
 
-fn set_magic_cookie(response: &mut Response, name: &str, value: &str, path: &str, service: &Service) {
-    let secure = if service.issuer_url().starts_with("https://") { "; Secure" } else { "" };
-    let cookie = format!("{name}={value}; Path={path}; Max-Age=300; SameSite=Lax{secure}");
-    if let Ok(cookie) = HeaderValue::from_str(&cookie) {
-        response.headers_mut().append("Set-Cookie", cookie);
+fn magic_cookie<'a>(name: &'a str, value: &'a str, path: &'a str) -> Cookie<'a> {
+    Cookie {
+        name,
+        value,
+        path,
+        max_age_seconds: MAGIC_COOKIE_MAX_AGE_SECONDS,
+        http_only: false,
     }
 }

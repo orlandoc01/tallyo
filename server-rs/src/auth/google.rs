@@ -8,6 +8,7 @@ use url::Url;
 use super::GoogleSettings;
 
 pub const GOOGLE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(10);
+const GOOGLE_EMAIL_UNVERIFIED: &str = "google email is not verified";
 
 #[derive(Clone)]
 pub struct GoogleClient {
@@ -71,6 +72,8 @@ impl GoogleClient {
         #[derive(Deserialize)]
         struct User {
             email: String,
+            #[serde(default)]
+            verified_email: bool,
         }
         let user = self
             .http
@@ -83,6 +86,7 @@ impl GoogleClient {
             .json::<User>()
             .await?;
         anyhow::ensure!(!user.email.is_empty(), "missing email");
+        anyhow::ensure!(user.verified_email, GOOGLE_EMAIL_UNVERIFIED);
         Ok(user.email)
     }
 }
@@ -94,7 +98,7 @@ mod tests {
         matchers::{method, path},
     };
 
-    use super::GoogleClient;
+    use super::{GOOGLE_EMAIL_UNVERIFIED, GoogleClient};
     use crate::auth::GoogleSettings;
 
     #[tokio::test]
@@ -107,10 +111,40 @@ mod tests {
             .await;
         Mock::given(method("GET"))
             .and(path("/userinfo"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"email":"person@example.com"})))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({"email":"person@example.com","verified_email":true})),
+            )
             .mount(&server)
             .await;
-        let client = GoogleClient::new(
+        let client = google_client(&server);
+        assert_eq!(
+            client.email(&client.exchange("code").await.unwrap()).await.unwrap(),
+            "person@example.com"
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_unverified_and_unflagged_google_emails() {
+        for body in [
+            serde_json::json!({"email":"person@example.com","verified_email":false}),
+            serde_json::json!({"email":"person@example.com"}),
+        ] {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/userinfo"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&server)
+                .await;
+            assert_eq!(
+                google_client(&server).email("token").await.unwrap_err().to_string(),
+                GOOGLE_EMAIL_UNVERIFIED
+            );
+        }
+    }
+
+    fn google_client(server: &MockServer) -> GoogleClient {
+        GoogleClient::new(
             reqwest::Client::new(),
             GoogleSettings {
                 enabled: true,
@@ -124,10 +158,6 @@ mod tests {
             },
             "https://tallyo.test".to_owned(),
         )
-        .unwrap();
-        assert_eq!(
-            client.email(&client.exchange("code").await.unwrap()).await.unwrap(),
-            "person@example.com"
-        );
+        .unwrap()
     }
 }

@@ -15,6 +15,8 @@ use super::{
 
 const OTP_LIFETIME: Duration = Duration::from_secs(10 * 60);
 const OTP_COOLDOWN: Duration = Duration::from_secs(60);
+// Sending a code extends the login session to the code's lifetime, so this is the user's whole window.
+const LOGIN_WINDOW_MINUTES: u64 = OTP_LIFETIME.as_secs() / 60;
 const SMTP_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub enum EmailSender {
@@ -35,7 +37,10 @@ impl EmailSender {
         match self {
             Self::Smtp(sender) => sender.send(to, subject, body).await,
             Self::DevLog => {
-                tracing::info!(%to, %subject, %body, "email OTP (no SMTP configured; dev mode only)");
+                tracing::info!(%to, %subject, "email not sent (no SMTP configured)");
+                if cfg!(debug_assertions) {
+                    tracing::debug!(%body, "email body (debug build only)");
+                }
                 Ok(())
             }
         }
@@ -91,7 +96,6 @@ fn smtp_sender(config: &SmtpConfig) -> SmtpSender {
 pub struct EmailSend {
     pub login_session_id: String,
     pub email: String,
-    pub code_verifier: String,
 }
 #[derive(Clone, Debug)]
 pub struct EmailVerify {
@@ -147,7 +151,7 @@ impl Service {
                 email: email.clone(),
                 hashed_otp: token_signature(&code),
                 hashed_magic_token: token_signature(&magic_token),
-                pkce_verifier: request.code_verifier,
+                pkce_verifier: String::new(),
                 expires_at,
             })
             .await?;
@@ -158,7 +162,7 @@ impl Service {
             &email,
             false,
         );
-        self.email_sender().send(&email, "Tallyo Email Login", format!("Your Tallyo sign-in code is: {code}\n\nOr, click this link to sign in instantly:\n{magic_link}\n\nBoth expire in 10 minutes.\n\nIf you didn't request this, you can safely ignore this email.")).await?;
+        self.email_sender().send(&email, "Tallyo Email Login", format!("Your Tallyo sign-in code is: {code}\n\nOr, click this link to sign in instantly:\n{magic_link}\n\nBoth must be used in the browser where you started signing in, within {LOGIN_WINDOW_MINUTES} minutes.\n\nIf you didn't request this, you can safely ignore this email.")).await?;
         Ok(EmailSendResult {
             sent: true,
             message: None,
