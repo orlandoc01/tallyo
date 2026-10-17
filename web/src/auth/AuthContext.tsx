@@ -10,7 +10,7 @@ import { getApiBaseUrl } from '../utils/apiUrl'
 import { beginPasskeyOAuthLogin } from './webauthn'
 import { isPastIdleTimeout, markActivity, useIdleTimeout } from '../hooks/useIdleTimeout'
 import { DialogButtonRow } from '../components/common/Button'
-import { clearMasterPassword, clearTokens, getMasterPassword, getScopes, hasAccessToken, hasRefreshToken, refreshAccessToken, setMasterPassword } from './tokenStore'
+import { clearMasterPassword, clearTokens, getMasterPassword, getScopes, hasAccessToken, hasRefreshToken, refreshAccessToken, revokeRefreshToken, setMasterPassword } from './tokenStore'
 
 const fullScopes = [
   'read:transactions',
@@ -154,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = () => {
+    void revokeRefreshToken()
     clearTokens()
     clearMasterPassword()
     setIsAuthenticated(false)

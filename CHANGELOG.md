@@ -4,6 +4,16 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+Merged on the private main line after the 0.3.7 snapshot; ships in the next public release.
+
+### Added
+- **Credit card details** (0efbffdf, e31b968a, 4b8d45c5, 1b823c0c). CREDIT accounts can record a credit limit, annual fee, annual fee date, and a business-card flag, and every account can record opened and closed dates, from the desktop account editor or the mobile account sheet. A daily job rolls past annual fee dates forward a year on open cards. API: `Account.openedAt`, `Account.closedAt`, `Account.details` (a union with `CreditCardDetails`), `creditCard` and the two dates on `UpdateAccountInput` and `CreateManualAccountInput`, and `Query.creditCardStats` (open cards, cards per institution, total credit limit, annual fees due within 60 days). MCP: a new `credit_card_stats` tool, and `list_accounts` now returns mask, institution name, dates, and card details. Migration 0005 adds the `credit_card_details` table and the two date columns.
+
+## [0.3.7] - 2026-10-17
+
+### Security
+- **Login hardening.** Browser login sessions are bound to the starting browser with an `HttpOnly` cookie and expire after two minutes (extended to the 10-minute code window once a sign-in email is sent), so email codes and magic links must be used in the same browser that began the sign-in; invite links bind the first browser that opens them. Sign-out revokes the refresh-token chain (`POST /auth/logout`), role changes revoke the user's tokens, refresh chains expire after 30 days, Google sign-in requires a verified email, email sign-in requires an SMTP host, rate limits are now per client address, repeated wrong `X-API-Key` values are throttled, and SimpleFIN setup tokens may only point at `bridge.simplefin.org`. Migration 0006 adds `login_sessions.browser_binding`, `oauth_refresh_tokens.first_issued_at`, and `oauth_clients.last_used_at`.
+
 ## [0.3.6] - 2026-10-04
 
 ### Added

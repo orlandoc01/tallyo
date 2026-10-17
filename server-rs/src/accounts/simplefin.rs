@@ -171,7 +171,7 @@ mod tests {
         let mut subscriber = events.register_subscriber("test");
         let service = SimpleFinService {
             pool: pool.clone(),
-            client: SimpleFinClient::new()?,
+            client: SimpleFinClient::unrestricted()?,
             events,
         };
         let payload = service

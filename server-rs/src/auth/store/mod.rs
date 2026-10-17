@@ -14,10 +14,10 @@ pub use types::{
 };
 
 pub const ERR_INVALID_CODE: &str = "invalid_code";
-pub const ERR_INVALID_TOKEN: &str = "invalid_token";
+pub(super) const ERR_INVALID_TOKEN: &str = "invalid_token";
 pub const ERR_TOO_MANY_ATTEMPTS: &str = "too_many_attempts";
 pub const ERR_EXPIRED: &str = "expired";
-pub const ERR_ALREADY_USED: &str = "already_used";
+pub(super) const ERR_ALREADY_USED: &str = "already_used";
 pub const ERR_LOGIN_SESSION_NOT_FOUND_OR_EXPIRED: &str = "login session not found or expired";
 pub const ERR_LOGIN_SESSION_ALREADY_AUTHENTICATED: &str = "login session already authenticated";
 pub const ERR_OTP_COOLDOWN: &str = "please wait before requesting a new code";

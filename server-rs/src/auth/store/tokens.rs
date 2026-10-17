@@ -140,6 +140,7 @@ impl Store {
                 scopes: Some(&scopes),
                 expires_at: token.expires_at.into(),
                 request_id: (!token.request_id.is_empty()).then_some(token.request_id.as_str()),
+                first_issued_at: token.first_issued_at.map(Into::into),
             },
         )
         .await
@@ -264,6 +265,7 @@ async fn insert_token_pair(
             scopes: Some(&refresh_scopes),
             expires_at: refresh.expires_at.into(),
             request_id: Some(&refresh.request_id),
+            first_issued_at: refresh.first_issued_at.map(Into::into),
         },
     )
     .await?;
@@ -280,6 +282,7 @@ impl From<(String, queries::AccessTokenRow)> for OAuthToken {
             expires_at: row.expires_at.into(),
             request_id: row.request_id,
             active: row.active,
+            first_issued_at: None,
         }
     }
 }
@@ -294,6 +297,7 @@ impl From<(String, queries::RefreshTokenRow)> for OAuthToken {
             expires_at: row.expires_at.into(),
             request_id: row.request_id,
             active: row.active,
+            first_issued_at: Some(row.first_issued_at.into()),
         }
     }
 }
@@ -340,6 +344,7 @@ mod tests {
             expires_at: now + Duration::minutes(10),
             request_id: "code".to_owned(),
             active: true,
+            first_issued_at: None,
         };
         store.create_access_token(&token).await.unwrap();
         assert_eq!(store.access_token(&token.signature, now).await.unwrap().unwrap(), token);
@@ -347,6 +352,7 @@ mod tests {
         assert!(store.access_token(&token.signature, now).await.unwrap().is_none());
         let refresh = OAuthToken {
             signature: "refresh-signature".to_owned(),
+            first_issued_at: Some(now),
             ..token
         };
         store.create_refresh_token(&refresh).await.unwrap();

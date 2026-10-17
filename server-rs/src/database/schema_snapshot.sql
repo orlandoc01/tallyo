@@ -261,7 +261,7 @@ CREATE TABLE login_sessions (
     state TEXT,
     subject TEXT,
     webauthn_session TEXT
-);
+, browser_binding TEXT);
 
 CREATE INDEX idx_login_sessions_expires ON login_sessions(expires_at);
 
@@ -312,7 +312,7 @@ CREATE TABLE oauth_clients (
     redirect_uris TEXT NOT NULL,
     response_types TEXT NOT NULL,
     scopes TEXT NOT NULL
-);
+, last_used_at DATETIME);
 
 CREATE TABLE oauth_refresh_tokens (
     active BOOLEAN NOT NULL DEFAULT 1,
@@ -323,7 +323,7 @@ CREATE TABLE oauth_refresh_tokens (
     scopes TEXT,
     signature TEXT PRIMARY KEY,
     subject TEXT NOT NULL
-);
+, first_issued_at DATETIME);
 
 CREATE INDEX idx_oauth_refresh_expires ON oauth_refresh_tokens(expires_at);
 

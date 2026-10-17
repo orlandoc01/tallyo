@@ -44,7 +44,7 @@ async fn configuration_obfuscates_secrets_and_reads_stored_sections() -> Result<
             auth: stored(
                 true,
                 AuthConfig {
-                    master_password: Some("master-secret".to_owned()),
+                    master_password: Some("master-secret-16ch".to_owned()),
                     ..AuthConfig::default()
                 },
             ),
@@ -154,7 +154,9 @@ async fn configuration_without_stored_auth_falls_back_to_the_static_config() -> 
         sync_off: true,
         authorization: crate::config::Authorization {
             disable_all_auth: true,
-            master_password: Some(crate::config::MasterPassword::try_from("env-secret".to_owned())?),
+            master_password: Some(crate::config::MasterPassword::try_from(
+                "env-secret-sixteen!".to_owned(),
+            )?),
         },
     });
     let configuration = resolver.configuration();
@@ -306,7 +308,7 @@ async fn update_configuration_preserves_placeholders_and_omitted_hosts() -> Resu
             auth: stored(
                 true,
                 AuthConfig {
-                    master_password: Some("master-secret".to_owned()),
+                    master_password: Some("master-secret-16ch".to_owned()),
                     ..AuthConfig::default()
                 },
             ),
@@ -369,7 +371,10 @@ async fn update_configuration_preserves_placeholders_and_omitted_hosts() -> Resu
         })
         .await?;
     let sections = admin_store::list_sections(&fixture.pool).await?;
-    assert_eq!(sections.auth.fields.master_password.as_deref(), Some("master-secret"));
+    assert_eq!(
+        sections.auth.fields.master_password.as_deref(),
+        Some("master-secret-16ch")
+    );
     assert_eq!(sections.auth.fields.oauth_issuer_url, "https://issuer.example.com");
     assert_eq!(sections.auth.fields.dev_cors_allowed_origins, ["http://localhost:5173"]);
     assert_eq!(

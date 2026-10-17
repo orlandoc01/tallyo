@@ -1,7 +1,7 @@
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use anyhow::Result;
-use axum::Router;
+use axum::{Router, extract::ConnectInfo};
 use hyper_util::{
     rt::{TokioExecutor, TokioIo, TokioTimer},
     server::{conn::auto::Builder, graceful::GracefulShutdown},
@@ -9,6 +9,7 @@ use hyper_util::{
 };
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
+use tower::ServiceBuilder;
 
 // hyper's single knob covers the first header read and every keep-alive gap; Go's 120 s idle bound is the binding one.
 const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(120);
@@ -21,6 +22,13 @@ pub async fn serve_until_done(
     drain_timeout: Duration,
 ) -> Result<()> {
     serve(listener, router, shutdown, drain_timeout, HEADER_READ_TIMEOUT).await
+}
+
+fn tag_remote<B>(remote: SocketAddr) -> impl Fn(axum::http::Request<B>) -> axum::http::Request<B> + Clone {
+    move |mut request| {
+        request.extensions_mut().insert(ConnectInfo(remote));
+        request
+    }
 }
 
 async fn serve(
@@ -40,9 +48,12 @@ async fn serve(
     loop {
         tokio::select! {
             accepted = listener.accept() => match accepted {
-                Ok((stream, _)) => {
+                Ok((stream, remote)) => {
+                    let service = ServiceBuilder::new()
+                        .map_request(tag_remote(remote))
+                        .service(router.clone());
                     let connection = builder
-                        .serve_connection(TokioIo::new(stream), TowerToHyperService::new(router.clone()))
+                        .serve_connection(TokioIo::new(stream), TowerToHyperService::new(service))
                         .into_owned();
                     let watched = graceful.watcher().watch(connection);
                     tokio::spawn(async move {
@@ -69,15 +80,16 @@ async fn serve(
 mod tests {
     use std::{net::SocketAddr, sync::Arc, time::Duration};
 
-    use axum::{Router, routing::get};
+    use axum::{Router, extract::ConnectInfo, routing::get};
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
-        net::{TcpListener, TcpStream},
+        net::{TcpListener, TcpSocket, TcpStream},
         sync::{Notify, oneshot},
     };
     use tokio_util::sync::CancellationToken;
 
     use super::{serve, serve_until_done};
+    use crate::middleware::{client_ip::ClientIpResolver, ratelimit::rate_limit_with_client_ip};
 
     #[tokio::test]
     async fn drains_an_in_flight_request() {
@@ -168,6 +180,65 @@ mod tests {
         let (address, _shutdown) = serve_with_header_timeout(Duration::from_millis(100)).await;
 
         assert!(String::from_utf8(request(address).await).unwrap().contains("200 OK"));
+    }
+
+    #[tokio::test]
+    async fn exposes_the_peer_address_through_connect_info() {
+        let router = Router::new().route(
+            "/",
+            get(|ConnectInfo(remote): ConnectInfo<SocketAddr>| async move { remote.ip().to_string() }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let shutdown = CancellationToken::new();
+        tokio::spawn(serve_until_done(
+            listener,
+            router,
+            shutdown.clone(),
+            Duration::from_secs(1),
+        ));
+
+        let response = String::from_utf8(request(address).await).unwrap();
+        assert!(response.contains("200 OK"), "{response}");
+        assert!(response.ends_with("127.0.0.1"), "{response}");
+    }
+
+    #[tokio::test]
+    async fn rate_limits_each_peer_address_independently() {
+        let router = Router::new()
+            .route("/", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(rate_limit_with_client_ip(
+                1,
+                Duration::from_secs(60),
+                ClientIpResolver::new(&[]).unwrap(),
+            )));
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let shutdown = CancellationToken::new();
+        tokio::spawn(serve_until_done(
+            listener,
+            router,
+            shutdown.clone(),
+            Duration::from_secs(1),
+        ));
+
+        let status = |response: Vec<u8>| String::from_utf8(response).unwrap().lines().next().unwrap().to_owned();
+        assert!(status(request_from("127.0.0.1", address).await).contains("200"));
+        assert!(status(request_from("127.0.0.1", address).await).contains("429"));
+        assert!(status(request_from("127.0.0.2", address).await).contains("200"));
+    }
+
+    async fn request_from(local_ip: &str, address: SocketAddr) -> Vec<u8> {
+        let socket = TcpSocket::new_v4().unwrap();
+        socket.bind(format!("{local_ip}:0").parse().unwrap()).unwrap();
+        let mut stream = socket.connect(address).await.unwrap();
+        stream
+            .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await.unwrap();
+        response
     }
 
     async fn serve_with_header_timeout(header_read_timeout: Duration) -> (SocketAddr, CancellationToken) {

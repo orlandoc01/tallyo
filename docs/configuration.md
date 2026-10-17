@@ -100,7 +100,7 @@ The Google authorized redirect URI is exactly `<public-origin>/auth/google/callb
 | Field | Default or initial value | Validation and behavior |
 |---|---|---|
 | Enabled | `false`; the OAuth wizard initially selects email when OAuth is chosen | Provider changes apply live; enabling the first OAuth provider requires valid Authorization settings but no restart. |
-| SMTP host | Empty in storage; wizard initially suggests `smtp.gmail.com` | An empty host jst writes OTP and magic-link data to server logs so do not rely on that mode in production. |
+| SMTP host | Empty in storage; wizard initially suggests `smtp.gmail.com` | Required when email sign-in is enabled; saving an enabled section with an empty host is rejected. |
 | SMTP port | Empty in storage; wizard initially uses `587` | Stored as text. SMTP connectivity is not tested when saved. |
 | SMTP from | Empty in storage; wizard initially uses `Tallyo` | Passed to the SMTP sender. Use a value accepted by the provider. |
 | SMTP username | Empty | Stored as plain configuration inside the protected database. |

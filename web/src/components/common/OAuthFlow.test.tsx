@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { beginOAuthLogin, completeOAuthCallback, locationAssigner } from '../../auth/oauth'
-import { authorizedFetch, clearMasterPassword, clearTokens, hasAccessToken, hasRefreshToken, refreshAccessToken, setMasterPassword, setTokens } from '../../auth/tokenStore'
+import { authorizedFetch, clearMasterPassword, clearTokens, hasAccessToken, hasRefreshToken, refreshAccessToken, revokeRefreshToken, setMasterPassword, setTokens } from '../../auth/tokenStore'
 import { jsonResponse } from '../../test/http'
 
 describe('OAuth token flow', () => {
@@ -41,6 +41,50 @@ describe('OAuth token flow', () => {
     localStorage.setItem('tallyo-oauth-state', 'state')
 
     await expect(completeOAuthCallback('?code=code&state=wrong')).rejects.toThrow(/state/i)
+  })
+
+  it('still compares state when the verifier arrives by cookie', async () => {
+    localStorage.setItem('tallyo-oauth-state', 'state')
+    document.cookie = 'pkce-verifier=cookie-verifier; path=/'
+
+    await expect(completeOAuthCallback('?code=code&state=wrong')).rejects.toThrow(/state/i)
+    document.cookie = 'pkce-verifier=; max-age=0; path=/'
+  })
+
+  it('completes an invite callback from the cookie verifier even with a stale stored state', async () => {
+    localStorage.setItem('tallyo-oauth-state', 'stale-abandoned-login')
+    document.cookie = 'pkce-verifier=cookie-verifier; path=/'
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(jsonResponse({ access_token: 'access', refresh_token: 'refresh' }))
+
+    await completeOAuthCallback('?code=code')
+
+    const body = (fetchMock.mock.calls[0][1] as RequestInit).body as URLSearchParams
+    expect(body.get('code_verifier')).toBe('cookie-verifier')
+    expect(hasAccessToken()).toBe(true)
+    expect(localStorage.getItem('tallyo-oauth-state')).toBeNull()
+    expect(document.cookie).not.toContain('pkce-verifier=cookie-verifier')
+  })
+
+  it('rejects a stateless callback without the invite cookie', async () => {
+    localStorage.setItem('tallyo-pkce-verifier', 'verifier')
+    localStorage.setItem('tallyo-oauth-state', 'state')
+
+    await expect(completeOAuthCallback('?code=code')).rejects.toThrow(/state/i)
+    expect(localStorage.getItem('tallyo-oauth-state')).toBe('state')
+  })
+
+  it('revokes the stored refresh token on logout and swallows failures', async () => {
+    setTokens('access', 'refresh')
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValueOnce(new Response(null, { status: 204 })).mockRejectedValueOnce(new Error('offline'))
+
+    await revokeRefreshToken()
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/auth/logout', expect.objectContaining({ method: 'POST' }))
+    expect((fetchMock.mock.calls[0][1] as RequestInit).body).toEqual(new URLSearchParams({ refresh_token: 'refresh' }))
+
+    await expect(revokeRefreshToken()).resolves.toBeUndefined()
+    clearTokens()
+    await revokeRefreshToken()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('refreshes and retries authorized fetches after a 401', async () => {

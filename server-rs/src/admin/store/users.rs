@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use sqlx::{Executor, Sqlite, SqlitePool};
+use sqlx::{Executor, Sqlite, SqliteConnection, SqlitePool};
 
 use crate::{
     auth::User,
@@ -36,12 +36,48 @@ pub async fn find_user(executor: impl Executor<'_, Database = Sqlite>, id: i64) 
 
 pub async fn update_user_role(pool: &SqlitePool, id: i64, role: Role) -> Result<User> {
     let role = role.to_string().to_ascii_lowercase();
-    queries::update_user_role(pool, queries::UpdateUserRoleParams { role: &role, id })
-        .await
-        .context("update user role")?;
+    database::with_tx(pool, |transaction| {
+        Box::pin(async move {
+            let email = lookup_email(&mut **transaction, id).await?;
+            queries::update_user_role(&mut **transaction, queries::UpdateUserRoleParams { role: &role, id })
+                .await
+                .context("update user role")?;
+            revoke_subject_tokens(transaction, &email).await
+        })
+    })
+    .await?;
     user_by_id(pool, id)
         .await
         .map_err(|error| anyhow::anyhow!("find updated user: {error}"))
+}
+
+async fn lookup_email(executor: impl Executor<'_, Database = Sqlite>, id: i64) -> Result<String> {
+    let rows = queries::users(
+        executor,
+        queries::UsersParams {
+            id: Some(id),
+            ..Default::default()
+        },
+    )
+    .await?;
+    Ok(rows.into_iter().next().context("lookup user: user not found")?.email)
+}
+
+/// Revokes every access and refresh token issued to `email`; takes a connection so it can run inside a transaction.
+async fn revoke_subject_tokens(connection: &mut SqliteConnection, email: &str) -> Result<()> {
+    queries::delete_access_tokens_by_subject(
+        &mut *connection,
+        queries::DeleteAccessTokensBySubjectParams { subject: email },
+    )
+    .await
+    .map_err(|error| anyhow::anyhow!("revoke access tokens: {error}"))?;
+    queries::delete_refresh_tokens_by_subject(
+        &mut *connection,
+        queries::DeleteRefreshTokensBySubjectParams { subject: email },
+    )
+    .await
+    .map_err(|error| anyhow::anyhow!("revoke refresh tokens: {error}"))?;
+    Ok(())
 }
 
 pub async fn insert_user(
@@ -94,31 +130,11 @@ pub async fn user_exists(executor: impl Executor<'_, Database = Sqlite>, email: 
 pub async fn remove_user(pool: &SqlitePool, id: i64) -> Result<()> {
     database::with_tx(pool, |transaction| {
         Box::pin(async move {
-            let rows = queries::users(
-                &mut **transaction,
-                queries::UsersParams {
-                    id: Some(id),
-                    ..Default::default()
-                },
-            )
-            .await?;
-            let email = rows.into_iter().next().context("lookup user: user not found")?.email;
+            let email = lookup_email(&mut **transaction, id).await?;
             queries::delete_user(&mut **transaction, queries::DeleteUserParams { id })
                 .await
                 .map_err(|error| anyhow::anyhow!("delete user: {error}"))?;
-            queries::delete_access_tokens_by_subject(
-                &mut **transaction,
-                queries::DeleteAccessTokensBySubjectParams { subject: &email },
-            )
-            .await
-            .map_err(|error| anyhow::anyhow!("revoke access tokens: {error}"))?;
-            queries::delete_refresh_tokens_by_subject(
-                &mut **transaction,
-                queries::DeleteRefreshTokensBySubjectParams { subject: &email },
-            )
-            .await
-            .map_err(|error| anyhow::anyhow!("revoke refresh tokens: {error}"))?;
-            Ok(())
+            revoke_subject_tokens(transaction, &email).await
         })
     })
     .await
@@ -147,13 +163,21 @@ mod tests {
         assert_eq!(user_by_id(&pool, user.id).await.unwrap(), user);
         assert!(user_exists(&pool, &user.email).await.unwrap());
 
+        seed_tokens(&pool, &user.email).await;
+        remove_user(&pool, user.id).await.unwrap();
+        assert!(!user_exists(&pool, &user.email).await.unwrap());
+        assert_eq!(live_token_count(&pool).await, (0, 0));
+        assert!(remove_user(&pool, user.id).await.is_err());
+    }
+
+    async fn seed_tokens(pool: &sqlx::SqlitePool, subject: &str) {
         let expires_at = Timestamp("2099-09-06T12:00:00Z".parse().unwrap());
         queries::create_access_token(
-            &pool,
+            pool,
             queries::CreateAccessTokenParams {
                 signature: "access",
                 client_id: "client",
-                subject: &user.email,
+                subject,
                 scopes: None,
                 expires_at,
                 request_id: None,
@@ -162,53 +186,48 @@ mod tests {
         .await
         .unwrap();
         queries::create_refresh_token(
-            &pool,
+            pool,
             queries::CreateRefreshTokenParams {
                 signature: "refresh",
                 client_id: "client",
-                subject: &user.email,
+                subject,
                 scopes: None,
                 expires_at,
                 request_id: None,
+                first_issued_at: None,
             },
         )
         .await
         .unwrap();
+    }
 
-        remove_user(&pool, user.id).await.unwrap();
-        assert!(!user_exists(&pool, &user.email).await.unwrap());
-        assert!(
-            queries::access_token_opt(
-                &pool,
-                queries::AccessTokenParams {
-                    signature: "access",
-                    now: Timestamp("2026-09-06T12:00:00Z".parse().unwrap()),
-                },
-            )
-            .await
-            .unwrap()
-            .is_none()
-        );
-        assert!(remove_user(&pool, user.id).await.is_err());
+    async fn live_token_count(pool: &sqlx::SqlitePool) -> (i64, i64) {
+        let count = |table: &str| {
+            let sql = format!("SELECT COUNT(*) FROM {table}");
+            async move { sqlx::query_scalar::<_, i64>(&sql).fetch_one(pool).await.unwrap() }
+        };
+        (count("oauth_access_tokens").await, count("oauth_refresh_tokens").await)
     }
 
     #[tokio::test]
-    async fn updates_user_roles_and_reports_unknown_users() {
+    async fn updates_user_roles_revokes_their_tokens_and_reports_unknown_users() {
         let pool = dbtest::open().await.unwrap();
         let user = insert_user(&pool, "user@example.com", None, Role::Writer)
             .await
             .unwrap();
+        seed_tokens(&pool, &user.email).await;
 
         assert_eq!(
             update_user_role(&pool, user.id, Role::Admin).await.unwrap().role,
             Role::Admin
         );
+        assert_eq!(live_token_count(&pool).await, (0, 0));
         assert_eq!(
             update_user_role(&pool, 999, Role::Writer)
                 .await
                 .unwrap_err()
                 .to_string(),
-            "find updated user: user not found"
+            "lookup user: user not found"
         );
     }
 }

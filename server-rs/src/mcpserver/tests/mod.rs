@@ -62,7 +62,7 @@ fn resolver(pool: SqlitePool) -> Resolver {
         }),
         simplefin: Arc::new(SimpleFinService {
             pool: pool.clone(),
-            client: SimpleFinClient::new().unwrap(),
+            client: SimpleFinClient::unrestricted().unwrap(),
             events,
         }),
         admin: Arc::new(AdminService::new(pool.clone(), manager)),

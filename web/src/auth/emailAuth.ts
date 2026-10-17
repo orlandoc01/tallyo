@@ -1,4 +1,4 @@
-import { beginAuthorize, PKCE_VERIFIER_KEY } from './oauth'
+import { beginAuthorize } from './oauth'
 import { setLastEmail } from './tokenStore'
 import { getApiBaseUrl } from '../utils/apiUrl'
 
@@ -8,15 +8,24 @@ export function beginEmailOAuthLogin() {
 
 export async function sendEmailOTP(loginSessionId: string, email: string): Promise<void> {
   setLastEmail(email)
-  const codeVerifier = localStorage.getItem(PKCE_VERIFIER_KEY) ?? ''
   const response = await fetch(`${getApiBaseUrl()}/auth/email/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login_session_id: loginSessionId, email, code_verifier: codeVerifier }),
+    body: JSON.stringify({ login_session_id: loginSessionId, email }),
   })
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(text || 'Failed to send OTP email')
+    throw new Error(errorMessage(text) || 'Failed to send OTP email')
+  }
+}
+
+// Session-expiry failures arrive as `{ error, message }` JSON; everything else is plain text.
+function errorMessage(text: string): string {
+  try {
+    const data = JSON.parse(text) as { message?: string }
+    return typeof data.message === 'string' ? data.message : text
+  } catch {
+    return text
   }
 }
 

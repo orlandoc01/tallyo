@@ -64,7 +64,7 @@ async fn manager_with_targets() -> (
         Service::new(
             AuthConfigSettings::new(
                 AuthSettings {
-                    master_password: Some(MasterPassword::try_from("password".to_owned()).unwrap()),
+                    master_password: Some(MasterPassword::try_from("password-sixteen!".to_owned()).unwrap()),
                     ..Default::default()
                 },
                 client_ip.clone(),
@@ -124,13 +124,13 @@ async fn resolves_environment_overrides_and_applies_live_targets_after_persisten
     );
     assert_eq!(
         manager
-            .resolve_runtime_config(Some("env-password"), false)
+            .resolve_runtime_config(Some("env-password-sixteen"), false)
             .unwrap()
             .auth
             .fields
             .master_password
             .as_deref(),
-        Some("env-password")
+        Some("env-password-sixteen")
     );
     assert!(!manager.resolve_runtime_config(None, true).unwrap().auth.enabled);
 

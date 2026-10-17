@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use super::oauth_error;
 use crate::auth::{OAuthToken, Scope, Service, code_challenge, random_token, token_signature};
 
+const REFRESH_CHAIN_LIFETIME: chrono::TimeDelta = chrono::TimeDelta::days(30);
+
 const INVALID_CLIENT: &str = "Client authentication failed (e.g., unknown client, no client authentication included, or unsupported authentication method).";
 const INVALID_GRANT: &str = "The provided authorization grant is invalid, expired, revoked, does not match the redirection URI used in the authorization request, or was issued to another client.";
 const INVALID_REQUEST: &str = "The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.";
@@ -25,6 +27,11 @@ pub(super) struct TokenRequest {
     code_verifier: Option<String>,
     redirect_uri: Option<String>,
     refresh_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub(super) struct LogoutRequest {
+    refresh_token: String,
 }
 
 #[derive(Serialize)]
@@ -53,6 +60,31 @@ pub(super) async fn exchange(
             "unsupported_grant_type",
             UNSUPPORTED_GRANT_TYPE,
         ),
+    })
+}
+
+/// Revokes the presented refresh token and its whole rotation chain; unknown tokens are a no-op.
+pub(super) async fn logout(
+    State(service): State<Arc<Service>>,
+    request: Result<Form<LogoutRequest>, axum::extract::rejection::FormRejection>,
+) -> Response {
+    let Ok(Form(request)) = request else {
+        return token_response(oauth_error(StatusCode::BAD_REQUEST, "invalid_request", INVALID_REQUEST));
+    };
+    let _token_lock = service.token_lock().await;
+    let signature = token_signature(&request.refresh_token);
+    let revoked = match service.store().refresh_token(&signature, Utc::now(), false).await {
+        Ok(Some(token)) => service
+            .store()
+            .revoke_refresh_token(&signature)
+            .await
+            .and(service.store().revoke_token_chain(&token.request_id).await),
+        Ok(None) => Ok(()),
+        Err(error) => Err(error),
+    };
+    token_response(match revoked {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "revoke token chain").into_response(),
     })
 }
 
@@ -100,7 +132,14 @@ async fn exchange_authorization_code(service: &Service, request: TokenRequest) -
     {
         return invalid_grant();
     }
-    let token = match mint_token_pair(service, &client_id, &code_session.subject, &code_session.scopes, &code) {
+    let token = match mint_token_pair(
+        service,
+        &client_id,
+        &code_session.subject,
+        &code_session.scopes,
+        &code,
+        now,
+    ) {
         Ok(token) => token,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "mint access token").into_response(),
     };
@@ -109,7 +148,7 @@ async fn exchange_authorization_code(service: &Service, request: TokenRequest) -
         .exchange_auth_code(&code, token.access, token.refresh)
         .await
     {
-        Ok(true) => axum::Json(token.response).into_response(),
+        Ok(true) => issued(service, &client_id, token.response).await,
         Ok(false) => {
             if service.store().revoke_token_chain(&code).await.is_err() {
                 return (StatusCode::INTERNAL_SERVER_ERROR, "revoke token chain").into_response();
@@ -157,12 +196,17 @@ async fn exchange_refresh_token(service: &Service, request: TokenRequest) -> Res
     if existing.client_id != client_id {
         return invalid_grant();
     }
+    let first_issued_at = existing.first_issued_at.unwrap_or(now);
+    if now - first_issued_at > REFRESH_CHAIN_LIFETIME {
+        return invalid_grant();
+    }
     let token = match mint_token_pair(
         service,
         &existing.client_id,
         &existing.subject,
         &existing.scopes.join(" "),
         &existing.request_id,
+        first_issued_at,
     ) {
         Ok(token) => token,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "mint access token").into_response(),
@@ -172,10 +216,17 @@ async fn exchange_refresh_token(service: &Service, request: TokenRequest) -> Res
         .rotate_refresh_token(signature, now, token.access, token.refresh)
         .await
     {
-        Ok(true) => axum::Json(token.response).into_response(),
+        Ok(true) => issued(service, &client_id, token.response).await,
         Ok(false) => invalid_grant(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "create token").into_response(),
     }
+}
+
+async fn issued(service: &Service, client_id: &str, response: TokenResponse) -> Response {
+    if let Err(error) = service.store().touch_client(client_id).await {
+        tracing::warn!(%error, "touch oauth client");
+    }
+    axum::Json(response).into_response()
 }
 
 struct TokenPair {
@@ -190,6 +241,7 @@ fn mint_token_pair(
     subject: &str,
     scope_value: &str,
     request_id: &str,
+    first_issued_at: chrono::DateTime<Utc>,
 ) -> anyhow::Result<TokenPair> {
     let scopes = scope_value
         .split_whitespace()
@@ -208,6 +260,7 @@ fn mint_token_pair(
         expires_at: now + chrono::Duration::from_std(service.access_token_lifetime())?,
         request_id: request_id.to_owned(),
         active: true,
+        first_issued_at: None,
     };
     let refresh_token = random_token(32);
     let refresh = OAuthToken {
@@ -218,6 +271,7 @@ fn mint_token_pair(
         expires_at: now + chrono::Duration::from_std(service.refresh_token_lifetime())?,
         request_id: request_id.to_owned(),
         active: true,
+        first_issued_at: Some(first_issued_at),
     };
     Ok(TokenPair {
         response: TokenResponse {

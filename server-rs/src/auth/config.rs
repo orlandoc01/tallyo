@@ -8,6 +8,8 @@ use crate::{config::MasterPassword, middleware::client_ip::ClientIpResolver, uti
 pub const FRONTEND_CLIENT_ID: &str = "tallyo-web";
 const ACCESS_TOKEN_LIFETIME: Duration = Duration::from_secs(15 * 60);
 const REFRESH_TOKEN_LIFETIME: Duration = Duration::from_secs(168 * 60 * 60);
+/// How long a browser has to finish a login after `/authorize` starts it.
+pub const LOGIN_SESSION_LIFETIME: chrono::TimeDelta = chrono::TimeDelta::seconds(120);
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DcrSettings {

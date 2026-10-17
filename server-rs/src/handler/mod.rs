@@ -20,14 +20,19 @@ use axum::{
 
 use crate::{
     admin::runtimeconfig::Manager,
-    auth::{self, Scope, Service, dev_cors, protect, protect_mcp},
+    auth::{self, API_KEY_HEADER, Scope, Service, dev_cors, protect, protect_mcp},
     graph::{self, Resolver},
-    middleware::{logging::request_logger, security::security_headers},
+    middleware::{logging::request_logger, ratelimit::rate_limit_unauthorized, security::security_headers},
     utils::future::BoxFuture,
 };
 
 const CSP: &str = "default-src 'self'; script-src 'self' https://cdn.plaid.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.plaid.com https://icons.duckduckgo.com; connect-src 'self' https://*.plaid.com; frame-src https://*.plaid.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
 const MAX_MCP_BODY: usize = 1 << 20;
+// Only wrong `X-API-Key` values count: the SPA's routine bearer-token 401s (expired access token, then refresh)
+// must never throttle a household sharing one address, while master-password guessing gets a hard cap.
+// In-flight `X-API-Key` requests hold a permit until they complete, so the cap also bounds concurrency.
+const UNAUTHORIZED_LIMIT: usize = 100;
+const UNAUTHORIZED_WINDOW: std::time::Duration = std::time::Duration::from_secs(10 * 60);
 
 pub struct Config {
     pub auth: Arc<Service>,
@@ -39,6 +44,12 @@ pub struct Config {
 pub fn router(config: Config) -> Router {
     let auth = config.auth;
     let https = auth.issuer_url().starts_with("https://");
+    let unauthorized_limiter = rate_limit_unauthorized(
+        UNAUTHORIZED_LIMIT,
+        UNAUTHORIZED_WINDOW,
+        auth.client_ip_resolver(),
+        API_KEY_HEADER,
+    );
     Router::new()
         .route("/healthz", get(|| async { StatusCode::NO_CONTENT }))
         .merge(auth::router(Arc::clone(&auth)))
@@ -46,9 +57,12 @@ pub fn router(config: Config) -> Router {
             config
                 .mcp
                 .route_layer(middleware::from_fn(dynamic_mcp(Arc::clone(&auth), config.runtime)))
-                .route_layer(DefaultBodyLimit::max(MAX_MCP_BODY)),
+                .route_layer(DefaultBodyLimit::max(MAX_MCP_BODY))
+                .route_layer(middleware::from_fn(unauthorized_limiter.clone())),
         )
-        .merge(protected_routes(Arc::clone(&auth), config.resolver))
+        .merge(
+            protected_routes(Arc::clone(&auth), config.resolver).route_layer(middleware::from_fn(unauthorized_limiter)),
+        )
         .fallback(web::spa)
         // axum runs the last layer first, so Go's logger → security headers → CORS order is added in reverse
         .layer(middleware::from_fn_with_state(auth, dev_cors))

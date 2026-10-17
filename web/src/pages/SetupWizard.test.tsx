@@ -93,7 +93,7 @@ describe('setup wizard pages', () => {
     const base: SetupState = {
       passwordEnabled: true,
       oauthEnabled: false,
-      masterPassword: 'master-password',
+      masterPassword: 'master-password-sixteen',
       passkeyEnabled: false,
       googleEnabled: false,
       emailEnabled: false,
@@ -113,7 +113,7 @@ describe('setup wizard pages', () => {
       dataProviderSummary: [],
     }
 
-    expect(buildSetupConfigurationInput(base)).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password' } })
+    expect(buildSetupConfigurationInput(base)).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password-sixteen' } })
     expect(buildSetupConfigurationInput({
       ...base,
       oauthEnabled: true,
@@ -128,7 +128,7 @@ describe('setup wizard pages', () => {
       webauthnRpOrigins: 'https://spend.example, http://localhost:5173',
     })).toMatchObject({
       setupComplete: true,
-      authorization: { masterPassword: 'master-password', frontendRedirectUris: ['https://spend.example/auth/callback'] },
+      authorization: { masterPassword: 'master-password-sixteen', frontendRedirectUris: ['https://spend.example/auth/callback'] },
       passKeyAuthn: { enabled: true, webauthnRpId: 'spend.example', webauthnRpOrigins: ['https://spend.example', 'http://localhost:5173'] },
       googleAuthn: { enabled: true, googleClientId: 'client', googleClientSecret: 'secret' },
       emailCodeAuthn: { enabled: true, smtpHost: 'smtp.example.com', smtpFrom: 'noreply@example.com' },
@@ -204,8 +204,8 @@ describe('setup wizard pages', () => {
 
     await user.click(screen.getByRole('button', { name: /oauth/i }))
     await user.click(screen.getByRole('button', { name: /continue/i }))
-    await user.type(await screen.findByLabelText(/^master password$/i), 'master-password')
-    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password')
+    await user.type(await screen.findByLabelText(/^master password$/i), 'master-password-sixteen')
+    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password-sixteen')
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('heading', { name: 'Auth config next' })).toBeInTheDocument()
@@ -215,8 +215,8 @@ describe('setup wizard pages', () => {
     const user = userEvent.setup()
     renderSetupWithAuth('/setup/password-setup', <PasswordSetupStep />, '/setup/owners', 'Owners next', authContextWithoutMasterPassword)
 
-    await user.type(screen.getByLabelText(/^master password$/i), 'master-password')
-    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password')
+    await user.type(screen.getByLabelText(/^master password$/i), 'master-password-sixteen')
+    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password-sixteen')
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByRole('heading', { name: 'Owners next' })).toBeInTheDocument()
@@ -325,7 +325,7 @@ describe('setup wizard pages', () => {
 
     try {
       renderWithProviders(
-        <SetupContext.Provider value={{ ...initialSetupState, passwordEnabled: true, masterPassword: 'master-password', updateSetup: vi.fn() }}>
+        <SetupContext.Provider value={{ ...initialSetupState, passwordEnabled: true, masterPassword: 'master-password-sixteen', updateSetup: vi.fn() }}>
           <CompleteStep />
         </SetupContext.Provider>,
         { initialEntries: ['/setup/complete'], withGraphql: true },
@@ -334,7 +334,7 @@ describe('setup wizard pages', () => {
       await user.click(screen.getByRole('button', { name: /finish/i }))
 
       await waitFor(() => expect(assign).toHaveBeenCalledWith('/accounts'))
-      expect(updateConfiguration.input).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password' } })
+      expect(updateConfiguration.input).toMatchObject({ setupComplete: true, authorization: { masterPassword: 'master-password-sixteen' } })
       expect(authConfigRequests).toBe(0)
       expect(document.cookie).toContain(`st_post_login=${encodeURIComponent('/accounts')}`)
     } finally {
@@ -356,8 +356,8 @@ describe('setup wizard pages', () => {
     const user = userEvent.setup()
     renderSetupWithAuth('/setup/password-setup', <PasswordSetupStep />, '/setup/connections', 'Connections next', authContextWithoutMasterPassword)
 
-    await user.type(screen.getByLabelText(/^master password$/i), 'password1')
-    await user.type(screen.getByLabelText(/^confirm master password$/i), 'password2')
+    await user.type(screen.getByLabelText(/^master password$/i), 'first-master-password')
+    await user.type(screen.getByLabelText(/^confirm master password$/i), 'other-master-password')
     await user.click(screen.getByRole('button', { name: /continue/i }))
 
     expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument()
@@ -542,8 +542,8 @@ describe('setup wizard pages', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /^continue$/i }))
-    await user.type(await screen.findByLabelText(/^master password$/i), 'master-password')
-    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password')
+    await user.type(await screen.findByLabelText(/^master password$/i), 'master-password-sixteen')
+    await user.type(screen.getByLabelText(/^confirm master password$/i), 'master-password-sixteen')
     await user.click(screen.getByRole('button', { name: /^continue$/i }))
     expect(await screen.findByRole('heading', { name: 'Owners page' })).toBeInTheDocument()
 

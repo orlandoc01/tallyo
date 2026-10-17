@@ -25,6 +25,18 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 
+/** Best-effort server-side revocation of the stored refresh token chain; never throws. */
+export function revokeRefreshToken(): Promise<void> {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+  if (!refreshToken) return Promise.resolve()
+  return fetch(`${getApiBaseUrl()}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ refresh_token: refreshToken }),
+    keepalive: true,
+  }).then(() => undefined, () => undefined)
+}
+
 export function hasRefreshToken() {
   return Boolean(localStorage.getItem(REFRESH_TOKEN_KEY))
 }
