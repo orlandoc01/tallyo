@@ -4,10 +4,15 @@ All notable changes to Tallyo. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
-Merged on the private main line after the 0.3.7 snapshot; ships in the next public release.
+Merged on the private main line after the 0.3.8 snapshot; ships in the next public release.
 
 ### Added
 - **Credit card details** (0efbffdf, e31b968a, 4b8d45c5, 1b823c0c). CREDIT accounts can record a credit limit, annual fee, annual fee date, and a business-card flag, and every account can record opened and closed dates, from the desktop account editor or the mobile account sheet. A daily job rolls past annual fee dates forward a year on open cards. API: `Account.openedAt`, `Account.closedAt`, `Account.details` (a union with `CreditCardDetails`), `creditCard` and the two dates on `UpdateAccountInput` and `CreateManualAccountInput`, and `Query.creditCardStats` (open cards, cards per institution, total credit limit, annual fees due within 60 days). MCP: a new `credit_card_stats` tool, and `list_accounts` now returns mask, institution name, dates, and card details. Migration 0005 adds the `credit_card_details` table and the two date columns.
+
+## [0.3.8] - 2026-10-20
+
+### Security
+- **Root certificate update.** `webpki-roots` 1.0.10 and `rustls-webpki` 0.103.16 (RUSTSEC-2026-0381, RUSTSEC-2026-0382): the bundled Mozilla root store no longer trusts the distrusted emSign intermediates, so every outbound TLS connection the server makes (Plaid, SimpleFIN, price feeds, SMTP, LLM providers) rejects certificates chained through them. No other changes.
 
 ## [0.3.7] - 2026-10-17
 
