@@ -353,11 +353,9 @@ fn validate_webauthn(issuer_url: &str, settings: &mut WebAuthnSettings) -> Resul
         settings.rp_id = issuer.host_str().unwrap_or_default().to_owned();
     }
     if settings.rp_origins.is_empty() {
-        settings.rp_origins.push(format!(
-            "{}://{}",
-            issuer.scheme(),
-            issuer.host_str().context("issuer host is required")?
-        ));
+        issuer.host_str().context("issuer host is required")?;
+        // The browser reports the page's full origin, port included, so keep it.
+        settings.rp_origins.push(issuer.origin().ascii_serialization());
     }
     if settings.rp_display_name.is_empty() {
         settings.rp_display_name = "Tallyo".to_owned();
@@ -383,7 +381,8 @@ fn validate_webauthn(issuer_url: &str, settings: &mut WebAuthnSettings) -> Resul
                 "webauthn origin {origin:?} is outside RP ID {:?}",
                 settings.rp_id
             );
-            Ok(format!("{}://{}", parsed.scheme(), parsed.host_str().unwrap()))
+            // Scheme, host and any non-default port; the WebAuthn origin check compares all three.
+            Ok(parsed.origin().ascii_serialization())
         })
         .collect::<Result<Vec<_>>>()?;
     settings.rp_origins = rp_origins.clone();
@@ -551,5 +550,34 @@ mod tests {
             };
             assert!(validate_webauthn("https://auth.tallyo.test", &mut invalid).is_err());
         }
+    }
+
+    #[test]
+    fn keeps_non_default_ports_in_webauthn_origins() {
+        let mut derived = WebAuthnSettings {
+            enabled: true,
+            ..Default::default()
+        };
+        let rp = validate_webauthn("https://auth.tallyo.test:8443", &mut derived)
+            .unwrap()
+            .unwrap();
+        assert_eq!(rp.rp_id, "auth.tallyo.test");
+        assert_eq!(rp.rp_origins, ["https://auth.tallyo.test:8443"]);
+
+        let mut explicit = WebAuthnSettings {
+            enabled: true,
+            rp_origins: vec![
+                "https://auth.tallyo.test:8443/".to_owned(),
+                "https://auth.tallyo.test:443".to_owned(),
+            ],
+            ..Default::default()
+        };
+        let rp = validate_webauthn("https://auth.tallyo.test:8443", &mut explicit)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            rp.rp_origins,
+            ["https://auth.tallyo.test:8443", "https://auth.tallyo.test"]
+        );
     }
 }
